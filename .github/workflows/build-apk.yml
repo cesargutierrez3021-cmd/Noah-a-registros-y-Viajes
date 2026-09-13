@@ -3,7 +3,7 @@ name: build-apk
 on:
   push:
     branches: [main]
-    paths: ['mia-proyecto.zip', '.github/workflows/build-apk.yml']
+    paths: ['MIAPROYECTO.zip', '.github/workflows/build-apk.yml']
   workflow_dispatch: {}
 
 jobs:
@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Descomprimir el proyecto
-        run: unzip -o mia-proyecto.zip -d .
+        run: unzip -o MIAPROYECTO.zip -d .
       - uses: actions/setup-node@v4
         with:
           node-version: 22
