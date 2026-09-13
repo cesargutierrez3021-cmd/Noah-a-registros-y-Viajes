@@ -38,7 +38,7 @@ jobs:
       - name: Build web (vite)
         working-directory: app
         env:
-          VITE_API_URL=https://mia-backend-kqms.onrender.com
+          VITE_API_URL:https://mia-backend-kqms.onrender.com
         run: npm run build
       - name: Sincronizar Capacitor -> Android
         working-directory: app
