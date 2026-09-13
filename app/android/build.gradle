@@ -2,12 +2,18 @@
 // Fase 5 nunca incluyó el proyecto Android real (ver PLAN-MAESTRO.md,
 // "Estado real de Fase 5", pendiente #1).
 buildscript {
+    // Necesario porque MainActivity.java (Java) usa 3 plugins nativos escritos
+    // en Kotlin (GpsTrackingPlugin, AlarmaPantallaPlugin, BurbujaPlugin) — sin
+    // este plugin, Gradle nunca compila los .kt y Java falla con
+    // "package ... does not exist" al intentar importarlos.
+    ext.kotlin_version = '1.9.24'
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.7.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
 
