@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
 import { useJornada } from '../../domain/jornada/store'
+import { sincronizarViajesPendientes } from '../../domain/viajes/sync'
+import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
 import type { Plataforma } from '../../domain/viajes/types'
 
 const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap', 'Rappi', 'Particular']
@@ -20,7 +22,7 @@ export function ViajesScreen() {
 
   useEffect(() => {
     void cargar()
-    cargarJornadas()
+    void cargarJornadas()
   }, [cargar, cargarJornadas])
 
   const jornada = jornadaAbierta()
@@ -30,8 +32,20 @@ export function ViajesScreen() {
       ingreso: Number(ingreso) || 0,
       distanciaReportadaPlataforma: null,
     })
-    if (viaje) agregarViajeAJornadaAbierta(viaje.id)
+    if (viaje) await agregarViajeAJornadaAbierta(viaje.id)
     setIngreso('')
+    // Fase 13: intento de sincronización inmediato tras cerrar un viaje —
+    // best-effort, no bloquea la UI ni molesta si falla (App.tsx ya lo
+    // reintenta de todos modos al próximo abrir la app). La jornada también
+    // cambió recién arriba (se le agregó el viaje), por eso se sincronizan
+    // las dos acá.
+    void sincronizarViajesPendientes()
+    void sincronizarJornadasPendientes()
+  }
+
+  async function manejarTerminarJornada() {
+    await terminarJornada()
+    void sincronizarJornadasPendientes()
   }
 
   return (
@@ -40,9 +54,9 @@ export function ViajesScreen() {
 
       <div className="tarjeta-viaje" style={{ marginBottom: 16 }}>
         {jornada ? (
-          <button type="button" onClick={terminarJornada}>Terminar jornada</button>
+          <button type="button" onClick={() => void manejarTerminarJornada()}>Terminar jornada</button>
         ) : (
-          <button type="button" onClick={iniciarJornada}>Iniciar jornada</button>
+          <button type="button" onClick={() => void iniciarJornada()}>Iniciar jornada</button>
         )}
       </div>
 

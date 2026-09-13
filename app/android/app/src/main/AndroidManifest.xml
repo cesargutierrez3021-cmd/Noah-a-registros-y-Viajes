@@ -25,6 +25,14 @@
          este permiso + la <property> con el motivo, dentro del <service>. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!-- Fase 10 — reconocimiento de voz (@capacitor-community/speech-recognition).
+         Solo se usa en primer plano (el conductor toca el botón y le habla a
+         la app abierta), a diferencia de ACCESS_BACKGROUND_LOCATION esto no
+         necesita "divulgación destacada" de Google, pero sí hay que
+         declararlo en el formulario de Data Safety (Fase 14) porque se
+         captura audio. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

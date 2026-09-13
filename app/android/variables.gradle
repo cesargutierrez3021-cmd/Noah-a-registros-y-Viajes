@@ -1,11 +1,5 @@
 ext {
-    // Subido de 23 a 24: el módulo capacitor-cordova-android-plugins (lo
-    // arma Capacitor internamente aunque no usemos plugins Cordova) trae
-    // org.apache.cordova:framework:14.0.1, que exige mínimo API 24 —
-    // ver error de "Manifest merger failed" en el build de GitHub Actions
-    // del 2026-09-13. API 24 = Android 7.0 (2016), sigue cubriendo casi
-    // todos los teléfonos reales en Colombia hoy.
-    minSdkVersion = 24
+    minSdkVersion = 23
     compileSdkVersion = 35
     targetSdkVersion = 35
     androidxActivityVersion = '1.9.3'

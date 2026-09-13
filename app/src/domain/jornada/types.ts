@@ -10,4 +10,11 @@ export interface Jornada {
   inicioISO: string
   finISO: string | null
   viajesIds: string[]
+  /**
+   * Fase 13 (continuación): a diferencia de un viaje, una jornada se marca
+   * pendiente de nuevo cada vez que cambia (se le agrega un viaje, o se
+   * cierra) — no es "se sube una vez y listo", el registro sigue vivo
+   * mientras la jornada está abierta.
+   */
+  pendienteDeSync: boolean
 }

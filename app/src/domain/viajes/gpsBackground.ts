@@ -4,14 +4,13 @@ import { registerPlugin } from '@capacitor/core';
  * Fase 5 / D-9: puente hacia el foreground service nativo de Android
  * (app/android/.../gps/GpsTrackingService.kt).
  *
- * IMPORTANTE — esto es NUEVO, todavía no está conectado a
- * domain/viajes/gps.ts ni a ViajesScreen.tsx. Esa integración es
- * intencionalmente el siguiente paso, no algo que se decidió tocar hoy
- * sin revisión (ver PLAN-MAESTRO.md).
- *
- * Cuando se conecte, la idea es que domain/viajes/gps.ts delegue en esto
- * cuando el viaje esté "en curso", en vez de usar @capacitor/geolocation
- * directamente, que es lo que hoy se corta al minimizar la app.
+ * Ya está conectado: domain/viajes/gps.ts delega en esto cuando corre en
+ * Android nativo, en vez de usar @capacitor/geolocation directamente (que
+ * es lo que se corta al minimizar la app). Este comentario decía antes
+ * "todavía no conectado" — quedó desactualizado de una sesión anterior a
+ * la integración real; se corrigió al revisar el pendiente crítico de
+ * Fase 5 (permiso de GPS que nunca se disparó, ver MainActivity.java y
+ * PLAN-MAESTRO).
  */
 
 export interface PuntoGpsCrudo {

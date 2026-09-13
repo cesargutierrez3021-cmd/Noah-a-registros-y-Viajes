@@ -1,0 +1,152 @@
+// Esquema de base de datos — MIA backend.
+// Fase 7: solo Usuario, Plan y PlanDeUsuario (lo mínimo para auth + planes).
+// NADA de esto valida todavía contra Google Play (eso es Fase 11, D-6) — hoy
+// el plan "gratis" se asigna solo al registrarse, sin cobro de por medio.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  contrasenaHash String
+  creadoEnISO    DateTime @default(now()) @map("creado_en")
+  planes         PlanDeUsuario[]
+  tokensRefresco TokenRefresco[]
+  viajes         Viaje[]
+  jornadas       Jornada[]
+  registrosMantenimiento RegistroMantenimiento[]
+
+  @@map("usuarios")
+}
+
+/// Token de refresco de sesión (D-5: JWT propio). Se guarda hasheado, nunca en texto plano,
+/// y se puede revocar (logout, o si se detecta uso indebido) sin tocar el access token en sí.
+model TokenRefresco {
+  id            String   @id @default(uuid())
+  usuarioId     String   @map("usuario_id")
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tokenHash     String   @unique @map("token_hash")
+  expiraEnISO   DateTime @map("expira_en")
+  revocadoEnISO DateTime? @map("revocado_en")
+  creadoEnISO   DateTime @default(now()) @map("creado_en")
+
+  @@map("tokens_refresco")
+}
+
+/// Catálogo de planes. Fase 7 solo necesitaba que existiera "gratis"; Fase 11 agrega
+/// los planes pagos reales (catálogo en modules/plans/types.ts) y el endpoint de
+/// validación de recibo de Play (modules/billing/).
+model Plan {
+  id             String   @id @default(uuid())
+  clave          String   @unique // ej. 'gratis', 'pro_mensual' — nunca se usa el id como lógica
+  nombre         String
+  limiteConsultasIA Int?  @map("limite_consultas_ia") // null = ilimitado
+  /// SKU/ID de producto o suscripción en Google Play Console. Null para el plan gratis
+  /// (no se "compra"). Es la clave para mapear una compra verificada a un Plan de acá.
+  productIdGooglePlay String? @unique @map("producto_id_google_play")
+  usuarios       PlanDeUsuario[]
+
+  @@map("planes")
+}
+
+model PlanDeUsuario {
+  id            String    @id @default(uuid())
+  usuarioId     String    @map("usuario_id")
+  usuario       Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  planId        String    @map("plan_id")
+  plan          Plan      @relation(fields: [planId], references: [id])
+  activo        Boolean   @default(true)
+  inicioISO     DateTime  @default(now()) @map("inicio")
+  finISO        DateTime? @map("fin") // null = sin vencimiento (caso del plan gratis)
+  /// Token de compra de Google Play que originó esta fila (Fase 11). Null para el plan
+  /// gratis asignado por registro. Único: es la forma de no procesar la misma compra dos
+  /// veces si Google reintenta la notificación o el cliente reenvía la validación.
+  purchaseToken String?   @unique @map("purchase_token")
+
+  @@map("planes_de_usuario")
+}
+
+/// Fase 13 — sincronización de viajes. `id` NO se autogenera acá: es el UUID que el
+/// cliente ya creó en domain/viajes/store.ts (crypto.randomUUID()) al iniciar el viaje.
+/// Ese mismo id es la clave de deduplicación (requisito #18 del documento de MIA:
+/// "protección contra duplicados") — reenviar el mismo viaje dos veces (ej. la app se
+/// cerró a mitad de la sincronización y reintenta) hace un upsert sobre la misma fila,
+/// nunca crea una segunda. Ver modules/sync/repository.ts para la verificación de
+/// pertenencia (un usuario no puede sobrescribir el viaje de otro aunque adivinara su id).
+model Viaje {
+  id                            String    @id
+  usuarioId                     String    @map("usuario_id")
+  usuario                       Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  plataforma                    String
+  estado                        String
+  inicioISO                     DateTime  @map("inicio")
+  finISO                        DateTime? @map("fin")
+  /// Array de {lat, lng, timestampISO} — igual forma que PuntoGPS del cliente (D-8: server
+  /// no importa tipos de app/, se guarda tal cual llega, ya validado por schemas.ts).
+  recorrido                     Json
+  kmHastaRecoger                Float     @map("km_hasta_recoger")
+  kmConPasajero                 Float     @map("km_con_pasajero")
+  kmTotalesReales               Float     @map("km_totales_reales")
+  distanciaReportadaPlataforma  Float?    @map("distancia_reportada_plataforma")
+  ingreso                       Float
+  localidad                     String?
+  zona                          String?
+  sincronizadoEnISO             DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@map("viajes")
+}
+
+/// Fase 13 (continuación) — sincronización de jornadas. Mismo criterio que Viaje:
+/// `id` es el UUID que el cliente ya generó (domain/jornada/store.ts), y es la
+/// clave de dedupe. A diferencia de un viaje (que se crea una sola vez, terminado),
+/// una jornada se sube varias veces mientras está abierta (cada vez que se le agrega
+/// un viaje) — el upsert por id hace que cada subida sea una actualización de la
+/// misma fila, nunca una fila nueva. `viajesIds` se guarda tal cual (array de ids
+/// de viajes, ya sincronizados o no — el backend no valida que existan, ver
+/// modules/sync/repository.ts).
+model Jornada {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  inicioISO          DateTime  @map("inicio")
+  finISO             DateTime? @map("fin")
+  viajesIds          Json      @map("viajes_ids")
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@map("jornadas")
+}
+
+/// Fase 13 (continuación) — sincronización de registros de mantenimiento (el
+/// historial de "esto se hizo tal día con tal km"). A propósito NO incluye
+/// `ItemMantenimiento` (la configuración de qué mantenimientos existen): ese
+/// modelo se puede editar y BORRAR desde el cliente (ver
+/// app/src/domain/mantenimiento/repository.ts, `eliminarItem`), y el diseño de
+/// sync de esta fase (D-16) es push-only con upsert por id, sin soporte de
+/// borrado — sincronizarlo tal cual dejaría basura huérfana en el backend
+/// cuando el usuario borra un ítem localmente. Un registro histórico, en
+/// cambio, nunca se edita ni se borra una vez creado (mismo patrón que Viaje),
+/// así que entra sin ese problema. `itemId` se guarda como referencia suelta
+/// (String, sin FK): el ítem en sí no existe en este backend todavía.
+model RegistroMantenimiento {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  itemId             String    @map("item_id")
+  fechaISO           DateTime  @map("fecha")
+  km                 Float
+  costo              Float?
+  notas              String?
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@map("registros_mantenimiento")
+}

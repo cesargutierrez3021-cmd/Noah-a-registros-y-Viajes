@@ -19,10 +19,12 @@ import com.getcapacitor.annotation.PermissionCallback
  *   GpsTracking.stopTracking()
  *   GpsTracking.addListener('locationUpdate', (punto) => { ... })
  *
- * Este plugin NO reemplaza domain/viajes/gps.ts todavía — eso se conecta
- * explícitamente en la próxima sesión (ver PLAN-MAESTRO.md, Fase 5,
- * pendiente de integración) para no tocar el flujo ya cerrado en Fase 4
- * sin que el usuario lo revise primero.
+ * Ya está conectado a domain/viajes/gps.ts (delega aquí en Android nativo).
+ * Este comentario decía antes "no está conectado todavía, próxima sesión" —
+ * quedó desactualizado de antes de que se hiciera esa integración; se
+ * corrigió al revisar el pendiente crítico de Fase 5 (ver MainActivity.java
+ * — el bug real era que este plugin nunca se registraba en el bridge de
+ * Capacitor, no que le faltara conectarse del lado TS).
  */
 @CapacitorPlugin(
     name = "GpsTracking",

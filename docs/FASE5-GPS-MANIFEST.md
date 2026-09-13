@@ -28,13 +28,22 @@ cuidado (requiere justificación en Play Console — declarar uso para
 
 ## 3. Registrar el plugin en MainActivity
 
-Si el proyecto registra plugins manualmente (Capacitor >= 3 normalmente
-los detecta solo por el `@CapacitorPlugin`, pero confirmar contra cómo
-están registrados `BurbujaPlugin`/`AlarmaPantallaPlugin` en el proyecto real):
+**RESUELTO DE VERDAD (antes decía "confirmar contra el proyecto real" y
+nunca se confirmó — ver PLAN-MAESTRO, pendiente crítico de Fase 5):** sí
+hace falta registro manual. `GpsTrackingPlugin`, `BurbujaPlugin` y
+`AlarmaPantallaPlugin` viven directamente en el módulo de la app (no son
+paquetes npm, D-1), y el auto-registro de Capacitor solo aplica a plugins
+npm procesados por `npx cap sync`. `MainActivity.java` ya tiene esto
+aplicado (revisar ese archivo, no copiar el snippet de abajo a mano):
 
-```kotlin
-// Si hace falta registro manual:
-registerPlugin(GpsTrackingPlugin::class.java)
+```java
+@Override
+public void onCreate(Bundle savedInstanceState) {
+    registerPlugin(GpsTrackingPlugin.class);
+    registerPlugin(BurbujaPlugin.class);
+    registerPlugin(AlarmaPantallaPlugin.class);
+    super.onCreate(savedInstanceState);
+}
 ```
 
 ## 4. Dependencia de Google Play Services Location

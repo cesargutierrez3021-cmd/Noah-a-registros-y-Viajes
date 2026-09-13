@@ -50,3 +50,51 @@
   border-radius: var(--radio-tarjeta);
   padding: calc(var(--espacio-unidad) * 1.5);
 }
+
+/* Fase 6: estado de alertas de mantenimiento. */
+.insignia {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.insignia--ok {
+  background: rgba(79, 140, 255, 0.15);
+  color: var(--color-acento);
+}
+
+.insignia--proximo {
+  background: rgba(240, 180, 40, 0.15);
+  color: #f0b428;
+}
+
+.insignia--vencido {
+  background: rgba(240, 70, 70, 0.15);
+  color: #f04646;
+}
+
+/* Fase 6: navegación entre las 3 pantallas (antes solo existía Viajes). */
+.barra-navegacion {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  background: var(--color-superficie);
+  border-top: 1px solid var(--color-borde);
+  padding: calc(var(--espacio-unidad) * 1.25) 0;
+}
+
+.barra-navegacion__item {
+  color: var(--color-texto-mute);
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+
+.barra-navegacion__item--activo {
+  color: var(--color-acento);
+  font-weight: 600;
+}
