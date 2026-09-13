@@ -1,0 +1,22 @@
+// ESTE ARCHIVO SE REGENERA AUTOMÁTICAMENTE cada vez que se corre
+// `npx cap sync android` — no editar dependencias de plugins a mano aquí,
+// se pierden en el próximo sync. Este contenido es el mínimo necesario
+// para que el módulo :app compile con los plugins ya usados en el código
+// (@capacitor/geolocation, @capacitor/local-notifications) hasta que se
+// corra el primer `cap sync` real con node_modules instalado.
+
+android {
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
+
+dependencies {
+}
+
+if (hasProperty('postBuildExtras')) {
+    postBuildExtras()
+}

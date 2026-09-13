@@ -1,0 +1,25 @@
+// Proyecto raíz Gradle — armado a mano en esta sesión porque el zip de
+// Fase 5 nunca incluyó el proyecto Android real (ver PLAN-MAESTRO.md,
+// "Estado real de Fase 5", pendiente #1).
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.2'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply from: "variables.gradle"
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

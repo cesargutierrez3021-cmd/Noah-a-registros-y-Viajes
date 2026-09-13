@@ -1,0 +1,16 @@
+// Módulo generado normalmente por `npx cap sync android`. Vacío porque el
+// proyecto no usa plugins Cordova (solo plugins Capacitor nativos propios:
+// GpsTracking, Burbuja, AlarmaPantalla — ver PLAN-MAESTRO.md D-1).
+apply plugin: 'com.android.library'
+
+android {
+    namespace "capacitor.cordova.android.plugins"
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+    }
+}
+
+dependencies {
+}

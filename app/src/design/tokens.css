@@ -1,0 +1,52 @@
+/**
+ * Sistema de diseño único de MIA.
+ *
+ * Regla: si necesitas un estilo nuevo, se agrega AQUÍ o se extiende una clase
+ * existente. Nunca se crea un archivo "-extra.css" o "-overrides.css" — eso fue
+ * exactamente el problema del proyecto viejo (20 archivos CSS parchados).
+ */
+
+:root {
+  --color-fondo: #0b0d10;
+  --color-superficie: #14171c;
+  --color-borde: #23262c;
+  --color-texto: #f5f6f7;
+  --color-texto-mute: #9aa0a8;
+  --color-acento: #4f8cff;
+
+  --radio-tarjeta: 18px;
+  --radio-boton: 14px;
+  --espacio-unidad: 8px;
+}
+
+.pantalla {
+  padding: calc(var(--espacio-unidad) * 2);
+  color: var(--color-texto);
+}
+
+.titulo-pantalla {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: calc(var(--espacio-unidad) * 2);
+}
+
+.texto-mute {
+  color: var(--color-texto-mute);
+  font-size: 0.85rem;
+}
+
+.lista-viajes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-unidad);
+}
+
+.tarjeta-viaje {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  padding: calc(var(--espacio-unidad) * 1.5);
+}

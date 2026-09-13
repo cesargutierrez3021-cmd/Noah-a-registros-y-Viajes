@@ -1,0 +1,18 @@
+include ':app'
+
+// Módulos generados normalmente por `npx cap sync android` a partir de
+// node_modules — se declaran a mano aquí porque este zip no corrió `cap sync`
+// (no hay node_modules en el entregable). Al abrir el proyecto en Android
+// Studio con `npm install` ya corrido, ejecutar `npx cap sync android` una
+// vez para que Capacitor regenere/actualice estas rutas automáticamente.
+include ':capacitor-android'
+project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
+
+include ':capacitor-cordova-android-plugins'
+project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins')
+
+include ':capacitor-geolocation'
+project(':capacitor-geolocation').projectDir = new File('../node_modules/@capacitor/geolocation/android')
+
+include ':capacitor-local-notifications'
+project(':capacitor-local-notifications').projectDir = new File('../node_modules/@capacitor/local-notifications/android')

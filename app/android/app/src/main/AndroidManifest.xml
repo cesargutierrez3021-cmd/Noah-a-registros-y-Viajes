@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Fase 5 (D-9) — GPS en segundo plano. ACCESS_BACKGROUND_LOCATION en
+         Android 10+ requiere declarar el uso en Play Console antes de
+         publicar (registro de viajes con la app en segundo plano) —
+         pendiente de la Fase 14, no bloquea compilar/probar en dispositivo. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- Ya requeridos por los plugins reutilizados del proyecto viejo (D-1) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- BurbujaService llama startForeground() (línea 169 del .kt); en
+         Android 14+ (targetSdk 35 aquí) todo foreground service necesita un
+         tipo declarado. No encaja en ningún tipo predefinido de Android
+         (no es location/media/datasync), así que usa specialUse — que exige
+         este permiso + la <property> con el motivo, dentro del <service>. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:label="@string/title_activity_main"
+            android:launchMode="singleTask"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Fase 5 — foreground service de GPS en segundo plano (D-9) -->
+        <service
+            android:name="com.noah.conductor.atlas.gps.GpsTrackingService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
+        <!-- Plugins reutilizados del proyecto viejo (D-1) -->
+        <service
+            android:name="com.noah.conductor.atlas.burbuja.BurbujaService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="burbuja_flotante_jornada_activa" />
+        </service>
+
+        <receiver
+            android:name="com.noah.conductor.atlas.alarma.AlarmaReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.noah.conductor.atlas.alarma.ReinicioReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- showWhenLocked + turnScreenOn: comentario explícito en
+             AlarmaActivity.kt dice que la pantalla completa debe abrir sola
+             con el celular bloqueado usando estos dos flags del manifiesto. -->
+        <activity
+            android:name="com.noah.conductor.atlas.alarma.AlarmaActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/AppTheme.NoActionBarLaunch" />
+
+    </application>
+
+</manifest>

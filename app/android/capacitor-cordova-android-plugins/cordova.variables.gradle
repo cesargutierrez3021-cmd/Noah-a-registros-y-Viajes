@@ -1,0 +1,6 @@
+ext {
+    cdvMinSdkVersion = rootProject.ext.minSdkVersion
+    // Sin plugins Cordova declarados — proyecto usa solo plugins nativos
+    // propios (Capacitor puro), ver D-1 en PLAN-MAESTRO.md.
+    cdvPluginPostBuildExtras = []
+}
