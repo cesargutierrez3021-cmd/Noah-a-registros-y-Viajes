@@ -9,7 +9,7 @@ import { Capacitor } from '@capacitor/core'
  *
  * Fase 10 (D-12, ver PLAN-MAESTRO): se usan plugins de Capacitor ya
  * existentes en la comunidad (@capacitor-community/speech-recognition,
- * @capacitor/text-to-speech) en vez de escribir plugins nativos propios como
+ * @capacitor-community/text-to-speech) en vez de escribir plugins nativos propios como
  * se hizo para GPS (D-9). A diferencia del GPS en segundo plano, ni el
  * reconocimiento de voz ni el texto a voz necesitan un foreground service —
  * solo funcionan con la app abierta en primer plano, que es exactamente el
@@ -119,7 +119,7 @@ function escucharUnaFraseWeb(idioma: string): Promise<string> {
 /** Lee `texto` en voz alta. Resuelve cuando termina de hablar. */
 export async function hablar(texto: string, idioma = 'es-CO'): Promise<void> {
   if (esAndroidNativo()) {
-    const { TextToSpeech } = await import('@capacitor/text-to-speech')
+    const { TextToSpeech } = await import('@capacitor-community/text-to-speech')
     await TextToSpeech.speak({ text: texto, lang: idioma, rate: 1.0, pitch: 1.0, volume: 1.0 })
     return
   }
@@ -140,7 +140,7 @@ export async function hablar(texto: string, idioma = 'es-CO'): Promise<void> {
 /** Interrumpe cualquier lectura en curso — se usa si el conductor toca "cancelar" a mitad de la respuesta. */
 export async function detenerHabla(): Promise<void> {
   if (esAndroidNativo()) {
-    const { TextToSpeech } = await import('@capacitor/text-to-speech')
+    const { TextToSpeech } = await import('@capacitor-community/text-to-speech')
     await TextToSpeech.stop()
     return
   }
