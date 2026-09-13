@@ -23,7 +23,7 @@ interface EstadoAuth {
   cerrarSesion: () => void
 }
 
-export const useAuth = create<EstadoAuth>((set, get) => ({
+export const useAuth = create<EstadoAuth>((set) => ({
   usuario: null,
   cargando: false,
   error: null,
