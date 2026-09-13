@@ -20,7 +20,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add app server docs PLAN-MAESTRO.md
+          git add app server docs PLAN-MAESTRO.md render.yaml
           git diff --cached --quiet && echo "Sin cambios de código fuente" || git commit -m "Sincronizar código fuente extraído desde MIAPROYECTO.zip"
           git push
       - uses: actions/setup-node@v4
