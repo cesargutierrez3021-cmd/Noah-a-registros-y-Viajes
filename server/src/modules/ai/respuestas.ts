@@ -1,4 +1,4 @@
-import type { ContextoIntent, ContextoMantenimientoItem, Intencion } from './types'
+import type { ContextoIntent, ContextoMantenimientoItem, Intencion } from './types.js'
 
 /**
  * Arma la respuesta en texto para las intenciones que saben usar `contexto` — punto 3 de

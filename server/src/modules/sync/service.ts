@@ -1,5 +1,5 @@
-import { repositorioSync } from './repository'
-import type { ViajeSyncEntrada, JornadaSyncEntrada, RegistroMantenimientoSyncEntrada } from './types'
+import { repositorioSync } from './repository.js'
+import type { ViajeSyncEntrada, JornadaSyncEntrada, RegistroMantenimientoSyncEntrada } from './types.js'
 
 export class ErrorSync extends Error {
   constructor(

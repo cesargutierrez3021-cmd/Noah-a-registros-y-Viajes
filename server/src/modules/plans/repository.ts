@@ -1,5 +1,5 @@
-import { prisma } from '../../lib/prisma'
-import { PLANES_BASE } from './types'
+import { prisma } from '../../lib/prisma.js'
+import { PLANES_BASE } from './types.js'
 
 export const repositorioPlanes = {
   async listarPlanes() {

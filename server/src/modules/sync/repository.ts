@@ -1,5 +1,5 @@
-import { prisma } from '../../lib/prisma'
-import type { ViajeSyncEntrada, JornadaSyncEntrada, RegistroMantenimientoSyncEntrada } from './types'
+import { prisma } from '../../lib/prisma.js'
+import type { ViajeSyncEntrada, JornadaSyncEntrada, RegistroMantenimientoSyncEntrada } from './types.js'
 
 export const repositorioSync = {
   /** null = no existe todavía ningún viaje con ese id. */

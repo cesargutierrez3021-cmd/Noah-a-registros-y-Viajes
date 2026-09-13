@@ -1,8 +1,8 @@
-import { REGLAS_INTENT, normalizarTexto } from './reglas'
-import { armarRespuesta } from './respuestas'
-import { clasificadorSinImplementar } from './clasificadorIA'
-import type { ClasificadorIntentIA } from './clasificadorIA'
-import type { ContextoIntent, ResultadoIntent } from './types'
+import { REGLAS_INTENT, normalizarTexto } from './reglas.js'
+import { armarRespuesta } from './respuestas.js'
+import { clasificadorSinImplementar } from './clasificadorIA.js'
+import type { ClasificadorIntentIA } from './clasificadorIA.js'
+import type { ContextoIntent, ResultadoIntent } from './types.js'
 
 /**
  * Único punto de entrada del Intent Router.

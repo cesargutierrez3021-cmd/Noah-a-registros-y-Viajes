@@ -1,10 +1,10 @@
 import type { NextFunction, Request, Response } from 'express'
 import { ZodError } from 'zod'
-import { ErrorAuth } from '../modules/auth/service'
-import { ErrorProveedorIANoConfigurado } from '../modules/ai/proveedorIA'
-import { ErrorBilling } from '../modules/billing/service'
-import { ErrorBillingNoConfigurado } from '../modules/billing/googlePlay'
-import { ErrorSync } from '../modules/sync/service'
+import { ErrorAuth } from '../modules/auth/service.js'
+import { ErrorProveedorIANoConfigurado } from '../modules/ai/proveedorIA.js'
+import { ErrorBilling } from '../modules/billing/service.js'
+import { ErrorBillingNoConfigurado } from '../modules/billing/googlePlay.js'
+import { ErrorSync } from '../modules/sync/service.js'
 
 /**
  * Único lugar donde se decide qué código HTTP y qué forma de JSON de error

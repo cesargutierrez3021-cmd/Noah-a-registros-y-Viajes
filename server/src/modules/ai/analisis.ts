@@ -1,7 +1,7 @@
-import { armarContextoCompacto } from './contextoCompacto'
-import { proveedorSinImplementar } from './proveedorIA'
-import type { ProveedorIA } from './proveedorIA'
-import type { ContextoAnalisis, ProfundidadAnalisis, ResultadoAnalisis } from './types'
+import { armarContextoCompacto } from './contextoCompacto.js'
+import { proveedorSinImplementar } from './proveedorIA.js'
+import type { ProveedorIA } from './proveedorIA.js'
+import type { ContextoAnalisis, ProfundidadAnalisis, ResultadoAnalisis } from './types.js'
 
 const INSTRUCCION_SISTEMA = [
   'Eres el analista de MIA, una app para conductores de plataformas (Uber, DiDi, inDrive, etc.) en Colombia.',

@@ -1,11 +1,12 @@
 import { Router } from 'express'
+import type { Request, Response } from 'express'
 import { z } from 'zod'
-import { resolverIntencion } from './router'
-import { generarAnalisis } from './analisis'
-import { procesarTurnoConversacion } from './conversacion'
-import { requiereAutenticacion } from '../auth/middleware'
-import { async } from '../../http/asyncHandler'
-import { crearLimitadorDeTasa } from '../../http/rateLimit'
+import { resolverIntencion } from './router.js'
+import { generarAnalisis } from './analisis.js'
+import { procesarTurnoConversacion } from './conversacion.js'
+import { requiereAutenticacion } from '../auth/middleware.js'
+import { async } from '../../http/asyncHandler.js'
+import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
 
 export const rutasAI = Router()
 
@@ -64,7 +65,7 @@ rutasAI.post(
   '/intent',
   requiereAutenticacion,
   limitadorAI,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const { texto, contexto } = esquemaPregunta.parse(req.body)
     const resultado = await resolverIntencion(texto, contexto)
     res.json(resultado)
@@ -99,7 +100,7 @@ rutasAI.post(
   '/analisis',
   requiereAutenticacion,
   limitadorAI,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const { pregunta, contexto, profundidad } = esquemaPreguntaAnalisis.parse(req.body)
     const resultado = await generarAnalisis(pregunta, contexto, profundidad)
     res.json(resultado)
@@ -140,7 +141,7 @@ rutasAI.post(
   '/conversacion',
   requiereAutenticacion,
   limitadorAI,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const { texto, contexto, profundidad } = esquemaPreguntaConversacion.parse(req.body)
     const resultado = await procesarTurnoConversacion(texto, contexto, profundidad)
     res.json(resultado)

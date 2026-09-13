@@ -1,7 +1,7 @@
-import { repositorioPlanes } from '../plans/repository'
-import { verificadorSinConfigurar } from './googlePlay'
-import type { VerificadorGooglePlay } from './types'
-import type { PlanPublico } from '../plans/types'
+import { repositorioPlanes } from '../plans/repository.js'
+import { verificadorSinConfigurar } from './googlePlay.js'
+import type { VerificadorGooglePlay } from './types.js'
+import type { PlanPublico } from '../plans/types.js'
 
 export class ErrorBilling extends Error {
   constructor(

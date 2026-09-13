@@ -1,10 +1,11 @@
 import { Router } from 'express'
-import { servicioSync, ErrorSync } from './service'
-import { esquemaViajeSync, esquemaJornadaSync, esquemaRegistroMantenimientoSync } from './schemas'
-import { requiereAutenticacion } from '../auth/middleware'
-import { async } from '../../http/asyncHandler'
-import { crearLimitadorDeTasa } from '../../http/rateLimit'
-import { logEventoSeguridad } from '../../lib/logSeguridad'
+import type { Request, Response } from 'express'
+import { servicioSync, ErrorSync } from './service.js'
+import { esquemaViajeSync, esquemaJornadaSync, esquemaRegistroMantenimientoSync } from './schemas.js'
+import { requiereAutenticacion } from '../auth/middleware.js'
+import { async } from '../../http/asyncHandler.js'
+import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
+import { logEventoSeguridad } from '../../lib/logSeguridad.js'
 
 export const rutasSync = Router()
 
@@ -31,7 +32,7 @@ rutasSync.post(
   '/viajes',
   requiereAutenticacion,
   limitadorSync,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const viaje = esquemaViajeSync.parse(req.body)
     try {
       await servicioSync.sincronizarViaje(req.usuarioId!, viaje)
@@ -56,7 +57,7 @@ rutasSync.post(
   '/jornadas',
   requiereAutenticacion,
   limitadorSync,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const jornada = esquemaJornadaSync.parse(req.body)
     try {
       await servicioSync.sincronizarJornada(req.usuarioId!, jornada)
@@ -80,7 +81,7 @@ rutasSync.post(
   '/mantenimiento/registros',
   requiereAutenticacion,
   limitadorSync,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const registro = esquemaRegistroMantenimientoSync.parse(req.body)
     try {
       await servicioSync.sincronizarRegistroMantenimiento(req.usuarioId!, registro)

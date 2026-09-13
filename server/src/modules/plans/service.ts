@@ -1,5 +1,5 @@
-import { repositorioPlanes } from './repository'
-import { CLAVE_PLAN_GRATIS, type PlanPublico } from './types'
+import { repositorioPlanes } from './repository.js'
+import { CLAVE_PLAN_GRATIS, type PlanPublico } from './types.js'
 
 function aPlanPublico(plan: { clave: string; nombre: string; limiteConsultasIA: number | null }): PlanPublico {
   return { clave: plan.clave, nombre: plan.nombre, limiteConsultasIA: plan.limiteConsultasIA }

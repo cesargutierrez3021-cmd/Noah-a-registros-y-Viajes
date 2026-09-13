@@ -1,10 +1,10 @@
-import { resolverIntencion } from './router'
-import { generarAnalisis } from './analisis'
-import { clasificadorSinImplementar } from './clasificadorIA'
-import type { ClasificadorIntentIA } from './clasificadorIA'
-import { proveedorSinImplementar } from './proveedorIA'
-import type { ProveedorIA } from './proveedorIA'
-import type { ContextoConversacion, ProfundidadAnalisis, ResultadoConversacion, TurnoConversacion } from './types'
+import { resolverIntencion } from './router.js'
+import { generarAnalisis } from './analisis.js'
+import { clasificadorSinImplementar } from './clasificadorIA.js'
+import type { ClasificadorIntentIA } from './clasificadorIA.js'
+import { proveedorSinImplementar } from './proveedorIA.js'
+import type { ProveedorIA } from './proveedorIA.js'
+import type { ContextoConversacion, ProfundidadAnalisis, ResultadoConversacion, TurnoConversacion } from './types.js'
 
 /**
  * Punto de entrada de POST /ai/conversacion (Fase 10). Es la pieza que decide,

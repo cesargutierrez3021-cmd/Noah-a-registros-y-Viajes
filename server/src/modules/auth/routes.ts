@@ -1,12 +1,13 @@
 import { Router } from 'express'
-import { servicioAuth } from './service'
-import { repositorioAuth } from './repository'
-import { esquemaCredenciales, esquemaTokenRefresco } from './schemas'
-import { requiereAutenticacion } from './middleware'
-import { async } from '../../http/asyncHandler'
-import { crearLimitadorDeTasa } from '../../http/rateLimit'
-import { logEventoSeguridad } from '../../lib/logSeguridad'
-import { ErrorAuth } from './service'
+import type { Request, Response } from 'express'
+import { servicioAuth } from './service.js'
+import { repositorioAuth } from './repository.js'
+import { esquemaCredenciales, esquemaTokenRefresco } from './schemas.js'
+import { requiereAutenticacion } from './middleware.js'
+import { async } from '../../http/asyncHandler.js'
+import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
+import { logEventoSeguridad } from '../../lib/logSeguridad.js'
+import { ErrorAuth } from './service.js'
 
 export const rutasAuth = Router()
 
@@ -19,7 +20,7 @@ const limitadorAuth = crearLimitadorDeTasa(15 * 60 * 1000, 10, 'Demasiados inten
 rutasAuth.post(
   '/registro',
   limitadorAuth,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const { email, contrasena } = esquemaCredenciales.parse(req.body)
     try {
       const { usuario, tokens } = await servicioAuth.registrar(email, contrasena)
@@ -38,7 +39,7 @@ rutasAuth.post(
 rutasAuth.post(
   '/login',
   limitadorAuth,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const { email, contrasena } = esquemaCredenciales.parse(req.body)
     try {
       const { usuario, tokens } = await servicioAuth.iniciarSesion(email, contrasena)
@@ -57,7 +58,7 @@ rutasAuth.post(
 rutasAuth.post(
   '/refrescar',
   limitadorAuth,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const { tokenRefresco } = esquemaTokenRefresco.parse(req.body)
     const tokens = await servicioAuth.refrescarSesion(tokenRefresco)
     res.json(tokens)
@@ -68,7 +69,7 @@ rutasAuth.post(
 rutasAuth.get(
   '/yo',
   requiereAutenticacion,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const usuario = await repositorioAuth.buscarUsuarioPorId(req.usuarioId!)
     if (!usuario) {
       res.status(404).json({ error: 'Usuario no encontrado' })

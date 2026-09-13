@@ -1,4 +1,4 @@
-import type { ResultadoIntent } from './types'
+import type { ResultadoIntent } from './types.js'
 
 /**
  * Clasificador de respaldo con IA — punto 2 de "Estado real de Fase 8" en PLAN-MAESTRO.

@@ -1,4 +1,4 @@
-import type { VerificadorGooglePlay } from './types'
+import type { VerificadorGooglePlay } from './types.js'
 
 /**
  * Igual que `clasificadorIA.ts` (Fase 8) y `proveedorIA.ts` (Fase 9): acá

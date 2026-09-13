@@ -1,4 +1,4 @@
-import type { ReglaIntent } from './types'
+import type { ReglaIntent } from './types.js'
 
 /**
  * Reglas determinísticas. Cubren las intenciones para las que ya existe una fuente de

@@ -1,4 +1,4 @@
-import type { ContextoAnalisis, ProfundidadAnalisis } from './types'
+import type { ContextoAnalisis, ProfundidadAnalisis } from './types.js'
 
 /**
  * Arma el "contexto compacto" que se manda al proveedor de IA — punto de

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
-import { env } from '../../config/env'
-import type { CargaTokenAcceso } from './types'
+import { env } from '../../config/env.js'
+import type { CargaTokenAcceso } from './types.js'
 
 export function firmarTokenAcceso(carga: CargaTokenAcceso): string {
   return jwt.sign(carga, env.jwtSecretoAcceso, { expiresIn: `${env.jwtExpiracionAccesoMin}m` })

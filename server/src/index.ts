@@ -1,14 +1,15 @@
 import express from 'express'
+import type { Request, Response } from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
-import { env } from './config/env'
-import { rutasAuth } from './modules/auth/routes'
-import { rutasPlanes } from './modules/plans/routes'
-import { rutasAI } from './modules/ai/routes'
-import { rutasBilling } from './modules/billing/routes'
-import { rutasSync } from './modules/sync/routes'
-import { manejadorDeErrores } from './http/errorHandler'
-import { repositorioPlanes } from './modules/plans/repository'
+import { env } from './config/env.js'
+import { rutasAuth } from './modules/auth/routes.js'
+import { rutasPlanes } from './modules/plans/routes.js'
+import { rutasAI } from './modules/ai/routes.js'
+import { rutasBilling } from './modules/billing/routes.js'
+import { rutasSync } from './modules/sync/routes.js'
+import { manejadorDeErrores } from './http/errorHandler.js'
+import { repositorioPlanes } from './modules/plans/repository.js'
 
 /**
  * Punto de entrada del backend MIA.
@@ -67,7 +68,7 @@ app.use(cors({ origin: env.corsOrigenes }))
 // número y el porqué, no se sube "por si acaso" sin motivo.
 app.use(express.json({ limit: '512kb' }))
 
-app.get('/salud', (_req, res) => {
+app.get('/salud', (_req: Request, res: Response) => {
   res.json({ estado: 'ok' })
 })
 

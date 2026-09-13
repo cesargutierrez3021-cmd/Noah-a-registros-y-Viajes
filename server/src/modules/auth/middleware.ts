@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { verificarTokenAcceso } from './jwt'
+import { verificarTokenAcceso } from './jwt.js'
 
 // Extiende el tipo de Express Request — así cualquier ruta protegida
 // tiene `req.usuarioId` con tipos, sin castear a `any` en cada handler.

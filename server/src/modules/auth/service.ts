@@ -1,10 +1,10 @@
-import { repositorioAuth } from './repository'
-import { hashearContrasena, verificarContrasena } from './password'
-import { firmarTokenAcceso, verificarTokenAcceso } from './jwt'
-import { generarTokenRefrescoCrudo, hashearTokenRefresco } from './refreshTokens'
-import { servicioPlanes } from '../plans/service'
-import { env } from '../../config/env'
-import type { ParDeTokens, UsuarioPublico } from './types'
+import { repositorioAuth } from './repository.js'
+import { hashearContrasena, verificarContrasena } from './password.js'
+import { firmarTokenAcceso, verificarTokenAcceso } from './jwt.js'
+import { generarTokenRefrescoCrudo, hashearTokenRefresco } from './refreshTokens.js'
+import { servicioPlanes } from '../plans/service.js'
+import { env } from '../../config/env.js'
+import type { ParDeTokens, UsuarioPublico } from './types.js'
 
 export class ErrorAuth extends Error {
   constructor(

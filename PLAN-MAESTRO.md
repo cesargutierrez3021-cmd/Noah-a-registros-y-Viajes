@@ -458,6 +458,15 @@ Con la decisión tomada, se dejó todo listo para que el usuario solo tenga que 
 
 **No verificado (no se puede sin las cuentas reales del usuario):** que el Blueprint de Render aplique sin errores, que `prisma migrate deploy` corra limpio contra Neon la primera vez, y que el health check de Render pase con el fix de `PORT`. Todo esto se revisó a mano contra la documentación de cada plataforma, no se probó en vivo.
 
+### Primer intento real de build en Render — 2 clases de error encontradas y corregidas en TODO el backend
+
+El Blueprint sí se aplicó (Neon conectado, `render.yaml` encontrado) y llegó a correr `npm run build` de verdad por primera vez en la historia de este proyecto — y falló, revelando dos bugs que existían desde que se escribió cada módulo, invisibles hasta ahora porque `npm run dev` (`tsx`) nunca los detecta, solo `tsc -b` (el build real) lo hace:
+
+1. **`TS2835` — 85 imports relativos en 25 archivos sin extensión `.js`** (ej. `from './repository'` en vez de `from './repository.js'`). `tsconfig.json` usa `moduleResolution: "NodeNext"` (ESM real), que exige la extensión explícita del archivo compilado — no es opcional, es una regla del propio Node.js con ESM, no un capricho de configuración. Corregido con un script que revisó TODO `server/src`, no solo los archivos que aparecían en el log truncado.
+2. **`TS7006` — parámetros `req`/`res` con tipo implícito `any`** en los 5 archivos de rutas (`ai`, `auth`, `billing`, `plans`, `sync`) que usan el wrapper `async(async (req, res) => {...})` de `http/asyncHandler.ts`, más el health-check `/salud` en `index.ts`. Se corrigió anotando explícitamente `(req: Request, res: Response)` en los 13 handlers que usan ese patrón, agregando `import type { Request, Response } from 'express'` donde faltaba. `middleware.ts`, `rateLimit.ts` y `errorHandler.ts` ya estaban bien tipados — se revisaron y no necesitaron cambios.
+
+**No verificado todavía:** no hay forma de correr `tsc` real contra este proyecto en este entorno (no hay `express`, `@prisma/client` ni el resto de dependencias instaladas, y no hay red para instalarlas) — la corrección se hizo revisando el patrón a mano y confirmando con `grep` que no queda ningún caso de los dos patrones en todo `server/src`, pero la próxima corrida real en Render sigue siendo la primera prueba de verdad. Si vuelve a fallar el build, puede haber una tercera clase de error distinta que este repaso no cubrió — mandar el log completo, no solo las primeras líneas, para no repetir el mismo problema de "el error real estaba más abajo en el log".
+
 ## Estructura del repo (tal como va hoy)
 
 ```

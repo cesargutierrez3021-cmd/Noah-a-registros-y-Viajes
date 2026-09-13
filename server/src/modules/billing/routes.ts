@@ -1,9 +1,10 @@
 import { Router } from 'express'
+import type { Request, Response } from 'express'
 import { z } from 'zod'
-import { servicioBilling } from './service'
-import { requiereAutenticacion } from '../auth/middleware'
-import { async } from '../../http/asyncHandler'
-import { crearLimitadorDeTasa } from '../../http/rateLimit'
+import { servicioBilling } from './service.js'
+import { requiereAutenticacion } from '../auth/middleware.js'
+import { async } from '../../http/asyncHandler.js'
+import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
 
 export const rutasBilling = Router()
 
@@ -29,7 +30,7 @@ rutasBilling.post(
   '/validar-compra',
   requiereAutenticacion,
   limitadorBilling,
-  async(async (req, res) => {
+  async(async (req: Request, res: Response) => {
     const { packageName, productId, purchaseToken } = esquemaValidarCompra.parse(req.body)
     const plan = await servicioBilling.validarCompra(req.usuarioId!, packageName, productId, purchaseToken)
     res.json(plan)

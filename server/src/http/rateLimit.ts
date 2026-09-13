@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { logEventoSeguridad } from '../lib/logSeguridad'
+import { logEventoSeguridad } from '../lib/logSeguridad.js'
 
 /**
  * Fase 12 — Seguridad: rate limiting. Se escribe a mano (ventana fija, en
