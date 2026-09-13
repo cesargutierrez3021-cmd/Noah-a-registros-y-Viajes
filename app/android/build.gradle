@@ -6,7 +6,12 @@ buildscript {
     // en Kotlin (GpsTrackingPlugin, AlarmaPantallaPlugin, BurbujaPlugin) — sin
     // este plugin, Gradle nunca compila los .kt y Java falla con
     // "package ... does not exist" al intentar importarlos.
-    ext.kotlin_version = '1.9.24'
+    // 2.1.0, no 1.9.24 — @capacitor/geolocation y @capacitor/local-notifications
+    // (Kotlin real, no bundle propio) ya obligan a esta versión más nueva por
+    // su cuenta; dejar el Gradle plugin de Kotlin en una versión más vieja
+    // mezcla dos stdlib distintos en el mismo build y rompe hasta código
+    // básico como `let`/`it` con errores sin sentido de "unresolved reference".
+    ext.kotlin_version = '2.1.0'
     repositories {
         google()
         mavenCentral()
