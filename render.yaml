@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: mia-backend
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npx prisma generate && npm run build
+    # prisma migrate deploy corre ANTES de arrancar el server en cada
+    # despliegue — así las migraciones se aplican solas, sin necesidad de
+    # una terminal (el plan free de Render no trae Shell).
+    startCommand: npx prisma migrate deploy && npm run start
+    envVars:
+      - key: DATABASE_URL
+        sync: false # se pega a mano en el dashboard — viene de Neon, no de Render
+      - key: JWT_SECRETO_ACCESO
+        generateValue: true # Render genera un valor aleatorio seguro solo
+      - key: JWT_SECRETO_REFRESCO
+        generateValue: true
+      - key: JWT_EXPIRACION_ACCESO_MIN
+        value: '15'
+      - key: JWT_EXPIRACION_REFRESCO_DIAS
+        value: '30'
+      - key: CORS_ORIGENES
+        # capacitor://localhost es el origen que usa la app Android empaquetada;
+        # ajustar acá el día que haya un dominio propio (dashboard web, etc.)
+        value: 'capacitor://localhost,http://localhost'
+    # PORT lo asigna Render solo — server/src/config/env.ts ya lo respeta
+    # (ver fix aplicado en esta sesión: antes solo leía PUERTO).
