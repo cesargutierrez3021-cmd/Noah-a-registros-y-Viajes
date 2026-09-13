@@ -31,6 +31,15 @@ android {
     }
 }
 
+// Fuerza a que TANTO javac como kotlinc usen la misma JVM (17) — sin esto,
+// cada uno puede "adivinar" una versión distinta según el JDK que traiga
+// instalado el runner de turno, y Gradle lo rechaza con "Inconsistent
+// JVM-target compatibility" (pasó justo eso: javac terminó en 21, kotlinc en
+// 17). Es la solución que el propio mensaje de error de Gradle sugiere
+// (kotl.in/gradle/jvm/toolchain).
+kotlin {
+    jvmToolchain(17)
+
 repositories {
     flatDir {
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
