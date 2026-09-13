@@ -1,5 +1,8 @@
 ext {
-    minSdkVersion = 23
+    // 24, no 23 — la librería org.apache.cordova:framework:14.0.1 (usada por
+    // los plugins de Capacitor community) exige mínimo 24, el manifest merger
+    // de Android falla si acá queda un número menor.
+    minSdkVersion = 24
     compileSdkVersion = 35
     targetSdkVersion = 35
     androidxActivityVersion = '1.9.3'
