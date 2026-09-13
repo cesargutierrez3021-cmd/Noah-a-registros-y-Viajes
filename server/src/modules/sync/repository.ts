@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js'
+import type { Prisma } from '@prisma/client'
 import type { ViajeSyncEntrada, JornadaSyncEntrada, RegistroMantenimientoSyncEntrada } from './types.js'
 
 export const repositorioSync = {
@@ -20,7 +21,12 @@ export const repositorioSync = {
       estado: viaje.estado,
       inicioISO: new Date(viaje.inicioISO),
       finISO: viaje.finISO ? new Date(viaje.finISO) : null,
-      recorrido: viaje.recorrido,
+      // `PuntoGPSSync[]` es un objeto JSON válido en los hechos, pero Prisma
+      // exige que cualquier valor para una columna Json tenga una firma de
+      // índice `string` explícita — una interfaz normal no la tiene, aunque
+      // su forma real sí encaje. Cast explícito hacia el tipo Json de Prisma
+      // en vez de hacia `any` (así se mantiene el chequeo de tipos del resto).
+      recorrido: viaje.recorrido as unknown as Prisma.InputJsonValue,
       kmHastaRecoger: viaje.kmHastaRecoger,
       kmConPasajero: viaje.kmConPasajero,
       kmTotalesReales: viaje.kmTotalesReales,
