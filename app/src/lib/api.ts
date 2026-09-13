@@ -17,7 +17,12 @@ const CLAVE_TOKEN_REFRESCO = 'mia:tokenRefresco'
 // Vite expone las variables que empiezan con VITE_ en import.meta.env.
 // Sin .env local, cae a localhost:3000 (mismo puerto por defecto que
 // server/.env.example) — sirve para desarrollar contra un backend local.
-const URL_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
+// Exportado temporalmente para diagnóstico en pantalla (ver PLAN-MAESTRO,
+// sección "Bug encontrado y corregido — Failed to fetch al crear cuenta" —
+// el usuario no tiene forma de conectar el teléfono a una PC para ver la
+// consola real, así que se muestra este valor directo en la UI del error).
+// Quitar el export cuando el diagnóstico ya no haga falta.
+export const URL_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
 export function obtenerTokenAcceso(): string | null {
   return localStorage.getItem(CLAVE_TOKEN_ACCESO)

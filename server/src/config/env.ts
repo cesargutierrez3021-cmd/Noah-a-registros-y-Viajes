@@ -28,7 +28,9 @@ export const env = {
   // NO es lo que protege al backend de apps no autorizadas (eso lo hace el
   // JWT). Default pensado para desarrollo local; en producción hay que
   // poner acá el dominio real si algún día hay un frontend web.
-  corsOrigenes: (process.env.CORS_ORIGENES ?? 'http://localhost:5173,capacitor://localhost,http://localhost')
+  corsOrigenes: (
+    process.env.CORS_ORIGENES ?? 'http://localhost:5173,capacitor://localhost,http://localhost,https://localhost'
+  )
     .split(',')
     .map((origen) => origen.trim()),
 }

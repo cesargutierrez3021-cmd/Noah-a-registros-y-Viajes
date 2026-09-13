@@ -21,8 +21,13 @@ services:
       - key: JWT_EXPIRACION_REFRESCO_DIAS
         value: '30'
       - key: CORS_ORIGENES
-        # capacitor://localhost es el origen que usa la app Android empaquetada;
-        # ajustar acá el día que haya un dominio propio (dashboard web, etc.)
-        value: 'capacitor://localhost,http://localhost'
+        # https://localhost es el origen real que usa la app Android empaquetada
+        # (esquema por defecto de Capacitor 3+ en Android, ver capacitor.config.ts
+        # que no declara androidScheme). capacitor://localhost es el esquema por
+        # defecto en iOS, NO en Android — el comentario anterior lo tenía al revés,
+        # y por eso el CORS bloqueaba en silencio el registro/login desde el
+        # dispositivo real ("Failed to fetch"). Se dejan los tres por si el
+        # esquema cambia o corre en iOS más adelante.
+        value: 'capacitor://localhost,http://localhost,https://localhost'
     # PORT lo asigna Render solo — server/src/config/env.ts ya lo respeta
     # (ver fix aplicado en esta sesión: antes solo leía PUERTO).
