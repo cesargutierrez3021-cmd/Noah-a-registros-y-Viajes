@@ -12,8 +12,8 @@ const INSTRUCCION_SISTEMA = [
 /**
  * Punto de entrada del proxy de IA (Fase 9). Arma el contexto compacto,
  * arma el prompt completo, y se lo pasa al proveedor de IA inyectado (por
- * defecto el stub `proveedorSinImplementar`, que lanza `ErrorProveedorIANoConfigurado`
- * — ver proveedorIA.ts).
+ * defecto el proveedor OpenAI-compatible `proveedorSinImplementar`, que lanza
+ * `ErrorProveedorIA` si falta OPENAI_API_KEY o el proveedor falla — ver proveedorIA.ts).
  */
 export async function generarAnalisis(
   pregunta: string,

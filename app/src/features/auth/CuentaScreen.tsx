@@ -34,12 +34,12 @@ export function CuentaScreen() {
         <h1 className="titulo-pantalla">Cuenta</h1>
         <p className="texto-mute" style={{ marginBottom: 16 }}>Ya iniciaste sesión.</p>
         <button type="button" onClick={cerrarSesion}>Cerrar sesión</button>
-      </section>
+      </div></section>
     )
   }
 
   return (
-    <section className="pantalla">
+    <section className="pantalla"><div className="app-panel">
       <h1 className="titulo-pantalla">{modo === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}</h1>
 
       <form onSubmit={manejarEnviar} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
