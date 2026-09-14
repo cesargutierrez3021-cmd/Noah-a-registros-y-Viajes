@@ -91,7 +91,7 @@ export function AgregarViajeManualScreen() {
   }
 
   return (
-    <section className="pantalla">
+    <section className="pantalla"><div className="app-panel">
       <h1 className="titulo-pantalla">Agregar viaje manual</h1>
       <p className="texto-mute" style={{ marginBottom: 16 }}>
         Para un viaje que ya pasó y no quedó registrado con el GPS. Sin recorrido — los km se escriben directo.
@@ -136,6 +136,6 @@ export function AgregarViajeManualScreen() {
           Cancelar
         </button>
       </div>
-    </section>
+    </div></section>
   )
 }

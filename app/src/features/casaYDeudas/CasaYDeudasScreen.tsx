@@ -15,19 +15,19 @@ export function CasaYDeudasScreen() {
   const [subSeccion, setSubSeccion] = useState<SubSeccion>('deudas')
 
   return (
-    <section className="pantalla">
-      <h1 className="titulo-pantalla">Casa y Deudas</h1>
+    <section className="pantalla"><div className="app-panel">
+      <div className="app-hero"><div className="app-eyebrow">MIA · CONTROL</div><h1 className="app-title">Casa y deudas</h1></div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <button type="button" onClick={() => setSubSeccion('deudas')} disabled={subSeccion === 'deudas'}>
+      <div className="app-tabs" style={{ marginBottom: 16 }}>
+        <button type="button" onClick={() => setSubSeccion('deudas')} className={subSeccion === 'deudas' ? 'active' : ''}>
           Deudas
         </button>
-        <button type="button" onClick={() => setSubSeccion('hogar')} disabled={subSeccion === 'hogar'}>
+        <button type="button" onClick={() => setSubSeccion('hogar')} className={subSeccion === 'hogar' ? 'active' : ''}>
           Hogar
         </button>
       </div>
 
       {subSeccion === 'deudas' ? <SeccionDeudas /> : <SeccionHogar />}
-    </section>
+    </div></section>
   )
 }

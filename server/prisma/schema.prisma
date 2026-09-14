@@ -103,6 +103,10 @@ model Viaje {
   ingreso                       Float
   localidad                     String?
   zona                          String?
+  localidadInicio               String? @map("localidad_inicio")
+  zonaInicio                    String? @map("zona_inicio")
+  localidadFin                  String? @map("localidad_fin")
+  zonaFin                       String? @map("zona_fin")
   sincronizadoEnISO             DateTime  @default(now()) @updatedAt @map("sincronizado_en")
 
   @@index([usuarioId])

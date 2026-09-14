@@ -30,7 +30,7 @@ export function CuentaScreen() {
 
   if (autenticado()) {
     return (
-      <section className="pantalla">
+      <section className="pantalla"><div className="app-panel">
         <h1 className="titulo-pantalla">Cuenta</h1>
         <p className="texto-mute" style={{ marginBottom: 16 }}>Ya iniciaste sesión.</p>
         <button type="button" onClick={cerrarSesion}>Cerrar sesión</button>
@@ -74,6 +74,6 @@ export function CuentaScreen() {
       <button type="button" onClick={() => setModo(modo === 'login' ? 'registro' : 'login')}>
         {modo === 'login' ? '¿No tienes cuenta? Crear una' : '¿Ya tienes cuenta? Iniciar sesión'}
       </button>
-    </section>
+    </div></section>
   )
 }

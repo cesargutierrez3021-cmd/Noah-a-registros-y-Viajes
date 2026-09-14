@@ -34,8 +34,8 @@ export function BalanceScreen() {
   const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar)
 
   return (
-    <section className="pantalla">
-      <h1 className="titulo-pantalla">Balance general</h1>
+    <section className="pantalla"><div className="app-panel">
+      <div className="app-hero"><div className="app-eyebrow">MIA · RESUMEN</div><h1 className="app-title">Balance general</h1></div>
       <p className="texto-mute" style={{ marginBottom: 16 }}>
         Cruce de todo lo que entró (viajes) contra todo lo que salió (gastos operativos + gastos de hogar). La deuda
         pendiente se muestra aparte — es una obligación futura, no un gasto ya hecho.
@@ -65,6 +65,6 @@ export function BalanceScreen() {
           <strong>{formatoPesos(balance.deudaPendienteTotal)}</strong>
         </li>
       </ul>
-    </section>
+    </div></section>
   )
 }

@@ -42,7 +42,7 @@ export function App() {
 
   return (
     <HashRouter>
-      <div style={{ paddingBottom: 64 }}>
+      <div className="app-shell">
         <Routes>
           <Route path="/" element={<TrabajoScreen />} />
           <Route path="/viajes/manual" element={<AgregarViajeManualScreen />} />
@@ -57,10 +57,10 @@ export function App() {
 
       <nav className="barra-navegacion">
         <NavLink to="/" end className={({ isActive }) => `barra-navegacion__item${isActive ? ' barra-navegacion__item--activo' : ''}`}>
-          Trabajo
+          ◉ Trabajo
         </NavLink>
         <NavLink to="/casa-y-deudas" className={({ isActive }) => `barra-navegacion__item${isActive ? ' barra-navegacion__item--activo' : ''}`}>
-          Casa y Deudas
+          Casa
         </NavLink>
         <NavLink to="/balance" className={({ isActive }) => `barra-navegacion__item${isActive ? ' barra-navegacion__item--activo' : ''}`}>
           Balance

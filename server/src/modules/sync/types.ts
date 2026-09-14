@@ -51,6 +51,10 @@ export interface ViajeSyncEntrada {
   ingreso: number
   localidad: string | null
   zona: string | null
+  localidadInicio?: string | null
+  zonaInicio?: string | null
+  localidadFin?: string | null
+  zonaFin?: string | null
 }
 
 /**

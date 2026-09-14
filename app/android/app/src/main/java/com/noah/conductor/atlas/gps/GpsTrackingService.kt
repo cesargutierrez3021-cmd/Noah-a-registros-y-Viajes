@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import org.json.JSONArray
+import org.json.JSONObject
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -52,6 +54,7 @@ class GpsTrackingService : Service() {
 
     private lateinit var fusedClient: FusedLocationProviderClient
     private var callback: LocationCallback? = null
+    private val prefs by lazy { getSharedPreferences("mia-gps", MODE_PRIVATE) }
 
     override fun onCreate() {
         super.onCreate()
@@ -90,6 +93,7 @@ class GpsTrackingService : Service() {
         callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
+                guardarPunto(loc.latitude, loc.longitude, loc.accuracy, loc.time)
                 listener?.onLocation(loc.latitude, loc.longitude, loc.accuracy, loc.time)
             }
         }
@@ -140,6 +144,18 @@ class GpsTrackingService : Service() {
         )
         manager.createNotificationChannel(channel)
     }
+
+
+    private fun guardarPunto(lat: Double, lng: Double, accuracy: Float, timestampMs: Long) {
+        val puntos = runCatching { JSONArray(prefs.getString("puntos", "[]")) }.getOrElse { JSONArray() }
+        puntos.put(JSONObject().apply { put("lat", lat); put("lng", lng); put("precisionMetros", accuracy); put("timestampMs", timestampMs) })
+        // Mantener solo la traza activa; un viaje normal no debería crecer indefinidamente.
+        while (puntos.length() > 5000) puntos.remove(0)
+        prefs.edit().putString("puntos", puntos.toString()).apply()
+    }
+
+    fun obtenerPuntosPersistidos(): String = prefs.getString("puntos", "[]") ?: "[]"
+    fun limpiarPuntosPersistidos() { prefs.edit().remove("puntos").apply() }
 
     override fun onDestroy() {
         callback?.let { fusedClient.removeLocationUpdates(it) }

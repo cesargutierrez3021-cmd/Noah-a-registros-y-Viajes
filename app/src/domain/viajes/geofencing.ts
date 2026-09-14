@@ -28,7 +28,11 @@ export interface Zona {
 }
 
 /** Zonas activas por defecto: las 20 localidades de Bogotá (D-7). */
-export const ZONAS: Zona[] = ZONAS_BOGOTA
+export const ZONAS_LOCALIDADES: Zona[] = ZONAS_BOGOTA
+
+/** Zonas comerciales/personalizadas se agregan aquí sin contaminar la capa oficial. */
+export const ZONAS_CUSTOM: Zona[] = []
+export const ZONAS: Zona[] = ZONAS_LOCALIDADES
 
 /**
  * Ray casting: determina si un punto está dentro de un anillo simple.
@@ -66,6 +70,14 @@ function puntoDentroDeZona(punto: PuntoGPS, zona: Zona): boolean {
  * oficiales, pero por si se agregan zonas custom más adelante), devuelve la
  * primera coincidencia en el orden del array.
  */
+export function obtenerLocalidad(punto: PuntoGPS): string | null {
+  return obtenerZona(punto, ZONAS_LOCALIDADES)
+}
+
+export function obtenerZonaCustom(punto: PuntoGPS): string | null {
+  return obtenerZona(punto, ZONAS_CUSTOM)
+}
+
 export function obtenerZona(punto: PuntoGPS, zonas: Zona[] = ZONAS): string | null {
   for (const zona of zonas) {
     if (puntoDentroDeZona(punto, zona)) {

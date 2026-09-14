@@ -23,7 +23,7 @@ export function PlanesScreen() {
   }, [])
 
   return (
-    <section className="pantalla">
+    <section className="pantalla"><div className="app-panel">
       <h1 className="titulo-pantalla">Planes</h1>
 
       {cargando && <p className="texto-mute">Cargando…</p>}
@@ -58,6 +58,6 @@ export function PlanesScreen() {
           </div>
         ))}
       </div>
-    </section>
+    </div></section>
   )
 }

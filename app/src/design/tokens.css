@@ -1,212 +1,555 @@
-/* MIA — sistema visual único. Solo estilos: no contiene lógica ni cambia contratos. */
-:root {
-  --color-fondo: #071211;
-  --color-superficie: #102321;
-  --color-superficie-alta: #18312e;
-  --color-borde: rgba(177, 224, 215, 0.18);
-  --color-borde-suave: rgba(177, 224, 215, 0.10);
-  --color-texto: #f2f7f5;
-  --color-texto-mute: #9bb2ad;
-  --color-acento: #79e7d0;
-  --color-acento-oscuro: #173c37;
-  --color-lila: #c6a7ff;
-  --color-oro: #efc985;
-  --color-coral: #f18a7d;
-  --radio-tarjeta: 22px;
-  --radio-boton: 15px;
-  --espacio-unidad: 8px;
-  --fuente-cuerpo: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, ui-sans-serif, system-ui, sans-serif;
-  --fuente-etiqueta: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
+/**
+ * Sistema de diseño único de MIA.
+ *
+ * Regla: si necesitas un estilo nuevo, se agrega AQUÍ o se extiende una clase
+ * existente. Nunca se crea un archivo "-extra.css" o "-overrides.css" — eso fue
+ * exactamente el problema del proyecto viejo (20 archivos CSS parchados).
+ */
 
-* { box-sizing: border-box; }
-html, body, #root { min-height: 100%; }
-html { background: var(--color-fondo); }
-body {
-  margin: 0;
-  background: radial-gradient(circle at 50% -12%, #173b35 0, var(--color-fondo) 42rem);
-  color: var(--color-texto);
-  font-family: var(--fuente-cuerpo);
-  -webkit-font-smoothing: antialiased;
+:root {
+  --color-fondo: #0b0d10;
+  --color-superficie: #14171c;
+  --color-borde: #23262c;
+  --color-texto: #f5f6f7;
+  --color-texto-mute: #9aa0a8;
+  --color-acento: #4f8cff;
+
+  --radio-tarjeta: 18px;
+  --radio-boton: 14px;
+  --espacio-unidad: 8px;
 }
-button, input, select { font: inherit; }
-button { -webkit-tap-highlight-color: transparent; }
-button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--color-acento); outline-offset: 2px; }
 
 .pantalla {
-  width: min(100%, 760px);
-  min-height: 100vh;
-  margin: 0 auto;
-  padding: 24px 18px 112px;
+  padding: calc(var(--espacio-unidad) * 2);
   color: var(--color-texto);
 }
+
 .titulo-pantalla {
-  margin: 0 0 10px;
-  font-size: clamp(1.8rem, 7vw, 2.6rem);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
-  font-weight: 750;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: calc(var(--espacio-unidad) * 2);
 }
-.texto-mute { color: var(--color-texto-mute); font-size: .9rem; line-height: 1.45; }
-.lista-viajes { display: flex; flex-direction: column; gap: 10px; }
+
+.texto-mute {
+  color: var(--color-texto-mute);
+  font-size: 0.85rem;
+}
+
+.lista-viajes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-unidad);
+}
+
 .tarjeta-viaje {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  background: linear-gradient(145deg, rgba(24,49,46,.98), rgba(14,34,32,.98));
+  background: var(--color-superficie);
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-tarjeta);
-  padding: 16px;
-  color: var(--color-texto);
-  box-shadow: 0 12px 30px rgba(0,0,0,.14);
+  padding: calc(var(--espacio-unidad) * 1.5);
 }
 
-button, .tema-trabajo button {
-  min-height: 44px;
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio-boton);
-  padding: 10px 15px;
-  background: #17332f;
-  color: var(--color-texto);
-  font-weight: 650;
-  cursor: pointer;
-  transition: transform .16s ease, background .16s ease, border-color .16s ease, opacity .16s ease;
+/* Fase 6: estado de alertas de mantenimiento. */
+.insignia {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
-button:hover { background: #21463f; border-color: rgba(121,231,208,.55); }
-button:active { transform: scale(.98); }
-button:disabled { opacity: .52; cursor: not-allowed; }
-input, select {
-  width: 100%;
-  min-height: 48px;
-  border: 1px solid var(--color-borde);
-  border-radius: 14px;
-  padding: 12px 14px;
-  background: rgba(7,18,17,.55);
-  color: var(--color-texto);
+
+.insignia--ok {
+  background: rgba(79, 140, 255, 0.15);
+  color: var(--color-acento);
 }
-input::placeholder { color: #78918b; }
-select option { background: #102321; color: var(--color-texto); }
 
-.insignia { font: 700 .72rem/1 var(--fuente-etiqueta); letter-spacing: .04em; padding: 8px 10px; border-radius: 999px; white-space: nowrap; }
-.insignia--ok { background: rgba(121,231,208,.14); color: var(--color-acento); }
-.insignia--proximo { background: rgba(239,201,133,.16); color: var(--color-oro); }
-.insignia--vencido { background: rgba(241,138,125,.16); color: var(--color-coral); }
+.insignia--proximo {
+  background: rgba(240, 180, 40, 0.15);
+  color: #f0b428;
+}
 
+.insignia--vencido {
+  background: rgba(240, 70, 70, 0.15);
+  color: #f04646;
+}
+
+/* Fase 6: navegación entre las 3 pantallas (antes solo existía Viajes). */
 .barra-navegacion {
   position: fixed;
-  z-index: 50;
-  left: 50%;
   bottom: 0;
-  width: min(100%, 760px);
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-around;
-  gap: 2px;
-  padding: 9px 5px calc(9px + env(safe-area-inset-bottom));
-  background: rgba(10,29,27,.94);
-  border: 1px solid var(--color-borde);
-  border-bottom: 0;
-  border-radius: 22px 22px 0 0;
-  backdrop-filter: blur(18px);
-  box-shadow: 0 -14px 34px rgba(0,0,0,.24);
+  background: var(--color-superficie);
+  border-top: 1px solid var(--color-borde);
+  padding: calc(var(--espacio-unidad) * 1.25) 0;
 }
+
 .barra-navegacion__item {
-  min-width: 0;
-  padding: 8px 7px;
-  overflow: hidden;
   color: var(--color-texto-mute);
   text-decoration: none;
-  text-align: center;
-  font-size: .72rem;
-  font-weight: 650;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  border-radius: 12px;
+  font-size: 0.8rem;
 }
-.barra-navegacion__item--activo { color: var(--color-acento); background: rgba(121,231,208,.10); }
 
-/* Panel Trabajo: lenguaje visual de la guía, aplicado a la interfaz existente. */
+.barra-navegacion__item--activo {
+  color: var(--color-acento);
+  font-weight: 600;
+}
+
+/**
+ * ============================================================================
+ * Tema del Panel "Trabajo" — Bloque 4, ítems 9/10/13/14 (parte visual)
+ * ============================================================================
+ * Pedido explícito del usuario: solo el Panel "Trabajo" se viste por ahora
+ * (Balance, Casa y Deudas, Cuenta, Planes quedan con el tema genérico de
+ * arriba, sin tocar). Por eso este bloque entero vive DENTRO del selector
+ * `.tema-trabajo` — nunca se tocan `:root`, `.pantalla`, `.tarjeta-viaje`,
+ * etc. a nivel global, porque esas clases las siguen usando las demás
+ * pantallas. `.tema-trabajo` se aplica una sola vez, en el `<section>` raíz
+ * de `TrabajoScreen.tsx` — todo lo de acá abajo hereda de ahí para adentro.
+ *
+ * Referencia visual: guía de capturas de pantalla que aportó el usuario
+ * (paleta oscura verde-azulada casi negra, acento degradado menta→dorado,
+ * tarjetas circulares/recortadas para métricas, tipografía serif para
+ * titulares y monoespaciada para etiquetas). Se sigue esa referencia tal
+ * cual la pidió el usuario ("quiero un tema así igual").
+ *
+ * Fuentes: pilas de fuentes del sistema (serif/sans/mono), sin `@import` ni
+ * Google Fonts — la app corre empaquetada en Capacitor sin garantía de
+ * internet en el momento de abrir, así que depender de una fuente remota
+ * dejaría el tema roto offline. Decisión deliberada, no un olvido.
+ */
 .tema-trabajo {
-  --tt-fondo: #071211;
-  --tt-fondo-alto: #102522;
-  --tt-superficie: #122825;
-  --tt-superficie-alta: #1a3934;
-  --tt-borde: rgba(177,224,215,.18);
-  --tt-texto: #f2f7f5;
-  --tt-texto-mute: #9bb2ad;
-  --tt-menta: #79e7d0;
-  --tt-oro: #efc985;
-  --tt-lila: #c6a7ff;
-  --tt-coral: #f18a7d;
-  --tt-gradiente-cta: linear-gradient(105deg, #78e4cd 0%, #a9dcae 52%, #efc985 100%);
-  background: radial-gradient(circle at 50% -8%, #173c35 0, var(--tt-fondo) 36rem);
+  --tt-fondo: #060e0c;
+  --tt-fondo-alto: #0c1a17;
+  --tt-superficie: #101f1c;
+  --tt-superficie-alta: #16302a;
+  --tt-borde: rgba(255, 255, 255, 0.08);
+  --tt-texto: #eef5f2;
+  --tt-texto-mute: #8ea39d;
+  --tt-menta: #6ee7c8;
+  --tt-oro: #f0c987;
+  --tt-lila: #b18cf5;
+  --tt-coral: #f0806a;
+  --tt-gradiente-cta: linear-gradient(100deg, #6ee7c8 0%, #d9dc8f 55%, #f0c987 100%);
+
+  --tt-fuente-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Noto Serif', serif;
+  --tt-fuente-cuerpo: -apple-system, 'Segoe UI', Roboto, ui-sans-serif, system-ui, sans-serif;
+  --tt-fuente-etiqueta: ui-monospace, 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+
+  background: var(--tt-fondo);
   color: var(--tt-texto);
-  font-family: var(--fuente-cuerpo);
-  padding: 0 0 44px;
-  min-height: 100vh;
+  font-family: var(--tt-fuente-cuerpo);
+  padding: 0 0 32px;
+  min-height: 100%;
 }
-.tema-trabajo .texto-mute { color: var(--tt-texto-mute); }
-.tema-trabajo .tt-hero { padding: 28px 18px 20px; }
-.tt-hero__eyebrow, .tt-estado__etiqueta, .tt-resumen-neto__etiqueta, .tt-pildoras__etiqueta {
-  color: var(--tt-menta);
-  font: 700 .68rem/1.2 var(--fuente-etiqueta);
-  letter-spacing: .13em;
+
+.tema-trabajo .titulo-pantalla {
+  /* El h1 "Trabajo" genérico ya no se usa como tal — TrabajoScreen.tsx lo
+     reemplaza por .tt-hero. Esta regla es un respaldo defensivo, no debería
+     verse en pantalla. */
+  display: none;
+}
+
+/* --- Encabezado tipo "portada" (NOAH/CUADERNO en la referencia → acá MIA/TRABAJO) --- */
+.tt-hero {
+  padding: 20px 18px 24px;
+  position: relative;
+}
+
+.tt-hero__eyebrow {
+  font-family: var(--tt-fuente-etiqueta);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--tt-menta);
 }
-.tt-hero__titulo { margin: 10px 0 8px; font-size: clamp(2.15rem, 10vw, 3.25rem); line-height: 1.02; letter-spacing: -.055em; font-weight: 780; }
-.tt-hero__subtitulo { max-width: 35ch; margin: 0; color: var(--tt-texto-mute); font-size: .98rem; line-height: 1.45; }
-.tt-tarjeta { background: linear-gradient(145deg, rgba(24,54,50,.98), rgba(14,34,32,.98)); border: 1px solid var(--tt-borde); border-radius: 24px; box-shadow: 0 14px 32px rgba(0,0,0,.16); }
-.tt-estado { margin: 0 18px 14px; padding: 22px; text-align: center; }
-.tt-estado__valor { margin: 8px 0 5px; font-size: 2rem; font-weight: 780; letter-spacing: -.04em; }
-.tt-estado__valor--activo { color: var(--tt-menta); }
-.tt-estado__valor--pausa { color: var(--tt-oro); }
-.tt-estado__detalle { color: var(--tt-texto-mute); font-size: .86rem; }
-.tt-boton-cta { display: flex; align-items: center; justify-content: center; width: calc(100% - 36px); margin: 0 18px 20px; min-height: 54px; border: 0; border-radius: 17px; background: var(--tt-gradiente-cta); color: #102b25; font-size: 1rem; font-weight: 800; box-shadow: 0 10px 24px rgba(121,231,208,.12); }
-.tt-boton-cta--pausar { background: var(--tt-superficie-alta); color: var(--tt-texto); border: 1px solid var(--tt-borde); box-shadow: none; }
-.tt-pildoras { display: flex; align-items: center; gap: 8px; padding: 0 18px 16px; overflow-x: auto; }
-.tt-pildoras__etiqueta { flex: 0 0 76px; color: var(--tt-texto-mute); font-size: .62rem; }
-.tt-pildora { min-height: 40px; flex-shrink: 0; padding: 8px 15px; border-radius: 999px; background: transparent; color: var(--tt-texto-mute); border-color: var(--tt-borde); }
-.tt-pildora--activa { background: var(--tt-lila); color: #1b1530; border-color: var(--tt-lila); }
-.tt-pildora--activa.tt-pildora--dorada { background: var(--tt-gradiente-cta); color: #102b25; border-color: transparent; }
-.tt-grilla-metricas { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; padding: 0 18px 20px; }
-.tt-metrica { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 12px; text-align: center; background: radial-gradient(circle at 30% 18%, #244841, var(--tt-superficie)); border: 1px solid var(--tt-borde); }
-.tt-metrica--redonda { border-radius: 50%; }
-.tt-metrica--recortada { border-radius: 24px; clip-path: polygon(14% 0,86% 0,100% 14%,100% 86%,86% 100%,14% 100%,0 86%,0 14%); }
-.tt-metrica__icono { font-size: 1.35rem; line-height: 1; }
-.tt-metrica__etiqueta { color: var(--tt-texto-mute); font-size: .75rem; line-height: 1.2; }
-.tt-metrica__valor { font-size: 1.08rem; font-weight: 780; }
+
+.tt-hero__titulo {
+  font-family: var(--tt-fuente-display);
+  font-size: clamp(2rem, 9vw, 2.6rem);
+  line-height: 1.08;
+  margin: 10px 0 8px;
+  font-weight: 400;
+  color: var(--tt-texto);
+}
+
+.tt-hero__subtitulo {
+  color: var(--tt-texto-mute);
+  font-size: 0.95rem;
+  max-width: 34ch;
+}
+
+.tt-hero__config {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--tt-borde);
+  background: var(--tt-fondo-alto);
+  color: var(--tt-texto-mute);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Tarjeta base compartida por estado/metricas/resumen --- */
+.tt-tarjeta {
+  background: var(--tt-superficie);
+  border: 1px solid var(--tt-borde);
+  border-radius: 22px;
+  padding: 18px;
+}
+
+/* --- Estado del sistema + botón de iniciar/terminar jornada --- */
+.tt-estado {
+  margin: 0 18px 14px;
+  text-align: center;
+}
+
+.tt-estado__etiqueta {
+  font-family: var(--tt-fuente-etiqueta);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tt-texto-mute);
+}
+
+.tt-estado__valor {
+  font-family: var(--tt-fuente-display);
+  font-size: 1.9rem;
+  margin: 6px 0 4px;
+}
+
+.tt-estado__valor--activo {
+  color: var(--tt-menta);
+}
+
+.tt-estado__valor--pausa {
+  color: var(--tt-oro);
+}
+
+.tt-estado__detalle {
+  color: var(--tt-texto-mute);
+  font-size: 0.85rem;
+}
+
+.tt-boton-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: calc(100% - 36px);
+  margin: 0 18px 18px;
+  padding: 16px;
+  border-radius: 20px;
+  border: none;
+  background: var(--tt-gradiente-cta);
+  color: #08221b;
+  font-family: var(--tt-fuente-cuerpo);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tt-boton-cta:active {
+  filter: brightness(0.96);
+}
+
+.tt-boton-cta--pausar {
+  background: var(--tt-superficie-alta);
+  color: var(--tt-texto);
+  border: 1px solid var(--tt-borde);
+}
+
+/* --- Grupo de píldoras (Redondas / Recortadas / Resumen, Hoy / Semana / Mes) --- */
+.tt-pildoras {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 18px 16px;
+  overflow-x: auto;
+}
+
+.tt-pildoras__etiqueta {
+  font-family: var(--tt-fuente-etiqueta);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tt-texto-mute);
+  line-height: 1.2;
+  flex-shrink: 0;
+  width: 58px;
+}
+
+.tt-pildora {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--tt-borde);
+  background: var(--tt-fondo-alto);
+  color: var(--tt-texto-mute);
+  font-family: var(--tt-fuente-cuerpo);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tt-pildora--activa {
+  background: var(--tt-lila);
+  border-color: var(--tt-lila);
+  color: #1c1030;
+}
+
+.tt-pildora--activa.tt-pildora--dorada {
+  background: var(--tt-gradiente-cta);
+  color: #08221b;
+}
+
+/* --- Grilla de métricas (vista "Redondas" / "Recortadas") --- */
+.tt-grilla-metricas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 0 18px 20px;
+}
+
+.tt-metrica {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 4px;
+  background: radial-gradient(circle at 30% 20%, var(--tt-superficie-alta), var(--tt-superficie));
+  border: 1px solid var(--tt-borde);
+  padding: 14px;
+}
+
+.tt-metrica--redonda {
+  border-radius: 50%;
+}
+
+.tt-metrica--recortada {
+  border-radius: 24px;
+  clip-path: polygon(16% 0%, 84% 0%, 100% 16%, 100% 84%, 84% 100%, 16% 100%, 0% 84%, 0% 16%);
+}
+
+.tt-metrica__icono {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.tt-metrica__etiqueta {
+  color: var(--tt-texto-mute);
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.tt-metrica__valor {
+  font-family: var(--tt-fuente-cuerpo);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
 .tt-metrica__valor--menta { color: var(--tt-menta); }
 .tt-metrica__valor--oro { color: var(--tt-oro); }
 .tt-metrica__valor--lila { color: var(--tt-lila); }
 .tt-metrica__valor--coral { color: var(--tt-coral); }
-.tt-resumen-neto { margin: 0 18px 18px; padding: 22px; background: linear-gradient(145deg, rgba(24,54,50,.98), rgba(14,34,32,.98)); border: 1px solid var(--tt-borde); border-radius: 24px; }
-.tt-resumen-neto__valor { margin: 8px 0 3px; font-size: clamp(2.35rem, 11vw, 3.5rem); font-weight: 800; letter-spacing: -.06em; }
-.tt-resumen-neto__detalle { color: var(--tt-texto-mute); font-size: .84rem; }
-.tt-resumen-filas { margin: 0 18px 18px; border-top: 1px solid var(--tt-borde); }
-.tt-resumen-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--tt-borde); }
-.tt-resumen-fila__nombre { font-weight: 650; }
-.tt-resumen-fila__nota { display: block; margin-top: 3px; color: var(--tt-texto-mute); font-size: .76rem; font-weight: 400; }
-.tt-divisor { margin: 28px 18px 13px; font-size: 1.55rem; letter-spacing: -.035em; }
-.tt-acciones { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 9px; margin: 0 18px 14px; }
-.tt-accion-boton { min-height: 76px; padding: 12px 8px; background: var(--tt-superficie); border-color: var(--tt-borde); border-radius: 18px; }
-.tt-acordeon { width: calc(100% - 36px); margin: 0 18px 20px; padding: 16px; background: var(--tt-superficie); border: 1px solid var(--tt-borde); border-radius: 18px; color: var(--tt-texto); font-weight: 700; text-align: left; }
-.tt-acordeon__contenido { margin-top: 12px; font-weight: 400; }
-.tema-trabajo h2.tt-titulo-seccion { margin: 32px 18px 13px; color: var(--tt-texto); font-size: 1.55rem; letter-spacing: -.035em; }
-.tema-trabajo .tarjeta-viaje { margin-left: 18px; margin-right: 18px; background: linear-gradient(145deg, rgba(24,54,50,.98), rgba(14,34,32,.98)); border-color: var(--tt-borde); border-radius: 20px; }
-.tema-trabajo input, .tema-trabajo select { background: rgba(7,18,17,.55); color: var(--tt-texto); border-color: var(--tt-borde); }
-.tema-trabajo .insignia--ok { background: rgba(121,231,208,.14); color: var(--tt-menta); }
-.tema-trabajo .insignia--proximo { background: rgba(239,201,133,.16); color: var(--tt-oro); }
-.tema-trabajo .insignia--vencido { background: rgba(241,138,125,.16); color: var(--tt-coral); }
 
-/* Estados de las pantallas no operativas: mismo lenguaje, mismas rutas. */
-#root > div > .pantalla:not(.tema-trabajo) .tarjeta-viaje { background: linear-gradient(145deg, rgba(24,54,50,.98), rgba(14,34,32,.98)); }
-#root > div > .pantalla:not(.tema-trabajo) h1 { margin-top: 4px; }
-
-@media (min-width: 620px) {
-  .pantalla { padding-left: 28px; padding-right: 28px; }
-  .tema-trabajo .tt-hero { padding-left: 28px; padding-right: 28px; }
-  .tt-estado, .tt-boton-cta, .tt-pildoras, .tt-grilla-metricas, .tt-resumen-neto, .tt-resumen-filas, .tt-acciones, .tt-acordeon, .tema-trabajo h2.tt-titulo-seccion, .tema-trabajo > .tarjeta-viaje, .tema-trabajo .lista-viajes { margin-left: 28px; margin-right: 28px; }
-  .tt-boton-cta, .tt-acordeon { width: calc(100% - 56px); }
+/* --- Vista "Resumen": neto grande + desglose + acciones + historial --- */
+.tt-resumen-neto {
+  margin: 0 18px 16px;
 }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+
+.tt-resumen-neto__etiqueta {
+  font-family: var(--tt-fuente-etiqueta);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tt-texto-mute);
+}
+
+.tt-resumen-neto__valor {
+  font-family: var(--tt-fuente-display);
+  font-size: 2.6rem;
+  margin: 4px 0 2px;
+}
+
+.tt-resumen-neto__detalle {
+  color: var(--tt-texto-mute);
+  font-size: 0.85rem;
+}
+
+.tt-resumen-filas {
+  margin: 0 18px 16px;
+  border-top: 1px solid var(--tt-borde);
+}
+
+.tt-resumen-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--tt-borde);
+}
+
+.tt-resumen-fila__nombre {
+  font-weight: 600;
+}
+
+.tt-resumen-fila__nota {
+  display: block;
+  color: var(--tt-texto-mute);
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.tt-divisor {
+  font-family: var(--tt-fuente-display);
+  font-size: 1.3rem;
+  font-weight: 400;
+  margin: 24px 18px 12px;
+}
+
+.tt-acciones {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 0 18px 14px;
+}
+
+.tt-accion-boton {
+  background: var(--tt-superficie);
+  border: 1px solid var(--tt-borde);
+  border-radius: 18px;
+  padding: 16px 8px;
+  color: var(--tt-texto);
+  font-family: var(--tt-fuente-cuerpo);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.tt-acordeon {
+  margin: 0 18px 20px;
+  background: var(--tt-superficie);
+  border: 1px solid var(--tt-borde);
+  border-radius: 18px;
+  padding: 16px;
+  color: var(--tt-texto);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tt-acordeon__contenido {
+  margin-top: 12px;
+  font-weight: 400;
+}
+
+/* --- Secciones internas (Jornada/Viajes, Mantenimiento, Gastos, Estadísticas):
+   se apoyan en las clases genéricas ya existentes (tarjeta-viaje, texto-mute,
+   lista-viajes) — acá se sobreescribe SOLO su apariencia dentro del panel
+   Trabajo, sin tocar la definición global que usan las demás pantallas. */
+.tema-trabajo h2.tt-titulo-seccion {
+  font-family: var(--tt-fuente-display);
+  font-size: 1.4rem;
+  font-weight: 400;
+  margin: 28px 18px 12px;
+  color: var(--tt-texto);
+}
+
+.tema-trabajo > .tarjeta-viaje,
+.tema-trabajo .lista-viajes {
+  margin-left: 18px;
+  margin-right: 18px;
+}
+
+.tema-trabajo .tarjeta-viaje {
+  background: var(--tt-superficie);
+  border-color: var(--tt-borde);
+  border-radius: 18px;
+  color: var(--tt-texto);
+}
+
+.tema-trabajo .texto-mute {
+  color: var(--tt-texto-mute);
+}
+
+.tema-trabajo .insignia--ok {
+  background: rgba(110, 231, 200, 0.15);
+  color: var(--tt-menta);
+}
+
+.tema-trabajo .insignia--proximo {
+  background: rgba(240, 201, 135, 0.18);
+  color: var(--tt-oro);
+}
+
+.tema-trabajo .insignia--vencido {
+  background: rgba(240, 128, 106, 0.18);
+  color: var(--tt-coral);
+}
+
+.tema-trabajo button {
+  font-family: var(--tt-fuente-cuerpo);
+  background: var(--tt-fondo-alto);
+  color: var(--tt-texto);
+  border: 1px solid var(--tt-borde);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tema-trabajo input,
+.tema-trabajo select {
+  font-family: var(--tt-fuente-cuerpo);
+  background: var(--tt-fondo-alto);
+  color: var(--tt-texto);
+  border: 1px solid var(--tt-borde);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+/* ===== MIA APP-WIDE UI ===== */
+*{box-sizing:border-box}
+html,body,#root{margin:0;min-height:100%;background:#070a0d;color:#f3f7f5}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit}
+button{border:0;cursor:pointer;color:#f3f7f5;background:#17221f;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:12px 15px;transition:.18s ease}
+button:hover{transform:translateY(-1px);background:#1d2d28}
+button:disabled{opacity:.48;cursor:not-allowed;transform:none}
+input,select,textarea{width:100%;background:#0e1513;color:#edf5f1;border:1px solid rgba(255,255,255,.10);border-radius:13px;padding:12px 13px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#6ee7c8;box-shadow:0 0 0 3px rgba(110,231,200,.10)}
+.pantalla{min-height:100vh;padding:20px 16px 92px;background:radial-gradient(circle at 50% -10%,rgba(70,120,105,.16),transparent 38%),#070a0d}
+.titulo-pantalla{font-size:1.7rem;font-weight:700;letter-spacing:-.03em;margin:0 0 8px}
+.texto-mute{color:#899992;font-size:.9rem;line-height:1.5}
+.lista-viajes{gap:10px}
+.tarjeta-viaje{background:linear-gradient(145deg,#111a18,#0d1312);border:1px solid rgba(255,255,255,.08);box-shadow:0 12px 30px rgba(0,0,0,.18);border-radius:20px}
+.barra-navegacion{height:72px;padding:8px 8px max(8px,env(safe-area-inset-bottom));gap:5px;background:rgba(9,13,12,.94);backdrop-filter:blur(18px);border-top:1px solid rgba(255,255,255,.08);z-index:50}
+.barra-navegacion__item{flex:1;text-align:center;padding:9px 4px;border-radius:13px;font-size:.72rem;font-weight:600}
+.barra-navegacion__item--activo{background:rgba(110,231,200,.10);color:#6ee7c8}
+.app-panel{max-width:760px;margin:0 auto}
+.app-hero{padding:8px 2px 20px}
+.app-eyebrow{font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:#6ee7c8;font-weight:700}
+.app-title{font-size:2.1rem;line-height:1.05;letter-spacing:-.045em;margin:8px 0}
+.app-card{background:linear-gradient(145deg,#111a18,#0c1211);border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:17px;box-shadow:0 16px 38px rgba(0,0,0,.20)}
+.app-card + .app-card{margin-top:12px}
+.app-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.app-stat{padding:15px;border-radius:18px;background:#0d1513;border:1px solid rgba(255,255,255,.07)}
+.app-stat strong{display:block;font-size:1.25rem;margin-top:5px}
+.app-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:#7f918b;font-weight:700}
+.app-primary{width:100%;background:linear-gradient(100deg,#6ee7c8,#c9d98d,#efc784);color:#07100d;font-weight:800;border:0}
+.app-danger{color:#ff8e7d}
+.app-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;background:#0c1211;border:1px solid rgba(255,255,255,.07);border-radius:15px}
+.app-tabs button{background:transparent;border:0;color:#82918d}
+.app-tabs button.active{background:#17231f;color:#6ee7c8}
+@media(min-width:700px){.pantalla{padding-left:28px;padding-right:28px}.app-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}

@@ -23,6 +23,8 @@ export interface PuntoGpsCrudo {
 interface GpsTrackingPlugin {
   startTracking(): Promise<void>;
   stopTracking(): Promise<void>;
+  getPersistedTrack(): Promise<{pointsJson: string}>;
+  clearPersistedTrack(): Promise<void>;
   addListener(
     eventName: 'locationUpdate',
     listenerFunc: (punto: PuntoGpsCrudo) => void
@@ -33,6 +35,15 @@ const GpsTracking = registerPlugin<GpsTrackingPlugin>('GpsTracking');
 
 export async function iniciarCapturaSegundoPlano(): Promise<void> {
   await GpsTracking.startTracking();
+}
+
+export async function obtenerTrazaPersistida(): Promise<PuntoGpsCrudo[]> {
+  const r = await GpsTracking.getPersistedTrack()
+  try { return JSON.parse(r.pointsJson) as PuntoGpsCrudo[] } catch { return [] }
+}
+
+export async function limpiarTrazaPersistida(): Promise<void> {
+  await GpsTracking.clearPersistedTrack()
 }
 
 export async function detenerCapturaSegundoPlano(): Promise<void> {

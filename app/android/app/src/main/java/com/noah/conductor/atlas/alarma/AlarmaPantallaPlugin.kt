@@ -72,7 +72,7 @@ class AlarmaPantallaPlugin : Plugin() {
     fun programar(call: PluginCall) {
         val id = call.getString("id") ?: return call.reject("falta id")
         val fechaHoraMs = call.getLong("fechaHoraMs") ?: return call.reject("falta fechaHoraMs")
-        val titulo = call.getString("titulo") ?: "NOAH"
+        val titulo = call.getString("titulo") ?: "MIA"
         val detalle = call.getString("detalle", "") ?: ""
         val vozId = call.getString("vozId", "voz_1") ?: "voz_1"
         val tipo = call.getString("tipo", "recordatorio") ?: "recordatorio"

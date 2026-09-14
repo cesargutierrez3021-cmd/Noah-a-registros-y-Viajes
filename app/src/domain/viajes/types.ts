@@ -44,6 +44,11 @@ export interface Viaje {
   ingreso: number
   localidad: string | null
   zona: string | null
+  /** Ubicación administrativa al iniciar y terminar el recorrido. */
+  localidadInicio: string | null
+  zonaInicio: string | null
+  localidadFin: string | null
+  zonaFin: string | null
   /** true mientras el viaje no se ha confirmado como sincronizado con el backend. */
   pendienteDeSync: boolean
 }
