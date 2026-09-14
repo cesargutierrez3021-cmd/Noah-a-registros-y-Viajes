@@ -9,36 +9,54 @@ import type { ContextoIntent, ContextoMantenimientoItem, Intencion } from './typ
  * absoluto), devuelve null — la ruta igual responde con la intención detectada, solo que
  * sin texto armado, tal como se comportaba antes de este punto.
  */
-export function armarRespuesta(intencion: Intencion, contexto?: ContextoIntent): string | null {
-  if (!contexto) return null
-
+/**
+ * Bloque 1, ítem 2 (bug "MIA no responde"): esta función ANTES devolvía
+ * `null` cuando faltaba el dato (ej. `contexto.hoy` no llegó), y
+ * `conversacion.ts` interpretaba ese `null` como "la regla no resolvió
+ * nada" — cayendo al proxy de IA (stub sin configurar, 503). Eso rompía
+ * incluso preguntas que el Intent Router SÍ reconoce perfectamente
+ * ("cuántos viajes hice hoy" → intención `viajes_hoy`), solo porque el dato
+ * de contexto no llegó completo esa vez. Ahora: si el router reconoció la
+ * intención, SIEMPRE hay una respuesta hablable — con datos reales si
+ * llegaron, o un aviso claro de qué falta si no. Nunca más null para una
+ * intención reconocida — así `conversacion.ts` nunca tiene motivo real para
+ * caer al proxy de IA cuando una regla ya resolvió la pregunta.
+ */
+export function armarRespuesta(intencion: Intencion, contexto?: ContextoIntent): string {
   switch (intencion) {
     case 'km_hoy':
-      if (!contexto.hoy) return null
+      if (!contexto?.hoy) return sinDatos('de hoy')
       return `Hoy llevas ${formatearKm(contexto.hoy.kmTotales)} km en ${contarViajes(contexto.hoy.cantidadViajes)}.`
 
     case 'ingresos_hoy':
-      if (!contexto.hoy) return null
+      if (!contexto?.hoy) return sinDatos('de hoy')
       return `Hoy llevas ${formatearDinero(contexto.hoy.ingresos)} en ${contarViajes(contexto.hoy.cantidadViajes)}.`
 
     case 'viajes_hoy':
-      if (!contexto.hoy) return null
+      if (!contexto?.hoy) return sinDatos('de hoy')
       return `Hoy llevas ${contarViajes(contexto.hoy.cantidadViajes)}.`
 
     case 'resumen_semana':
-      if (!contexto.semana) return null
+      if (!contexto?.semana) return sinDatos('de esta semana')
       return `Esta semana llevas ${formatearKm(contexto.semana.kmTotales)} km y ${formatearDinero(contexto.semana.ingresos)} en ${contarViajes(contexto.semana.cantidadViajes)}.`
 
     case 'mantenimientos_pendientes':
-      return armarRespuestaMantenimiento(contexto.mantenimiento)
+      return armarRespuestaMantenimiento(contexto?.mantenimiento)
 
     default:
-      return null
+      // No debería pasar nunca en la práctica: router.ts solo llama a esta
+      // función con `regla.intencion`, y `ReglaIntent` excluye 'no_reconocida'
+      // por tipo. Se deja un mensaje real (no null) igual, por si acaso.
+      return 'No entendí bien esa pregunta.'
   }
 }
 
-function armarRespuestaMantenimiento(items?: ContextoMantenimientoItem[]): string | null {
-  if (!items) return null
+function sinDatos(periodo: string): string {
+  return `Todavía no tengo tus datos ${periodo} cargados. Abre la app un momento para que se sincronicen y vuelve a preguntarme.`
+}
+
+function armarRespuestaMantenimiento(items?: ContextoMantenimientoItem[]): string {
+  if (!items) return sinDatos('de mantenimiento')
 
   const vencidos = items.filter((i) => i.vencido)
   const proximos = items.filter((i) => i.proximoAVencer)

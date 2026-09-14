@@ -2,12 +2,12 @@
  * Dominio: Estadísticas.
  *
  * A propósito NO tiene repository.ts ni store.ts propio: no es dueño de
- * ningún dato, solo deriva números a partir de domain/viajes (única fuente
- * de verdad de km/ingreso/plataforma/zona — ver PLAN-MAESTRO). Si mañana
- * existe domain/gastos, este dominio se extiende para cruzarlo, pero hoy
- * gastos no está construido (Fase 6 solo cubrió mantenimiento + estadísticas
- * de viajes), así que "ganancia neta" no se calcula todavía a propósito, no
- * por olvido.
+ * ningún dato, solo deriva números a partir de otros dominios (viajes,
+ * jornada, y desde Bloque 4 también gastos — ver `calcularCostoPorKm`).
+ * `domain/gastos` ya existe desde Bloque 3; lo único que faltaba era esta
+ * función que cruza ambos, y es SOLO esta: nunca se decide acá cuánto costó
+ * ni cuándo toca un mantenimiento — eso sigue siendo de `domain/gastos` y
+ * `domain/mantenimiento` respectivamente.
  */
 
 export type UnidadPeriodo = 'dia' | 'semana' | 'mes'
@@ -28,4 +28,39 @@ export interface PuntoPeriodo {
 export interface DesglosePor<TClave extends string> {
   clave: TClave
   resumen: ResumenViajes
+}
+
+/**
+ * Bloque 2, ítem 3 — tiempo de una jornada, desglosado en trabajado vs. muerto.
+ * "Trabajado" = suma de la duración de los viajes finalizados de esa jornada
+ * (desde que arranca hasta que cierra cada viaje, GPS real). "Muerto" = todo
+ * el resto del tiempo transcurrido de la jornada — esperando el próximo viaje,
+ * en tráfico entre carreras, etc. Nunca negativo por construcción (ver
+ * calcularTiempoJornada).
+ */
+export interface TiempoJornada {
+  tiempoTotalMs: number
+  tiempoTrabajadoMs: number
+  tiempoMuertoMs: number
+}
+
+/** Ingreso por hora, en dos versiones — ver calcularRentabilidadPorHora. */
+export interface RentabilidadPorHora {
+  /** Solo cuenta las horas con pasajero/en viaje activo — la tarifa "real" de manejar. */
+  ingresoPorHoraTrabajada: number
+  /** Cuenta TODA la jornada, incluida la espera — la tarifa real de todo el turno. */
+  ingresoPorHoraConEspera: number
+}
+
+/**
+ * Bloque 4 — cruce de `domain/gastos` (plata gastada) contra `domain/viajes`
+ * (km recorridos) en un mismo rango de fechas. Es un número que cambia cada
+ * período por diseño (ver PLAN-MAESTRO, "Por qué Mantenimiento y Gastos
+ * siguen siendo DOS cosas distintas") — nunca se guarda, siempre se deriva.
+ */
+export interface CostoPorKm {
+  gastoTotal: number
+  kmTotales: number
+  /** null si kmTotales es 0 — dividir por cero no es "costo cero", es "no se puede calcular todavía". */
+  costoPorKm: number | null
 }

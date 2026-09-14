@@ -1,6 +1,15 @@
 import { prisma } from '../../lib/prisma.js'
 import type { Prisma } from '@prisma/client'
-import type { ViajeSyncEntrada, JornadaSyncEntrada, RegistroMantenimientoSyncEntrada } from './types.js'
+import type {
+  ViajeSyncEntrada,
+  JornadaSyncEntrada,
+  RegistroMantenimientoSyncEntrada,
+  GastoSyncEntrada,
+  DeudaSyncEntrada,
+  AbonoDeudaSyncEntrada,
+  ConceptoFijoSyncEntrada,
+  GastoHogarSyncEntrada,
+} from './types.js'
 
 export const repositorioSync = {
   /** null = no existe todavía ningún viaje con ese id. */
@@ -92,6 +101,132 @@ export const repositorioSync = {
     await prisma.registroMantenimiento.upsert({
       where: { id: registro.id },
       create: { id: registro.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ningún gasto con ese id. */
+  async buscarGastoPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.gasto.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /** Upsert por id — mismo criterio que los demás recursos de sync. */
+  async guardarGasto(usuarioId: string, gasto: GastoSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      categoria: gasto.categoria,
+      monto: gasto.monto,
+      fechaISO: new Date(gasto.fechaISO),
+      litros: gasto.litros,
+      notas: gasto.notas,
+    }
+
+    await prisma.gasto.upsert({
+      where: { id: gasto.id },
+      create: { id: gasto.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ninguna deuda con ese id. */
+  async buscarDeudaPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.deuda.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /** Upsert por id — Deuda es mutable (saldoActual cambia con cada abono), mismo criterio que Jornada. */
+  async guardarDeuda(usuarioId: string, deuda: DeudaSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      nombre: deuda.nombre,
+      saldoInicial: deuda.saldoInicial,
+      saldoActual: deuda.saldoActual,
+      cuotaProgramada: (deuda.cuotaProgramada ?? undefined) as Prisma.InputJsonValue | undefined,
+      creadaEnISO: new Date(deuda.creadaEnISO),
+    }
+
+    await prisma.deuda.upsert({
+      where: { id: deuda.id },
+      create: { id: deuda.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ningún abono con ese id. */
+  async buscarAbonoDeudaPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.abonoDeuda.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /**
+   * Upsert por id. `deudaId` es un FK real (a diferencia de `itemId` en
+   * RegistroMantenimiento) — si la deuda todavía no llegó al backend, Prisma
+   * lanza P2003 (violación de FK) y esto se propaga tal cual. La traducción
+   * a un error de negocio claro (409, "reintentá en un momento") se hace en
+   * service.ts, no acá — mismo criterio de separación que ya usa
+   * `verificarPertenencia` (el repository solo habla con la base, nunca
+   * decide códigos HTTP ni arma `ErrorSync`).
+   */
+  async guardarAbonoDeuda(usuarioId: string, abono: AbonoDeudaSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      deudaId: abono.deudaId,
+      monto: abono.monto,
+      fechaISO: new Date(abono.fechaISO),
+    }
+
+    await prisma.abonoDeuda.upsert({
+      where: { id: abono.id },
+      create: { id: abono.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ningún concepto fijo con ese id. */
+  async buscarConceptoFijoPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.conceptoFijo.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /** Upsert por id — ConceptoFijo es mutable (montoEsperado/activo cambian con el tiempo), mismo criterio que Deuda. */
+  async guardarConceptoFijo(usuarioId: string, concepto: ConceptoFijoSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      nombre: concepto.nombre,
+      montoEsperado: concepto.montoEsperado,
+      diaDelMes: concepto.diaDelMes,
+      activo: concepto.activo,
+      creadoEnISO: new Date(concepto.creadoEnISO),
+    }
+
+    await prisma.conceptoFijo.upsert({
+      where: { id: concepto.id },
+      create: { id: concepto.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ningún gasto de hogar con ese id. */
+  async buscarGastoHogarPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.gastoHogar.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /**
+   * Upsert por id. `conceptoFijoId` es un FK real cuando no es null (igual
+   * que `AbonoDeuda.deudaId`) — si el concepto todavía no llegó al backend,
+   * Prisma rechaza con P2003. La traducción a un error de negocio claro se
+   * hace en service.ts, no acá (mismo criterio que guardarAbonoDeuda).
+   */
+  async guardarGastoHogar(usuarioId: string, gasto: GastoHogarSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      nombre: gasto.nombre,
+      monto: gasto.monto,
+      tipo: gasto.tipo,
+      fechaISO: new Date(gasto.fechaISO),
+      conceptoFijoId: gasto.conceptoFijoId,
+    }
+
+    await prisma.gastoHogar.upsert({
+      where: { id: gasto.id },
+      create: { id: gasto.id, ...datos },
       update: datos,
     })
   },

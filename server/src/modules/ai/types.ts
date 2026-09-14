@@ -24,10 +24,12 @@ export interface ResultadoIntent {
   resueltaPorRegla: boolean
   confianza: number // 0 a 1. Las reglas siempre devuelven 1.
   /**
-   * Texto de respuesta ya armado a partir de `contexto` (punto 3 de Fase 8). null si el
-   * cliente no mandó el dato que esa intención necesita, o si la intención no sabe usar
-   * contexto (ej. 'no_reconocida'). Pensado para mostrarse tal cual o leerse en voz alta
-   * (Fase 10), no como JSON crudo.
+   * Texto de respuesta ya armado. Si `resueltaPorRegla` es true, esto NUNCA es null
+   * (Bloque 1, ítem 2 — ver respuestas.ts): si falta el dato, se devuelve un aviso
+   * ("todavía no tengo tus datos de hoy...") en vez de null, justamente para que
+   * conversacion.ts nunca tenga que caer al proxy de IA por una intención que la
+   * regla ya reconoció. Solo puede ser null cuando viene del clasificador IA de
+   * respaldo (stub, ver clasificadorIA.ts) y ese stub no armó nada.
    */
   respuesta: string | null
 }

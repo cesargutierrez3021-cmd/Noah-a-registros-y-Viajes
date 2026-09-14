@@ -1,5 +1,15 @@
 import type { Viaje } from '../viajes/types'
-import type { DesglosePor, PuntoPeriodo, ResumenViajes, UnidadPeriodo } from './types'
+import type { Jornada } from '../jornada/types'
+import type { Gasto } from '../gastos/types'
+import type {
+  CostoPorKm,
+  DesglosePor,
+  PuntoPeriodo,
+  RentabilidadPorHora,
+  ResumenViajes,
+  TiempoJornada,
+  UnidadPeriodo,
+} from './types'
 
 const SIN_ZONA = 'Sin zona detectada'
 
@@ -93,4 +103,78 @@ export function desglosePorZona(viajes: Viaje[]): DesglosePor<string>[] {
   return Array.from(grupos.entries())
     .map(([clave, viajesDeLaZona]) => ({ clave, resumen: calcularResumen(viajesDeLaZona) }))
     .sort((a, b) => b.resumen.ingresos - a.resumen.ingresos)
+}
+
+const UNA_HORA_MS = 3_600_000
+
+/**
+ * Bloque 2, ítem 3. Cruza `Jornada` (domain/jornada) con `Viaje[]` (domain/viajes)
+ * — sigue siendo una función pura: recibe ambos como parámetros, no importa
+ * ningún store (D-10: la coordinación entre dominios pasa por la capa de
+ * orquestación que llama a esto, nunca dentro de un store).
+ *
+ * Si la jornada sigue abierta (`finISO === null`), usa el momento actual como
+ * fin provisional — así el tiempo muerto/trabajado se puede mostrar EN VIVO
+ * mientras el conductor sigue de turno, no solo después de cerrar.
+ */
+export function calcularTiempoJornada(jornada: Jornada, viajes: Viaje[]): TiempoJornada {
+  const inicioMs = new Date(jornada.inicioISO).getTime()
+  const finMs = jornada.finISO ? new Date(jornada.finISO).getTime() : Date.now()
+  const tiempoTotalMs = Math.max(0, finMs - inicioMs)
+
+  const viajesDeLaJornada = viajes.filter(
+    (v) => jornada.viajesIds.includes(v.id) && v.estado === 'finalizado' && v.finISO,
+  )
+  const tiempoTrabajadoMs = viajesDeLaJornada.reduce((acc, v) => {
+    const duracion = new Date(v.finISO as string).getTime() - new Date(v.inicioISO).getTime()
+    return acc + Math.max(0, duracion)
+  }, 0)
+
+  // Math.min acá, no solo el Math.max de cada sumando: un viaje manual (Bloque
+  // 2, ítem 4) pudo cargarse con una duración que en teoría se solapa o excede
+  // el tiempo total de la jornada (el conductor tipeó mal una hora) — mejor
+  // mostrar "tiempo muerto: 0" que un número negativo sin sentido.
+  const tiempoMuertoMs = Math.max(0, tiempoTotalMs - Math.min(tiempoTotalMs, tiempoTrabajadoMs))
+
+  return { tiempoTotalMs, tiempoTrabajadoMs, tiempoMuertoMs }
+}
+
+/**
+ * Bloque 2, ítem 3. Reutiliza `calcularTiempoJornada` (D-18: no duplicar un
+ * cálculo que ya existe) para las horas, y suma el ingreso de los mismos
+ * viajes finalizados de la jornada.
+ */
+export function calcularRentabilidadPorHora(jornada: Jornada, viajes: Viaje[]): RentabilidadPorHora {
+  const tiempo = calcularTiempoJornada(jornada, viajes)
+
+  const ingresos = viajes
+    .filter((v) => jornada.viajesIds.includes(v.id) && v.estado === 'finalizado')
+    .reduce((acc, v) => acc + v.ingreso, 0)
+
+  const horasTrabajadas = tiempo.tiempoTrabajadoMs / UNA_HORA_MS
+  const horasTotales = tiempo.tiempoTotalMs / UNA_HORA_MS
+
+  return {
+    ingresoPorHoraTrabajada: horasTrabajadas === 0 ? 0 : ingresos / horasTrabajadas,
+    ingresoPorHoraConEspera: horasTotales === 0 ? 0 : ingresos / horasTotales,
+  }
+}
+
+/**
+ * Bloque 4 — costo por km en un rango de fechas [desdeISO, hastaISO). Recibe
+ * los gastos y los viajes ya filtrados/agregados por quien llama (capa de
+ * orquestación) o el rango crudo — acá se filtran ambos contra el mismo
+ * rango para no depender de que quien llama haya filtrado igual las dos
+ * listas.
+ */
+export function calcularCostoPorKm(gastos: Gasto[], viajes: Viaje[], desdeISO: string, hastaISO: string): CostoPorKm {
+  const gastoTotal = gastos
+    .filter((g) => g.fechaISO >= desdeISO && g.fechaISO < hastaISO)
+    .reduce((acc, g) => acc + g.monto, 0)
+
+  const kmTotales = soloFinalizados(viajes)
+    .filter((v) => v.inicioISO >= desdeISO && v.inicioISO < hastaISO)
+    .reduce((acc, v) => acc + v.distancia.kmTotalesReales, 0)
+
+  return { gastoTotal, kmTotales, costoPorKm: kmTotales === 0 ? null : gastoTotal / kmTotales }
 }

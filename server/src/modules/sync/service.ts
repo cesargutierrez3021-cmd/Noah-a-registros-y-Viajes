@@ -1,5 +1,14 @@
 import { repositorioSync } from './repository.js'
-import type { ViajeSyncEntrada, JornadaSyncEntrada, RegistroMantenimientoSyncEntrada } from './types.js'
+import type {
+  ViajeSyncEntrada,
+  JornadaSyncEntrada,
+  RegistroMantenimientoSyncEntrada,
+  GastoSyncEntrada,
+  DeudaSyncEntrada,
+  AbonoDeudaSyncEntrada,
+  ConceptoFijoSyncEntrada,
+  GastoHogarSyncEntrada,
+} from './types.js'
 
 export class ErrorSync extends Error {
   constructor(
@@ -58,5 +67,71 @@ export const servicioSync = {
     const existente = await repositorioSync.buscarRegistroMantenimientoPorId(registro.id)
     verificarPertenencia(usuarioId, existente, 'Este registro ya pertenece a otra cuenta.')
     await repositorioSync.guardarRegistroMantenimiento(usuarioId, registro)
+  },
+
+  /** Mismo criterio que sincronizarViaje. Ver schema.prisma (modelo Gasto). */
+  async sincronizarGasto(usuarioId: string, gasto: GastoSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarGastoPorId(gasto.id)
+    verificarPertenencia(usuarioId, existente, 'Este gasto ya pertenece a otra cuenta.')
+    await repositorioSync.guardarGasto(usuarioId, gasto)
+  },
+
+  /** Mismo criterio que sincronizarViaje. Ver schema.prisma (modelo Deuda) sobre por qué esta sí se sincroniza mutable, sin soporte de borrado. */
+  async sincronizarDeuda(usuarioId: string, deuda: DeudaSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarDeudaPorId(deuda.id)
+    verificarPertenencia(usuarioId, existente, 'Esta deuda ya pertenece a otra cuenta.')
+    await repositorioSync.guardarDeuda(usuarioId, deuda)
+  },
+
+  /**
+   * Mismo criterio de pertenencia que los demás, más una traducción de error
+   * específica de este recurso: `deudaId` es un FK real (ver schema.prisma),
+   * así que si la deuda todavía no llegó al backend, Prisma rechaza el
+   * insert con P2003. Se traduce acá a un 409 con mensaje claro — el cliente
+   * ya intenta evitar este caso (domain/deudas/sync.ts sube la deuda antes
+   * que sus abonos), pero esta es la garantía real del lado del servidor,
+   * no una simple optimización.
+   */
+  async sincronizarAbonoDeuda(usuarioId: string, abono: AbonoDeudaSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarAbonoDeudaPorId(abono.id)
+    verificarPertenencia(usuarioId, existente, 'Este abono ya pertenece a otra cuenta.')
+    try {
+      await repositorioSync.guardarAbonoDeuda(usuarioId, abono)
+    } catch (err) {
+      const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
+      if (esViolacionDeFK) {
+        throw new ErrorSync('La deuda de este abono todavía no está sincronizada. Reintentá en un momento.', 409)
+      }
+      throw err
+    }
+  },
+
+  /** Mismo criterio que sincronizarDeuda. Ver schema.prisma (modelo ConceptoFijo) sobre por qué es mutable, sin soporte de borrado. */
+  async sincronizarConceptoFijo(usuarioId: string, concepto: ConceptoFijoSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarConceptoFijoPorId(concepto.id)
+    verificarPertenencia(usuarioId, existente, 'Este concepto fijo ya pertenece a otra cuenta.')
+    await repositorioSync.guardarConceptoFijo(usuarioId, concepto)
+  },
+
+  /**
+   * Mismo criterio de pertenencia que los demás, más la misma traducción de
+   * FK que sincronizarAbonoDeuda: `conceptoFijoId` (cuando no es null) es un
+   * FK real hacia ConceptoFijo — si ese concepto todavía no llegó al
+   * backend, Prisma rechaza con P2003. El cliente ya intenta evitar este
+   * caso (domain/hogar/sync.ts sube los conceptos antes que sus gastos),
+   * esta es la garantía real del lado del servidor.
+   */
+  async sincronizarGastoHogar(usuarioId: string, gasto: GastoHogarSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarGastoHogarPorId(gasto.id)
+    verificarPertenencia(usuarioId, existente, 'Este gasto de hogar ya pertenece a otra cuenta.')
+    try {
+      await repositorioSync.guardarGastoHogar(usuarioId, gasto)
+    } catch (err) {
+      const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
+      if (esViolacionDeFK) {
+        throw new ErrorSync('El concepto fijo de este gasto todavía no está sincronizado. Reintentá en un momento.', 409)
+      }
+      throw err
+    }
   },
 }

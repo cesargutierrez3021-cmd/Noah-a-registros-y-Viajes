@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import type { Viaje, Plataforma, PuntoGPS } from './types'
-import { repositorioViajes, crearViajeDesdeCiere } from './repository'
+import type { Viaje, Plataforma, PuntoGPS, ViajeManualInput } from './types'
+import { repositorioViajes, crearViajeDesdeCiere, crearViajeManual } from './repository'
 import { iniciarSeguimientoGPS, type SeguidorGPS } from './gps'
 
 /**
@@ -25,6 +25,11 @@ interface EstadoViajes {
   viajes: Viaje[]
   viajeEnCurso: ViajeEnCurso | null
   cargando: boolean
+  /** Bloque 1, ítem 1: antes un error de GPS al iniciar viaje quedaba en
+   *  silencio (la promesa rechazada de iniciarSeguimientoGPS no se atrapaba
+   *  en ningún lado). Ahora queda acá, visible, para que la pantalla lo
+   *  muestre — se limpia solo al iniciar un viaje nuevo con éxito. */
+  errorGPS: string | null
   cargar: () => Promise<void>
   iniciarViaje: (plataforma: Plataforma) => Promise<void>
   marcarRecogida: () => void
@@ -32,6 +37,10 @@ interface EstadoViajes {
     ingreso: number
     distanciaReportadaPlataforma: number | null
   }) => Promise<Viaje | null>
+  /** Bloque 2, ítem 4 — "agregar viaje manual". No toca `viajeEnCurso` ni el
+   *  GPS para nada: es un camino totalmente aparte para cargar un viaje que
+   *  ya pasó y no se registró en su momento. */
+  agregarViajeManual: (input: ViajeManualInput) => Promise<Viaje>
 }
 
 function generarId(): string {
@@ -45,6 +54,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
   viajes: [],
   viajeEnCurso: null,
   cargando: false,
+  errorGPS: null,
 
   cargar: async () => {
     set({ cargando: true })
@@ -62,14 +72,26 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
       recorrido: [],
       puntoDeRecogidaISO: null,
     }
-    set({ viajeEnCurso: enCurso })
+    set({ viajeEnCurso: enCurso, errorGPS: null })
 
-    seguidorActivo = await iniciarSeguimientoGPS((punto) => {
-      set((s) => {
-        if (!s.viajeEnCurso) return s
-        return { viajeEnCurso: { ...s.viajeEnCurso, recorrido: [...s.viajeEnCurso.recorrido, punto] } }
+    // Bloque 1, ítem 1: iniciarSeguimientoGPS puede rechazar (permiso negado,
+    // GPS desactivado, plugin nativo sin registrar, etc.) — antes ese rechazo
+    // no lo atrapaba nadie, quedaba como una promesa rechazada silenciosa y
+    // el viaje se veía "iniciado" en pantalla sin que el GPS estuviera
+    // grabando nada de verdad. Ahora: si falla, se avisa (errorGPS) y el
+    // viaje en curso se cancela — mejor que dejar al conductor pensando que
+    // se está registrando un recorrido que en realidad está vacío.
+    try {
+      seguidorActivo = await iniciarSeguimientoGPS((punto) => {
+        set((s) => {
+          if (!s.viajeEnCurso) return s
+          return { viajeEnCurso: { ...s.viajeEnCurso, recorrido: [...s.viajeEnCurso.recorrido, punto] } }
+        })
       })
-    })
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : 'No se pudo iniciar el GPS'
+      set({ viajeEnCurso: null, errorGPS: mensaje })
+    }
   },
 
   marcarRecogida: () => {
@@ -98,6 +120,13 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
 
     await repositorioViajes.guardar(viaje)
     set({ viajes: [viaje, ...get().viajes], viajeEnCurso: null })
+    return viaje
+  },
+
+  agregarViajeManual: async (input) => {
+    const viaje = crearViajeManual(generarId(), input)
+    await repositorioViajes.guardar(viaje)
+    set({ viajes: [viaje, ...get().viajes] })
     return viaje
   },
 }))

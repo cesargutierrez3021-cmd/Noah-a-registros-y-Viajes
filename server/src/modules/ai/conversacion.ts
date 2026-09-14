@@ -19,10 +19,20 @@ import type { ContextoConversacion, ProfundidadAnalisis, ResultadoConversacion, 
  *    respuesta armada (regla o clasificador de respaldo), se devuelve eso —
  *    sin tocar el proxy de IA. Es el camino barato y es el que más se va a
  *    usar en la práctica según las intenciones que ya existen (Fase 8).
- * 2. Si no ('no_reconocida', o reconocida pero sin dato para responder — ver
- *    `respuestas.ts`), se pasa al proxy de IA (Fase 9), agregando los turnos
- *    previos de esta conversación a la pregunta para que el modelo pueda
- *    resolver referencias tipo "¿y ayer?" sin que el cliente repita todo.
+ *
+ *    Bloque 1, ítem 2 (confirmado leyendo el código, no supuesto): cuando
+ *    `resueltaPorRegla` es true, `resultadoIntent.respuesta` ahora NUNCA es
+ *    null (fix real en `respuestas.ts`, no acá) — así que este `if` ya no
+ *    puede fallar por error para una intención que la regla sí reconoció.
+ *    Antes SÍ podía pasar: `armarRespuesta` devolvía null si faltaba un dato
+ *    del contexto, y este `if` (que solo mira si `respuesta` es truthy)
+ *    caía al proxy de IA de abajo — que es un stub sin proveedor
+ *    configurado, de ahí el error "IA no configurada" que reportó el
+ *    usuario incluso preguntando algo que el router sí reconocía.
+ * 2. Si no (`no_reconocida`, o el clasificador de respaldo sin implementar
+ *    devolvió sin respuesta), se pasa al proxy de IA (Fase 9), agregando los
+ *    turnos previos de esta conversación a la pregunta para que el modelo
+ *    pueda resolver referencias tipo "¿y ayer?" sin que el cliente repita todo.
  */
 export async function procesarTurnoConversacion(
   texto: string,

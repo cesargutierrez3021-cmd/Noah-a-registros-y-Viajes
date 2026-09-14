@@ -25,7 +25,7 @@ export function CuentaScreen() {
   async function manejarEnviar(evento: React.FormEvent) {
     evento.preventDefault()
     const exito = modo === 'login' ? await iniciarSesion(email, contrasena) : await registrarse(email, contrasena)
-    if (exito) navegar('/conversacion')
+    if (exito) navegar('/') // antes iba a /conversacion — esa ruta ya no existe, MIA ahora es <MiaBurbuja/> visible desde cualquier panel (Bloque 4)
   }
 
   if (autenticado()) {

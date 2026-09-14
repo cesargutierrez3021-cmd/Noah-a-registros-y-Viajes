@@ -22,6 +22,11 @@ model Usuario {
   viajes         Viaje[]
   jornadas       Jornada[]
   registrosMantenimiento RegistroMantenimiento[]
+  gastos         Gasto[]
+  deudas         Deuda[]
+  abonosDeuda    AbonoDeuda[]
+  conceptosFijos ConceptoFijo[]
+  gastosHogar    GastoHogar[]
 
   @@map("usuarios")
 }
@@ -149,4 +154,113 @@ model RegistroMantenimiento {
 
   @@index([usuarioId])
   @@map("registros_mantenimiento")
+}
+
+/// Bloque 3 (dominios nuevos, expansión funcional post-Fase 13) — gastos de
+/// operación del vehículo (gasolina/aceite/llantas/mantenimiento pagado/otro).
+/// Mismo criterio que RegistroMantenimiento: un gasto nunca se edita ni se
+/// borra desde el cliente una vez creado (ver app/src/domain/gastos/types.ts),
+/// así que encaja sin problema en el diseño push-only con upsert por id
+/// (D-16) — no hace falta resolver borrado/edición para sincronizar esto.
+model Gasto {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoria          String
+  monto              Float
+  fechaISO           DateTime  @map("fecha")
+  /// Solo tiene valor para categoria='gasolina' (rendimiento km/litro). Null para el resto.
+  litros             Float?
+  notas              String?
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@map("gastos")
+}
+
+/// Bloque 3 (dominios nuevos) — deudas. A diferencia de Gasto/RegistroMantenimiento
+/// (append-only), Deuda es MUTABLE: `saldoActual` se actualiza con cada abono
+/// (ver app/src/domain/deudas/store.ts, función `abonar`) y se resincroniza vía
+/// upsert — mismo criterio que Jornada. Deliberadamente sin soporte de borrado
+/// (ver el comentario de `pendienteDeSync` en el tipo del cliente para el porqué).
+model Deuda {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nombre             String
+  saldoInicial       Float     @map("saldo_inicial")
+  saldoActual        Float     @map("saldo_actual")
+  /// { monto: number, frecuencia: 'semanal'|'quincenal'|'mensual' } o null. Json en vez de columnas
+  /// separadas porque es opcional como bloque completo, no campo por campo (D-8: no hay razón
+  /// técnica para partirlo en dos columnas nullable en vez de un solo objeto).
+  cuotaProgramada    Json?     @map("cuota_programada")
+  creadaEnISO        DateTime  @map("creada_en")
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+  abonos             AbonoDeuda[]
+
+  @@index([usuarioId])
+  @@map("deudas")
+}
+
+/// Historial de abonos a una deuda. Append-only, mismo criterio que RegistroMantenimiento/Gasto.
+/// `deudaId` SÍ tiene FK real (a diferencia de `itemId` en RegistroMantenimiento) porque `Deuda`
+/// sí existe en este backend — no es una referencia suelta.
+model AbonoDeuda {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  deudaId            String    @map("deuda_id")
+  deuda              Deuda     @relation(fields: [deudaId], references: [id], onDelete: Cascade)
+  monto              Float
+  fechaISO           DateTime  @map("fecha")
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@index([deudaId])
+  @@map("abonos_deuda")
+}
+
+/// Bloque 3, sección 3/4. Plantilla de gasto recurrente (ej. "Arriendo,
+/// $500.000, día 5") — MUTABLE (montoEsperado puede cambiar de un mes a
+/// otro) y sincroniza por upsert, mismo criterio que Deuda. Sin soporte de
+/// borrado a propósito (D-16): en vez de borrar, el cliente desactiva
+/// (`activo=false`) — deja de autogenerar gastos nuevos, conserva el
+/// historial ya generado en GastoHogar.
+model ConceptoFijo {
+  id                 String       @id
+  usuarioId          String       @map("usuario_id")
+  usuario            Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nombre             String
+  montoEsperado      Float        @map("monto_esperado")
+  diaDelMes          Int          @map("dia_del_mes")
+  activo             Boolean      @default(true)
+  creadoEnISO        DateTime     @map("creado_en")
+  sincronizadoEnISO  DateTime     @default(now()) @updatedAt @map("sincronizado_en")
+  gastos             GastoHogar[]
+
+  @@index([usuarioId])
+  @@map("conceptos_fijos")
+}
+
+/// Historial real de gastos del hogar — append-only, igual que Gasto. Cubre
+/// tanto los gastos "únicos" (conceptoFijoId=null) como los autogenerados
+/// cada mes a partir de un ConceptoFijo activo (tipo='fijo').
+/// `conceptoFijoId` SÍ tiene FK real (igual razón que AbonoDeuda.deudaId):
+/// ConceptoFijo existe en este backend, no es una referencia suelta.
+model GastoHogar {
+  id                 String        @id
+  usuarioId          String        @map("usuario_id")
+  usuario            Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nombre             String
+  monto              Float
+  /// 'unico' | 'fijo'
+  tipo               String
+  fechaISO           DateTime      @map("fecha")
+  conceptoFijoId     String?       @map("concepto_fijo_id")
+  conceptoFijo       ConceptoFijo? @relation(fields: [conceptoFijoId], references: [id], onDelete: Cascade)
+  sincronizadoEnISO  DateTime      @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@index([conceptoFijoId])
+  @@map("gastos_hogar")
 }

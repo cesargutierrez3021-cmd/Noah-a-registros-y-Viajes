@@ -1,4 +1,4 @@
-import type { Viaje, CierreViajeInput } from './types'
+import type { Viaje, CierreViajeInput, ViajeManualInput } from './types'
 import { calcularDistanciaReal } from './distancia'
 import { obtenerZona } from './geofencing'
 
@@ -90,6 +90,35 @@ export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje
     ingreso: input.ingreso,
     localidad: zonaDetectada,
     zona: zonaDetectada,
+    pendienteDeSync: true,
+  }
+}
+
+/**
+ * Bloque 2, ítem 4 — construye un `Viaje` cargado a mano (sin GPS). Reutiliza
+ * el mismo `Viaje` de siempre (D-18): `recorrido` queda vacío (no hay puntos
+ * que capturar), `distancia` se arma directo del km que el conductor tipeó
+ * en vez de calcularse con `calcularDistanciaReal` (esa función necesita un
+ * `recorrido` real, que acá no existe) — todo lo demás es idéntico a
+ * `crearViajeDesdeCiere`.
+ */
+export function crearViajeManual(id: string, input: ViajeManualInput): Viaje {
+  return {
+    id,
+    plataforma: input.plataforma,
+    estado: 'finalizado',
+    inicioISO: input.inicioISO,
+    finISO: input.finISO,
+    recorrido: [],
+    distancia: {
+      kmHastaRecoger: 0,
+      kmConPasajero: input.kmTotalesReales,
+      kmTotalesReales: input.kmTotalesReales,
+    },
+    distanciaReportadaPlataforma: input.distanciaReportadaPlataforma,
+    ingreso: input.ingreso,
+    localidad: input.localidad,
+    zona: input.zona,
     pendienteDeSync: true,
   }
 }

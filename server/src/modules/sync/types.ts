@@ -1,6 +1,14 @@
 /**
  * Fase 13 — Offline + sincronización. Cubre: viajes (primer corte de esta
- * fase), jornadas y registros de mantenimiento (continuación). Deliberadamente
+ * fase), jornadas, registros de mantenimiento y gastos (Bloque 3). Deuda y
+ * AbonoDeuda (Bloque 3, continuación) también — a diferencia de los demás,
+ * `AbonoDeuda` tiene FK real a `Deuda` (ver schema.prisma), así que el
+ * cliente tiene que subir la deuda ANTES que sus abonos (ver
+ * app/src/domain/deudas/sync.ts sobre cómo se garantiza ese orden).
+ * ConceptoFijo y GastoHogar (Bloque 3, sección 3) siguen el mismo patrón
+ * exacto que Deuda/AbonoDeuda: `GastoHogar.conceptoFijoId` es FK real hacia
+ * `ConceptoFijo`, mismo orden de subida requerido (ver
+ * app/src/domain/hogar/sync.ts). Deliberadamente
  * NO cubre `ItemMantenimiento` (la configuración de qué mantenimientos existen)
  * porque se puede editar y borrar desde el cliente, y el diseño push-only con
  * upsert por id (D-16) no tiene forma de propagar un borrado — ver el
@@ -67,4 +75,52 @@ export interface RegistroMantenimientoSyncEntrada {
   km: number
   costo: number | null
   notas: string | null
+}
+
+/** Lo que el cliente manda por gasto (Bloque 3). */
+export interface GastoSyncEntrada {
+  id: string
+  categoria: string
+  monto: number
+  fechaISO: string
+  litros: number | null
+  notas: string | null
+}
+
+/** Lo que el cliente manda por deuda (Bloque 3). Se reenvía completa en cada abono (mismo criterio que Jornada). */
+export interface DeudaSyncEntrada {
+  id: string
+  nombre: string
+  saldoInicial: number
+  saldoActual: number
+  cuotaProgramada: { monto: number; frecuencia: string } | null
+  creadaEnISO: string
+}
+
+/** Lo que el cliente manda por abono a una deuda (Bloque 3). */
+export interface AbonoDeudaSyncEntrada {
+  id: string
+  deudaId: string
+  monto: number
+  fechaISO: string
+}
+
+/** Lo que el cliente manda por concepto fijo de hogar (Bloque 3, sección 3). Se reenvía completo cada vez que cambia (monto o activo). */
+export interface ConceptoFijoSyncEntrada {
+  id: string
+  nombre: string
+  montoEsperado: number
+  diaDelMes: number
+  activo: boolean
+  creadoEnISO: string
+}
+
+/** Lo que el cliente manda por gasto de hogar (Bloque 3, sección 3) — único o autogenerado desde un ConceptoFijo. */
+export interface GastoHogarSyncEntrada {
+  id: string
+  nombre: string
+  monto: number
+  tipo: string
+  fechaISO: string
+  conceptoFijoId: string | null
 }

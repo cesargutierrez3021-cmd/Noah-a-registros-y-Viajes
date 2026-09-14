@@ -37,3 +37,51 @@ export const esquemaRegistroMantenimientoSync = z.object({
   costo: z.number().nonnegative().nullable(),
   notas: z.string().nullable(),
 })
+
+export const esquemaGastoSync = z.object({
+  id: z.string().uuid('El id del gasto debe ser el UUID generado en el cliente'),
+  categoria: z.enum(['gasolina', 'aceite', 'llantas', 'mantenimiento', 'otro']),
+  monto: z.number().positive(),
+  fechaISO: z.string(),
+  litros: z.number().positive().nullable(),
+  notas: z.string().nullable(),
+})
+
+const esquemaCuotaProgramada = z.object({
+  monto: z.number().positive(),
+  frecuencia: z.enum(['semanal', 'quincenal', 'mensual']),
+})
+
+export const esquemaDeudaSync = z.object({
+  id: z.string().uuid('El id de la deuda debe ser el UUID generado en el cliente'),
+  nombre: z.string().min(1),
+  saldoInicial: z.number().positive(),
+  saldoActual: z.number().nonnegative(),
+  cuotaProgramada: esquemaCuotaProgramada.nullable(),
+  creadaEnISO: z.string(),
+})
+
+export const esquemaAbonoDeudaSync = z.object({
+  id: z.string().uuid('El id del abono debe ser el UUID generado en el cliente'),
+  deudaId: z.string().uuid('deudaId debe ser el UUID de una deuda ya creada'),
+  monto: z.number().positive(),
+  fechaISO: z.string(),
+})
+
+export const esquemaConceptoFijoSync = z.object({
+  id: z.string().uuid('El id del concepto fijo debe ser el UUID generado en el cliente'),
+  nombre: z.string().min(1),
+  montoEsperado: z.number().positive(),
+  diaDelMes: z.number().int().min(1).max(31),
+  activo: z.boolean(),
+  creadoEnISO: z.string(),
+})
+
+export const esquemaGastoHogarSync = z.object({
+  id: z.string().uuid('El id del gasto debe ser el UUID generado en el cliente'),
+  nombre: z.string().min(1),
+  monto: z.number().positive(),
+  tipo: z.enum(['unico', 'fijo']),
+  fechaISO: z.string(),
+  conceptoFijoId: z.string().uuid('conceptoFijoId debe ser el UUID de un concepto fijo ya creado').nullable(),
+})

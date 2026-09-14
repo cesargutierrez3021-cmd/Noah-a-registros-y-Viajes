@@ -58,3 +58,23 @@ export interface CierreViajeInput {
   distanciaReportadaPlataforma: number | null
   ingreso: number
 }
+
+/**
+ * Bloque 2, ítem 4 — "agregar viaje manual". Sin GPS no hay recorrido para
+ * calcular distancia (ver distancia.ts) ni para detectar zona (ver
+ * geofencing.ts) — el conductor escribe los km directamente, y localidad/zona
+ * quedan en null salvo que él mismo las indique. Mismo `Viaje` de siempre
+ * (D-18: no se crea un tipo de viaje "manual" aparte), solo cambia cómo se
+ * construye (ver `crearViajeManual` en repository.ts).
+ */
+export interface ViajeManualInput {
+  plataforma: Plataforma
+  inicioISO: string
+  finISO: string
+  /** El conductor mide o estima los km totales del viaje completo — no se separa recogida/con pasajero sin GPS. */
+  kmTotalesReales: number
+  distanciaReportadaPlataforma: number | null
+  ingreso: number
+  localidad: string | null
+  zona: string | null
+}
