@@ -4,7 +4,9 @@
 
 > **Regla de comunicación durante el trabajo (pedida explícitamente por el usuario):** mientras se está trabajando en una sección/bloque, NO mandar mensajes narrando el progreso paso a paso — trabajar en silencio y solo escribir cuando: (a) hace falta preguntarle algo al usuario porque es una decisión real que cambiaría el resultado (no una duda que se puede resolver leyendo el código), o (b) pasó un error real que bloquea seguir. Al terminar una sección/bloque completo, entregar directamente el zip actualizado (con este plan actualizado adentro) sin preámbulo largo — un resumen breve de qué se hizo y cuál es el siguiente paso, y ya.
 
-Última actualización: **Bloque 4 (rediseño visual) — parte NO visual hecha, en 2 secciones (pedido explícito del usuario: hacer todo lo que no sea diseño/tema, dejando esa parte para después).** Ver "Estado real de Bloque 4 — parte no visual" para el detalle completo de las 2 secciones. La parte visual (tema, `tokens.css`, animación de la tarjeta de pulso, vestir formularios) sigue 100% pendiente — no se tocó ni un color ni una fuente en esta sesión, a propósito.
+Última actualización: **Bloque 4 — parte visual, SOLO Panel "Trabajo" (pedido explícito del usuario: "solo hace el diseño visual de la parte del trabajo... no me toques balance ni nada más por ahora").** Ver "Estado real de Bloque 4 — parte visual (solo Panel Trabajo)" para el detalle completo. Balance, Casa y Deudas, Cuenta y Planes siguen exactamente con el tema genérico de siempre — no se tocó ni una línea de esas pantallas.
+
+Antes de esto: **Bloque 4 (rediseño visual) — parte NO visual hecha, en 2 secciones (pedido explícito del usuario: hacer todo lo que no sea diseño/tema, dejando esa parte para después).** Ver "Estado real de Bloque 4 — parte no visual" para el detalle completo de las 2 secciones.
 
 Antes de esto: **✅ Bloque 3 (dominios nuevos) COMPLETO — las 4 secciones.** Sección 4/4 (Balance general) hecha esa sesión — ver "Estado real de Bloque 3 — sección 4: Balance general" para el detalle.
 
@@ -287,12 +289,12 @@ No tiene sentido construir funciones nuevas encima de una base con bugs conocido
 **✅ Bloque 3 completo — las 4 secciones. Antes de seguir con el Bloque 4 (rediseño visual), se le preguntó al usuario si continúa (mismo protocolo que al cerrar el Bloque 2).**
 
 ### Bloque 4 — Rediseño visual (al final, sobre una base funcional ya sólida)
-9. El usuario elige el tema (o combinación) entre los 3 mockups ya generados (ver detalle de los 3 temas más abajo) — **sigue sin confirmarse, no se escribe CSS real hasta que esto se decida.**
-10. Aplicar el tema elegido a `design/tokens.css` — se EXTIENDE ese único archivo (D-8/Fase 6: nunca un `-extra.css`). **PENDIENTE.**
+9. El usuario eligió el tema aportando su propia guía visual (`visual.zip`, 20 capturas — reemplaza a los 3 mockups genéricos anteriores) en vez de elegir entre los 3 mockups ya generados. **HECHO, pero SOLO para el Panel "Trabajo"** — el usuario pidió explícitamente no tocar el resto todavía (ver "Estado real de Bloque 4 — parte visual (solo Panel Trabajo)"). Balance/Casa y Deudas/Cuenta/Planes siguen sin tema — decisión pendiente si se les aplica el mismo o distinto.
+10. Aplicar el tema elegido a `design/tokens.css` — se EXTIENDE ese único archivo (D-8/Fase 6: nunca un `-extra.css`). **HECHO para el Panel "Trabajo"** (selector `.tema-trabajo`, scoped a propósito). **PENDIENTE para el resto de paneles.**
 11. ~~Fusionar `ViajesScreen`+`MantenimientoScreen`+`EstadisticasScreen`+la pantalla de Gastos (Bloque 3) en un solo Panel "Trabajo"~~ — **HECHO (parte no visual, sección 1/2 de esta sesión).** `domain/deudas`/`domain/hogar` (Bloque 3) arman su propio **Panel "Casa y Deudas"** — **HECHO (sección 2/2)**. Ver "Estado real de Bloque 4 — parte no visual" más abajo. Falta solo vestirlo con el tema (eso es el ítem 10 aplicado a estas pantallas).
 12. ~~Sacar a MIA de ruta aparte y convertirla en burbuja de micrófono flotante (overlay)~~ — **HECHO (parte no visual, sección 2/2)**: `MiaBurbuja.tsx`, sin animación/ícono todavía.
-13. Construir la tarjeta de pulso animada (neto del día, km, estado de jornada) alimentada con datos reales de los stores ya existentes — **la parte de DATOS está hecha** (`SeccionPulso.tsx`, sección 1/2 de esta sesión, incluye el `calcularCostoPorKm` nuevo). **La animación sigue pendiente** (parte visual).
-14. Vestir con el tema elegido los formularios nuevos de los bloques 2 y 3 (gastos, deudas, hogar, viaje manual) — se hace al final para no vestir dos veces lo mismo si el layout cambia mientras se construye. **PENDIENTE.**
+13. Construir la tarjeta de pulso animada (neto del día, km, estado de jornada) alimentada con datos reales de los stores ya existentes — **HECHO, datos + visual** (`SeccionPulso.tsx` reescrita esta sesión: estado del sistema, CTA degradado, grilla de 8 métricas Redondas/Recortadas/Resumen, todo con datos reales). **Sin animación de entrada/transición todavía** (motion propiamente dicho, no solo estilo estático) — pendiente si el usuario la pide.
+14. Vestir con el tema elegido los formularios nuevos de los bloques 2 y 3 (gastos, deudas, hogar, viaje manual) — se hace al final para no vestir dos veces lo mismo si el layout cambia mientras se construye. **Gastos y viaje manual: HECHO (heredan `.tema-trabajo` por vivir dentro del Panel Trabajo). Deudas y Hogar: PENDIENTE** (viven en Panel "Casa y Deudas", fuera del alcance pedido esta sesión).
 
 **Por qué este orden y no otro:** los bugs del Bloque 1 pueden estar afectando datos que los bloques siguientes van a mostrar (ej. si el GPS falla en silencio, el tiempo real de viaje del Bloque 2 estaría mal). Los dominios nuevos del Bloque 3 son la parte más grande y arriesgada — conviene tenerlos funcionando en su forma más simple (sin vestir) antes de invertir tiempo en el rediseño visual completo del Bloque 4, para no tener que rehacer estilos si algo del diseño de datos cambia sobre la marcha.
 
@@ -737,7 +739,27 @@ Esto disparó una revisión más amplia: **ninguna versión de ninguna dependenc
 
 **No verificado todavía:** sigue sin poder correrse `npm install` real en este entorno — la próxima corrida de GitHub Actions (cliente) y del build de Render (backend) son las primeras pruebas reales de que estas versiones relajadas efectivamente resuelven.
 
-## Estado real de Bloque 4 — parte no visual (2 secciones, ambas HECHAS)
+## Estado real de Bloque 4 — parte visual (solo Panel Trabajo)
+
+**Referencia:** 20 capturas de pantalla del usuario (`visual.zip` — el `.rar` original no se pudo abrir, este entorno no tiene `unrar` ni acceso a internet para instalarlo; el usuario lo reenvió como `.zip`). Paleta oscura verde-azulada casi negra, acento degradado menta→dorado, tarjetas circulares/recortadas para métricas conmutables con píldoras (Redondas/Recortadas/Resumen), tipografía serif para titulares y monoespaciada para etiquetas tipo eyebrow. Se siguió la referencia tal cual la pidió el usuario ("quiero un tema así igual") — las capturas eran de NOAH (marca vieja); se adaptó el texto de marca a "MIA" donde correspondía, sin copiar branding ajeno.
+
+**Alcance, respetado al pie de la letra:** SOLO el Panel "Trabajo". Decisión de arquitectura clave para lograrlo sin tocar nada más: el tema nuevo vive dentro de un único selector `.tema-trabajo` en `design/tokens.css` (extendido, no un archivo nuevo — D-18) aplicado una sola vez en el `<section>` raíz de `TrabajoScreen.tsx`. Nunca se tocó `:root` ni las clases genéricas a nivel global (`.pantalla`, `.tarjeta-viaje`, `.texto-mute`, etc.) — esas las siguen usando Balance/Casa y Deudas/Cuenta/Planes sin ningún cambio. Dentro de `.tema-trabajo` sí hay overrides de esas mismas clases (`.tema-trabajo .tarjeta-viaje {...}`), pero por estar anidados bajo el selector, no salen del panel.
+
+**`SeccionPulso.tsx` — reescrita completa** (era la parte con más capturas de referencia):
+- Encabezado tipo portada (eyebrow + título serif + subtítulo dinámico según haya o no jornada abierta).
+- Tarjeta "Estado del sistema" (En curso / Pausa) + botón CTA con degradado (Iniciar/Terminar jornada).
+- Selector Redondas/Recortadas/Resumen (estado local, sin tocar ningún store) con la grilla de 8 métricas reales: tiempo de jornada, tiempo real trabajado, tiempo muerto (`calcularTiempoJornada`, Bloque 2), dinero/hora real (`calcularRentabilidadPorHora`, Bloque 2), gasolina/km (`calcularCostoPorKm` filtrado a categoría 'gasolina' — antes ese filtro no existía, ahora la etiqueta sí corresponde al dato real), dinero que se va en espera (**`calcularDineroEnEspera` — función nueva en `domain/estadisticas/calculos.ts`**, hora muerta × tarifa real de la hora trabajada, verificada con `node`), kilómetros del día, mantenimiento del día (suma de gastos categoría 'mantenimiento' de hoy).
+- Vista "Resumen": píldoras Hoy/Semana/Mes, neto grande, desglose por categoría (Gasolina/Mantenimiento/Aceite/Total), divisor "Operación y registros" con 2 botones que hacen scroll real a las secciones de abajo, e historial acordeón de los últimos 5 días (`agruparPorPeriodo`, ya existía).
+
+**Dos decisiones para resolver ambigüedades de la guía que no se pueden despejar del todo con capturas recortadas — documentadas para no tener que redecidir:**
+1. "Gasolina/km" usa específicamente gastos categoría `gasolina`, no el total de gastos (eso ya lo cubre el desglose de "Resumen").
+2. La guía mostraba un botón "Agregar bono" — no se agregó: ese concepto no existe como dominio en MIA, y D-18 prohíbe crear botones que no lleven a nada real. Quedaron "Agregar viaje" y "Agregar gasto", los dos con acción real.
+
+**Las otras 4 secciones (`SeccionViajesYJornada`, `SeccionMantenimiento`, `SeccionGastos`, `SeccionEstadisticas`):** NO se reescribieron a mano (ninguna de sus ~430 líneas de lógica se tocó, D-3) — heredan el tema nuevo automáticamente por los overrides de `.tema-trabajo` sobre las clases genéricas que ya usaban, más un `id` nuevo en cada una (para el scroll de los botones de arriba) y su encabezado cambiado a la clase serif `.tt-titulo-seccion`. No tienen la fidelidad visual completa de las capturas (esas mostraban formularios/listas más elaborados) — quedan con el look del tema pero la MISMA estructura de antes; si el usuario quiere que también se vistan a fondo (no solo hereden colores/fuentes), es la continuación natural de este mismo trabajo.
+
+**No se pudo compilar ni ver esto renderizado ni una vez** — mismo límite de siempre (sin `npm install` en este entorno). Se verificaron con `node` las funciones puras nuevas (`calcularDineroEnEspera`, `formatoDuracion`, los rangos de semana/mes) y se confirmó a mano que las etiquetas JSX quedaron balanceadas en los 6 archivos tocados. La próxima sesión (o el usuario, si corre `npm run build`) debería revisar visualmente antes de seguir — es la primera vez que se escribe CSS de verdad en este proyecto.
+
+
 
 **Alcance acordado con el usuario para este corte:** de los 6 ítems del Bloque 4 (9 a 14), se hizo TODO lo que no es diseño/tema — es decir, la reestructura real de pantallas, la fusión de paneles, MIA como burbuja, y la capa de datos de la tarjeta de pulso. **Los ítems 9, 10 y 14 (elegir tema, aplicar tema a `tokens.css`, vestir formularios) siguen 100% pendientes** — no se tocó ningún color, fuente, ni el archivo `tokens.css` en esta sesión. Todo lo nuevo reutiliza las mismas clases genéricas de siempre (`pantalla`, `titulo-pantalla`, `texto-mute`, `tarjeta-viaje`, `lista-viajes`, `insignia`).
 
@@ -823,7 +845,8 @@ mia/
         planes/
           PlanesScreen.tsx  ← plan actual + catálogo, sin botón de compra todavía (Fase 11, D-14)
       design/
-        tokens.css          ← SIGUE plano/genérico — el tema del Bloque 4 (ítems 9/10) no se aplicó todavía
+        tokens.css          ← tema genérico (global) + `.tema-trabajo` (Bloque 4 visual,
+                                SOLO Panel Trabajo, scoped a propósito — ver PLAN)
       lib/
         api.ts              ← Fase 10: primer cliente HTTP real hacia server/ (D-11)
     android/                ← plugins nativos (burbuja, alarma) copiados del proyecto viejo (D-1),

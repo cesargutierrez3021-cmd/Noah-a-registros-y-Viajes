@@ -62,8 +62,8 @@ export function SeccionMantenimiento() {
   }
 
   return (
-    <>
-      <h2 className="titulo-pantalla" style={{ fontSize: 18 }}>Mantenimiento</h2>
+    <div id="seccion-mantenimiento">
+      <h2 className="tt-titulo-seccion">Mantenimiento</h2>
       <p className="texto-mute" style={{ marginBottom: 12 }}>
         Km actual: <strong>{kmActual.toFixed(0)} km</strong>
       </p>
@@ -139,6 +139,6 @@ export function SeccionMantenimiento() {
           </>
         )}
       </div>
-    </>
+    </div>
   )
 }

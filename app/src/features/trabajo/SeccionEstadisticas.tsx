@@ -23,8 +23,8 @@ export function SeccionEstadisticas() {
   const porZona = desglosePorZona(viajes)
 
   return (
-    <>
-      <h2 className="titulo-pantalla" style={{ fontSize: 18 }}>Estadísticas</h2>
+    <div id="seccion-estadisticas">
+      <h2 className="tt-titulo-seccion">Estadísticas</h2>
 
       <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
         <span className="texto-mute">Total histórico</span>
@@ -83,6 +83,6 @@ export function SeccionEstadisticas() {
           </ul>
         </>
       )}
-    </>
+    </div>
   )
 }

@@ -98,3 +98,423 @@
   color: var(--color-acento);
   font-weight: 600;
 }
+
+/**
+ * ============================================================================
+ * Tema del Panel "Trabajo" — Bloque 4, ítems 9/10/13/14 (parte visual)
+ * ============================================================================
+ * Pedido explícito del usuario: solo el Panel "Trabajo" se viste por ahora
+ * (Balance, Casa y Deudas, Cuenta, Planes quedan con el tema genérico de
+ * arriba, sin tocar). Por eso este bloque entero vive DENTRO del selector
+ * `.tema-trabajo` — nunca se tocan `:root`, `.pantalla`, `.tarjeta-viaje`,
+ * etc. a nivel global, porque esas clases las siguen usando las demás
+ * pantallas. `.tema-trabajo` se aplica una sola vez, en el `<section>` raíz
+ * de `TrabajoScreen.tsx` — todo lo de acá abajo hereda de ahí para adentro.
+ *
+ * Referencia visual: guía de capturas de pantalla que aportó el usuario
+ * (paleta oscura verde-azulada casi negra, acento degradado menta→dorado,
+ * tarjetas circulares/recortadas para métricas, tipografía serif para
+ * titulares y monoespaciada para etiquetas). Se sigue esa referencia tal
+ * cual la pidió el usuario ("quiero un tema así igual").
+ *
+ * Fuentes: pilas de fuentes del sistema (serif/sans/mono), sin `@import` ni
+ * Google Fonts — la app corre empaquetada en Capacitor sin garantía de
+ * internet en el momento de abrir, así que depender de una fuente remota
+ * dejaría el tema roto offline. Decisión deliberada, no un olvido.
+ */
+.tema-trabajo {
+  --tt-fondo: #060e0c;
+  --tt-fondo-alto: #0c1a17;
+  --tt-superficie: #101f1c;
+  --tt-superficie-alta: #16302a;
+  --tt-borde: rgba(255, 255, 255, 0.08);
+  --tt-texto: #eef5f2;
+  --tt-texto-mute: #8ea39d;
+  --tt-menta: #6ee7c8;
+  --tt-oro: #f0c987;
+  --tt-lila: #b18cf5;
+  --tt-coral: #f0806a;
+  --tt-gradiente-cta: linear-gradient(100deg, #6ee7c8 0%, #d9dc8f 55%, #f0c987 100%);
+
+  --tt-fuente-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Noto Serif', serif;
+  --tt-fuente-cuerpo: -apple-system, 'Segoe UI', Roboto, ui-sans-serif, system-ui, sans-serif;
+  --tt-fuente-etiqueta: ui-monospace, 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+
+  background: var(--tt-fondo);
+  color: var(--tt-texto);
+  font-family: var(--tt-fuente-cuerpo);
+  padding: 0 0 32px;
+  min-height: 100%;
+}
+
+.tema-trabajo .titulo-pantalla {
+  /* El h1 "Trabajo" genérico ya no se usa como tal — TrabajoScreen.tsx lo
+     reemplaza por .tt-hero. Esta regla es un respaldo defensivo, no debería
+     verse en pantalla. */
+  display: none;
+}
+
+/* --- Encabezado tipo "portada" (NOAH/CUADERNO en la referencia → acá MIA/TRABAJO) --- */
+.tt-hero {
+  padding: 20px 18px 24px;
+  position: relative;
+}
+
+.tt-hero__eyebrow {
+  font-family: var(--tt-fuente-etiqueta);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tt-menta);
+}
+
+.tt-hero__titulo {
+  font-family: var(--tt-fuente-display);
+  font-size: clamp(2rem, 9vw, 2.6rem);
+  line-height: 1.08;
+  margin: 10px 0 8px;
+  font-weight: 400;
+  color: var(--tt-texto);
+}
+
+.tt-hero__subtitulo {
+  color: var(--tt-texto-mute);
+  font-size: 0.95rem;
+  max-width: 34ch;
+}
+
+.tt-hero__config {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--tt-borde);
+  background: var(--tt-fondo-alto);
+  color: var(--tt-texto-mute);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Tarjeta base compartida por estado/metricas/resumen --- */
+.tt-tarjeta {
+  background: var(--tt-superficie);
+  border: 1px solid var(--tt-borde);
+  border-radius: 22px;
+  padding: 18px;
+}
+
+/* --- Estado del sistema + botón de iniciar/terminar jornada --- */
+.tt-estado {
+  margin: 0 18px 14px;
+  text-align: center;
+}
+
+.tt-estado__etiqueta {
+  font-family: var(--tt-fuente-etiqueta);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tt-texto-mute);
+}
+
+.tt-estado__valor {
+  font-family: var(--tt-fuente-display);
+  font-size: 1.9rem;
+  margin: 6px 0 4px;
+}
+
+.tt-estado__valor--activo {
+  color: var(--tt-menta);
+}
+
+.tt-estado__valor--pausa {
+  color: var(--tt-oro);
+}
+
+.tt-estado__detalle {
+  color: var(--tt-texto-mute);
+  font-size: 0.85rem;
+}
+
+.tt-boton-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: calc(100% - 36px);
+  margin: 0 18px 18px;
+  padding: 16px;
+  border-radius: 20px;
+  border: none;
+  background: var(--tt-gradiente-cta);
+  color: #08221b;
+  font-family: var(--tt-fuente-cuerpo);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tt-boton-cta:active {
+  filter: brightness(0.96);
+}
+
+.tt-boton-cta--pausar {
+  background: var(--tt-superficie-alta);
+  color: var(--tt-texto);
+  border: 1px solid var(--tt-borde);
+}
+
+/* --- Grupo de píldoras (Redondas / Recortadas / Resumen, Hoy / Semana / Mes) --- */
+.tt-pildoras {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 18px 16px;
+  overflow-x: auto;
+}
+
+.tt-pildoras__etiqueta {
+  font-family: var(--tt-fuente-etiqueta);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tt-texto-mute);
+  line-height: 1.2;
+  flex-shrink: 0;
+  width: 58px;
+}
+
+.tt-pildora {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--tt-borde);
+  background: var(--tt-fondo-alto);
+  color: var(--tt-texto-mute);
+  font-family: var(--tt-fuente-cuerpo);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tt-pildora--activa {
+  background: var(--tt-lila);
+  border-color: var(--tt-lila);
+  color: #1c1030;
+}
+
+.tt-pildora--activa.tt-pildora--dorada {
+  background: var(--tt-gradiente-cta);
+  color: #08221b;
+}
+
+/* --- Grilla de métricas (vista "Redondas" / "Recortadas") --- */
+.tt-grilla-metricas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 0 18px 20px;
+}
+
+.tt-metrica {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 4px;
+  background: radial-gradient(circle at 30% 20%, var(--tt-superficie-alta), var(--tt-superficie));
+  border: 1px solid var(--tt-borde);
+  padding: 14px;
+}
+
+.tt-metrica--redonda {
+  border-radius: 50%;
+}
+
+.tt-metrica--recortada {
+  border-radius: 24px;
+  clip-path: polygon(16% 0%, 84% 0%, 100% 16%, 100% 84%, 84% 100%, 16% 100%, 0% 84%, 0% 16%);
+}
+
+.tt-metrica__icono {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.tt-metrica__etiqueta {
+  color: var(--tt-texto-mute);
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.tt-metrica__valor {
+  font-family: var(--tt-fuente-cuerpo);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.tt-metrica__valor--menta { color: var(--tt-menta); }
+.tt-metrica__valor--oro { color: var(--tt-oro); }
+.tt-metrica__valor--lila { color: var(--tt-lila); }
+.tt-metrica__valor--coral { color: var(--tt-coral); }
+
+/* --- Vista "Resumen": neto grande + desglose + acciones + historial --- */
+.tt-resumen-neto {
+  margin: 0 18px 16px;
+}
+
+.tt-resumen-neto__etiqueta {
+  font-family: var(--tt-fuente-etiqueta);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tt-texto-mute);
+}
+
+.tt-resumen-neto__valor {
+  font-family: var(--tt-fuente-display);
+  font-size: 2.6rem;
+  margin: 4px 0 2px;
+}
+
+.tt-resumen-neto__detalle {
+  color: var(--tt-texto-mute);
+  font-size: 0.85rem;
+}
+
+.tt-resumen-filas {
+  margin: 0 18px 16px;
+  border-top: 1px solid var(--tt-borde);
+}
+
+.tt-resumen-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--tt-borde);
+}
+
+.tt-resumen-fila__nombre {
+  font-weight: 600;
+}
+
+.tt-resumen-fila__nota {
+  display: block;
+  color: var(--tt-texto-mute);
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.tt-divisor {
+  font-family: var(--tt-fuente-display);
+  font-size: 1.3rem;
+  font-weight: 400;
+  margin: 24px 18px 12px;
+}
+
+.tt-acciones {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 0 18px 14px;
+}
+
+.tt-accion-boton {
+  background: var(--tt-superficie);
+  border: 1px solid var(--tt-borde);
+  border-radius: 18px;
+  padding: 16px 8px;
+  color: var(--tt-texto);
+  font-family: var(--tt-fuente-cuerpo);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.tt-acordeon {
+  margin: 0 18px 20px;
+  background: var(--tt-superficie);
+  border: 1px solid var(--tt-borde);
+  border-radius: 18px;
+  padding: 16px;
+  color: var(--tt-texto);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tt-acordeon__contenido {
+  margin-top: 12px;
+  font-weight: 400;
+}
+
+/* --- Secciones internas (Jornada/Viajes, Mantenimiento, Gastos, Estadísticas):
+   se apoyan en las clases genéricas ya existentes (tarjeta-viaje, texto-mute,
+   lista-viajes) — acá se sobreescribe SOLO su apariencia dentro del panel
+   Trabajo, sin tocar la definición global que usan las demás pantallas. */
+.tema-trabajo h2.tt-titulo-seccion {
+  font-family: var(--tt-fuente-display);
+  font-size: 1.4rem;
+  font-weight: 400;
+  margin: 28px 18px 12px;
+  color: var(--tt-texto);
+}
+
+.tema-trabajo > .tarjeta-viaje,
+.tema-trabajo .lista-viajes {
+  margin-left: 18px;
+  margin-right: 18px;
+}
+
+.tema-trabajo .tarjeta-viaje {
+  background: var(--tt-superficie);
+  border-color: var(--tt-borde);
+  border-radius: 18px;
+  color: var(--tt-texto);
+}
+
+.tema-trabajo .texto-mute {
+  color: var(--tt-texto-mute);
+}
+
+.tema-trabajo .insignia--ok {
+  background: rgba(110, 231, 200, 0.15);
+  color: var(--tt-menta);
+}
+
+.tema-trabajo .insignia--proximo {
+  background: rgba(240, 201, 135, 0.18);
+  color: var(--tt-oro);
+}
+
+.tema-trabajo .insignia--vencido {
+  background: rgba(240, 128, 106, 0.18);
+  color: var(--tt-coral);
+}
+
+.tema-trabajo button {
+  font-family: var(--tt-fuente-cuerpo);
+  background: var(--tt-fondo-alto);
+  color: var(--tt-texto);
+  border: 1px solid var(--tt-borde);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tema-trabajo input,
+.tema-trabajo select {
+  font-family: var(--tt-fuente-cuerpo);
+  background: var(--tt-fondo-alto);
+  color: var(--tt-texto);
+  border: 1px solid var(--tt-borde);
+  border-radius: 12px;
+  padding: 10px 12px;
+}

@@ -37,8 +37,8 @@ export function SeccionViajesYJornada() {
   }
 
   return (
-    <>
-      <h2 className="titulo-pantalla" style={{ fontSize: 18 }}>Jornada y viajes</h2>
+    <div id="seccion-viajes-jornada">
+      <h2 className="tt-titulo-seccion">Jornada y viajes</h2>
 
       <div className="tarjeta-viaje" style={{ marginBottom: 16 }}>
         {jornada ? (
@@ -95,6 +95,6 @@ export function SeccionViajesYJornada() {
           ))}
         </ul>
       )}
-    </>
+    </div>
   )
 }

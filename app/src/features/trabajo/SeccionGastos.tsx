@@ -52,8 +52,8 @@ export function SeccionGastos() {
   const gastosOrdenados = [...gastos].sort((a, b) => b.fechaISO.localeCompare(a.fechaISO))
 
   return (
-    <>
-      <h2 className="titulo-pantalla" style={{ fontSize: 18 }}>Gastos de jornada</h2>
+    <div id="seccion-gastos">
+      <h2 className="tt-titulo-seccion">Gastos de jornada</h2>
       <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 12, alignItems: 'stretch' }}>
         <label className="texto-mute">
           Categoría
@@ -97,6 +97,6 @@ export function SeccionGastos() {
           ))}
         </ul>
       )}
-    </>
+    </div>
   )
 }

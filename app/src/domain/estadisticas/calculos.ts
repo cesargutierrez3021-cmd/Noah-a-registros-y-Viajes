@@ -161,6 +161,19 @@ export function calcularRentabilidadPorHora(jornada: Jornada, viajes: Viaje[]): 
 }
 
 /**
+ * Bloque 4, ítem 13 (visual) — "dinero que se va en espera": cuánto se deja
+ * de ganar en el tiempo muerto de la jornada, medido contra la propia tarifa
+ * efectiva del conductor mientras SÍ está trabajando (`ingresoPorHoraTrabajada`
+ * — reutilizada, D-18, no se recalcula nada de cero). Es un estimado de
+ * oportunidad perdida, no plata que de verdad se gastó — se muestra así en
+ * la tarjeta correspondiente, no como un gasto real.
+ */
+export function calcularDineroEnEspera(tiempo: TiempoJornada, rentabilidad: RentabilidadPorHora): number {
+  const horasMuertas = tiempo.tiempoMuertoMs / UNA_HORA_MS
+  return horasMuertas * rentabilidad.ingresoPorHoraTrabajada
+}
+
+/**
  * Bloque 4 — costo por km en un rango de fechas [desdeISO, hastaISO). Recibe
  * los gastos y los viajes ya filtrados/agregados por quien llama (capa de
  * orquestación) o el rango crudo — acá se filtran ambos contra el mismo
