@@ -55,6 +55,52 @@ class GpsTrackingPlugin : Plugin(), GpsTrackingService.GpsLocationListener {
         beginService(call)
     }
 
+    /**
+     * 2026-09-15 — pedido explícito del usuario: pantalla de onboarding que
+     * pide los 4 permisos (notificaciones, ubicación, burbuja, micrófono)
+     * apenas se abre la app por primera vez, ANTES de que el conductor
+     * inicie ningún viaje. `startTracking()` ya dispara el mismo diálogo de
+     * permisos, pero además arranca el foreground service (y su
+     * notificación persistente) — no sirve para "solo preguntar". Este
+     * método es el mismo flujo de permisos exacto (foreground → background,
+     * mismos alias declarados arriba en @CapacitorPlugin), sin el
+     * `beginService()` final — ver domain/onboarding/permisos.ts.
+     */
+    @PluginMethod
+    fun solicitarPermisos(call: PluginCall) {
+        if (!hasRequiredPermissions()) {
+            requestPermissionForAlias("location", call, "onboardingLocationCallback")
+            return
+        }
+        onboardingBackgroundCheck(call)
+    }
+
+    @PermissionCallback
+    private fun onboardingLocationCallback(call: PluginCall) {
+        onboardingBackgroundCheck(call)
+    }
+
+    private fun onboardingBackgroundCheck(call: PluginCall) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            getPermissionState("backgroundLocation") != com.getcapacitor.PermissionState.GRANTED
+        ) {
+            requestPermissionForAlias("backgroundLocation", call, "onboardingBackgroundCallback")
+            return
+        }
+        resolverConcedido(call)
+    }
+
+    @PermissionCallback
+    private fun onboardingBackgroundCallback(call: PluginCall) {
+        resolverConcedido(call)
+    }
+
+    private fun resolverConcedido(call: PluginCall) {
+        val r = JSObject()
+        r.put("concedido", hasRequiredPermissions())
+        call.resolve(r)
+    }
+
     @PermissionCallback
     private fun locationPermsCallback(call: PluginCall) {
         if (getPermissionState("location") != com.getcapacitor.PermissionState.GRANTED) {

@@ -901,3 +901,33 @@ mia/
                                 googlePlay.ts es un stub a propósito (verificadorSinConfigurar,
                                 503) — no hay cuenta de desarrollador de Google Play todavía.
 ```
+
+## 2026-09-15 — Temas reales (Verde + Carbón dorado mate) + Onboarding de permisos
+
+Pedido explícito del usuario: los dos temas dejan de ser mockups/HTML sueltos y pasan a ser el CSS real de la app; y la primera vez que se abre la app, antes de cualquier panel, se piden los 4 permisos (notificaciones, ubicación precisa siempre, burbuja sobre otras apps, micrófono) y después se elige el tema. El tema se puede volver a cambiar después desde Ajustes.
+
+**`design/tokens.css` — unificado, ya no son tres capas sueltas.** Antes había `:root` (vestigial), `.tema-trabajo` con sus propios `--tt-*` fijos, y una sección "MIA APP-WIDE UI" con hex fijo para Balance/Casa/Cuenta/Planes — ninguna de las tres cambiaba con el tema. Ahora todo vive en `:root, [data-tema='verde']` (los valores de Verde, sin cambiar ninguno) y un bloque nuevo `[data-tema='oro']` con los valores EXACTOS del documento que compartió el usuario (`MIA_TEMA_CARBON_DORADO_MATE.json`/`.docx`) — colores, tipografías (`Georgia` para display, `Inter` para cuerpo), radios (`18px` tarjeta — se confirmó que el documento no pedía octágono, así que ya no lo es). Los `--tt-*` de `.tema-trabajo` pasaron a ser alias de las variables nuevas (`--tt-fondo: var(--color-fondo)`, etc.) para que las ~50 reglas que ya los usaban cambien de tema solas, sin tocarlas una por una (D-18). La sección "app-wide" se convirtió de hex fijo a `var(...)` en todos lados.
+
+**`domain/tema/`** (nuevo, D-8 — un dominio chico, todo el resto del tema vive en CSS, no en JS):
+- `types.ts` — `Tema = 'verde' | 'oro'` + `TEMAS_DISPONIBLES` (nombre/descripción de cada uno), reusado por Onboarding y Ajustes.
+- `store.ts` — aplica `data-tema` al `<html>` apenas se importa el módulo (antes de que React monte nada, para no tener parpadeo del tema por defecto), persiste en `localStorage` (`mia:tema`). `yaElegido` es la bandera que decide si ya se pasó por el Onboarding — se reusa esa, no se agregó una segunda (mismo criterio que `haySesion()` en `lib/api.ts`).
+
+**`domain/onboarding/permisos.ts`** (nuevo) — orquesta los 4 permisos reutilizando puentes nativos que YA EXISTÍAN, sin duplicar nada (D-18):
+- Notificaciones → `@capacitor/local-notifications` (ya era dependencia desde Fase 6).
+- Ubicación → **único método nativo nuevo de esta sesión**, `GpsTrackingPlugin.kt` gana `solicitarPermisos()` — mismo flujo foreground→background que ya usaba `startTracking()` (mismos alias `location`/`backgroundLocation` declarados en el `@CapacitorPlugin`), pero sin arrancar el foreground service — solo pregunta.
+- Burbuja → `BurbujaPlugin.solicitarPermiso()` ya existía del lado nativo, le faltaba el export del lado TS (`domain/viajes/burbuja.ts`, función `solicitarPermisoBurbuja()` nueva).
+- Micrófono → `domain/conversacion/voz.ts`, `pedirPermisoVoz()`, sin cambios (Fase 10).
+
+Ninguno de los 4 bloquea si el usuario lo niega — el onboarding sigue igual (mismo criterio que ya tenía `GpsTrackingPlugin` con el permiso de background: mejor tener parte que no tener nada). Se puede conceder cualquiera más tarde desde los ajustes del sistema Android.
+
+**`features/onboarding/OnboardingScreen.tsx`** (nuevo) — pantalla secuencial de 6 pasos (bienvenida → notificaciones → ubicación → burbuja → micrófono → elegir tema), cada paso de permiso con "Permitir"/"Ahora no" que siempre avanza. El último paso lista `TEMAS_DISPONIBLES` — elegir uno llama `elegirTema()` y ahí termina el onboarding (`yaElegido` pasa a `true`).
+
+**`features/ajustes/AjustesScreen.tsx`** (nuevo) — para "cambiar el tono más adelante", pedido explícito. Misma lista `TEMAS_DISPONIBLES`, mismo `elegirTema()` del store — sin duplicar nada. Nueva ruta `/ajustes`.
+
+**`App.tsx`** — gana `if (!yaElegido) return <OnboardingScreen />` antes de las rutas normales (así el onboarding tapa todo hasta elegir tema), la ruta `/ajustes`, y un ícono ⚙ fijo arriba a la derecha (visible en cualquier panel, mismo patrón que `<MiaBurbuja/>`) como entrada a Ajustes.
+
+**Verificado esta sesión — a diferencia de sesiones anteriores, esta vez SÍ se pudo compilar de verdad:** `npm run build` corrió limpio tanto en `app/` (`tsc -b && vite build`, sin errores) como en `server/` (sin cambios ahí, se corrió igual para confirmar que nada se rompió). Se confirmó además que el `AndroidManifest.xml` ya declara `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION`/`ACCESS_BACKGROUND_LOCATION`/`SYSTEM_ALERT_WINDOW`/`RECORD_AUDIO`, y que `POST_NOTIFICATIONS` (Android 13+) llega mezclado automáticamente desde el propio manifiesto del plugin `@capacitor/local-notifications` — no hacía falta agregarlo a mano.
+
+**No verificado — sigue siendo la misma limitación de siempre:** el método nuevo de `GpsTrackingPlugin.kt` (Kotlin) no se pudo compilar ni correr en este entorno (sin Android SDK). Se escribió calcando exactamente el patrón ya existente de `startTracking()`/`locationPermsCallback`/`backgroundPermsCallback` en el mismo archivo, para minimizar el riesgo, pero la primera prueba real es un build de Android de verdad (ver más abajo cómo generar el APK).
+
+**Bug encontrado de paso en `.github/workflows/build-apk.yml`:** el primer paso (`unzip -o MIAPROYECTO.zip`) llevaba varias sesiones roto — ese archivo se borró del repo hace tiempo (el código fuente pasó a commitearse directo, ya no llega como zip subido a mano), así que CUALQUIER corrida de este workflow fallaba de entrada, antes de llegar siquiera a compilar nada. Se quitó ese paso y el de "Publicar código fuente para Render" que dependía de él (ya no aplica, el código ya está en el repo). El workflow ahora arranca directo en `actions/checkout` → build.

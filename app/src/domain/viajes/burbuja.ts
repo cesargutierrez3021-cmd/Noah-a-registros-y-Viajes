@@ -19,3 +19,9 @@ export async function actualizarBurbuja(km:string, tiempo:string, enViaje:boolea
   await Burbuja.actualizar({km,tiempo,enViaje,totalViajes})
 }
 export async function ocultarBurbuja(){ await Burbuja.ocultar().catch(()=>undefined) }
+
+/** Onboarding (2026-09-15): permiso de "dibujar sobre otras apps" — Burbuja.solicitarPermiso() ya existía en el nativo, sin exportar todavía del lado TS. */
+export async function solicitarPermisoBurbuja(): Promise<boolean> {
+  const r = await Burbuja.solicitarPermiso()
+  return r.concedido
+}

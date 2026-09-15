@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { HashRouter, Link, NavLink, Route, Routes } from 'react-router-dom'
 import { TrabajoScreen } from './features/trabajo/TrabajoScreen'
 import { AgregarViajeManualScreen } from './features/viajes/AgregarViajeManualScreen'
 import { CasaYDeudasScreen } from './features/casaYDeudas/CasaYDeudasScreen'
@@ -7,6 +7,9 @@ import { BalanceScreen } from './features/balance/BalanceScreen'
 import { MiaBurbuja } from './features/mia/MiaBurbuja'
 import { CuentaScreen } from './features/auth/CuentaScreen'
 import { PlanesScreen } from './features/planes/PlanesScreen'
+import { AjustesScreen } from './features/ajustes/AjustesScreen'
+import { OnboardingScreen } from './features/onboarding/OnboardingScreen'
+import { useTema } from './domain/tema/store'
 import { sincronizarViajesPendientes } from './domain/viajes/sync'
 import { sincronizarJornadasPendientes } from './domain/jornada/sync'
 import { sincronizarRegistrosMantenimientoPendientes } from './domain/mantenimiento/sync'
@@ -39,8 +42,18 @@ import { registrarSincronizacionAutomatica } from './lib/autoSync'
  * verdad: MiaBurbuja (hablarle a MIA ya pedía login, sin cambios acá),
  * PlanesScreen (suscribirte a un plan pago) y BalanceScreen (guardar tus
  * datos para no perderlos). Mismo patrón en los tres: <Link to="/cuenta">.
+ *
+ * Onboarding + temas (2026-09-15, pedido explícito del usuario): antes de
+ * mostrar cualquier panel, la primera vez que se abre la app se debe pedir
+ * los 4 permisos y elegir tema (OnboardingScreen). `useTema().yaElegido` es
+ * la misma bandera que ya usa el store para saber si aplicar el tema
+ * guardado — se reusa acá para decidir si el onboarding ya se completó
+ * (D-18: no se agrega una segunda bandera separada). El tema se puede
+ * volver a cambiar después desde /ajustes (ícono ⚙ en la barra).
  */
 export function App() {
+  const { yaElegido } = useTema()
+
   useEffect(() => {
     registrarSincronizacionAutomatica('viajes', sincronizarViajesPendientes)
     registrarSincronizacionAutomatica('jornadas', sincronizarJornadasPendientes)
@@ -50,6 +63,10 @@ export function App() {
     registrarSincronizacionAutomatica('hogar', sincronizarHogarPendiente)
     registrarSincronizacionAutomatica('ahorro', sincronizarAhorroPendiente)
   }, [])
+
+  if (!yaElegido) {
+    return <OnboardingScreen />
+  }
 
   return (
     <HashRouter>
@@ -61,10 +78,34 @@ export function App() {
           <Route path="/balance" element={<BalanceScreen />} />
           <Route path="/cuenta" element={<CuentaScreen />} />
           <Route path="/planes" element={<PlanesScreen />} />
+          <Route path="/ajustes" element={<AjustesScreen />} />
         </Routes>
       </div>
 
       <MiaBurbuja />
+
+      <Link
+        to="/ajustes"
+        aria-label="Ajustes"
+        style={{
+          position: 'fixed',
+          top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+          right: 12,
+          zIndex: 20,
+          width: 36,
+          height: 36,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '50%',
+          background: 'var(--color-superficie)',
+          border: '1px solid var(--color-borde)',
+          fontSize: 18,
+          textDecoration: 'none',
+        }}
+      >
+        ⚙
+      </Link>
 
       <nav className="barra-navegacion">
         <NavLink to="/" end className={({ isActive }) => `barra-navegacion__item${isActive ? ' barra-navegacion__item--activo' : ''}`}>

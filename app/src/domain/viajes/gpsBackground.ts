@@ -25,6 +25,8 @@ interface GpsTrackingPlugin {
   stopTracking(): Promise<void>;
   getPersistedTrack(): Promise<{pointsJson: string}>;
   clearPersistedTrack(): Promise<void>;
+  /** Solo pide el permiso (foreground + background) — no arranca el foreground service. Ver domain/onboarding. */
+  solicitarPermisos(): Promise<{concedido: boolean}>;
   addListener(
     eventName: 'locationUpdate',
     listenerFunc: (punto: PuntoGpsCrudo) => void
@@ -48,6 +50,12 @@ export async function limpiarTrazaPersistida(): Promise<void> {
 
 export async function detenerCapturaSegundoPlano(): Promise<void> {
   await GpsTracking.stopTracking();
+}
+
+/** Onboarding (2026-09-15): pide ubicación foreground + background sin arrancar el servicio. */
+export async function solicitarPermisosUbicacion(): Promise<boolean> {
+  const r = await GpsTracking.solicitarPermisos()
+  return r.concedido
 }
 
 export function suscribirsePuntosGps(

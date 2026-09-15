@@ -1,28 +1,23 @@
 name: build-apk
 
+# 2026-09-15: se quitaron los pasos "Descomprimir el proyecto" / "Publicar
+# código fuente para Render" — eran de la época en que el código llegaba
+# como MIAPROYECTO.zip subido a mano; ese archivo ya no existe en el repo
+# (se borró hace varias sesiones), así que ese `unzip` fallaba siempre. El
+# código fuente ya está commiteado directo, no hace falta desempaquetar nada.
 on:
   push:
     branches: [main]
-    paths: ['MIAPROYECTO.zip', '.github/workflows/build-apk.yml']
   workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Descomprimir el proyecto
-        run: unzip -o MIAPROYECTO.zip -d .
-      - name: Publicar código fuente para Render
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add app server docs PLAN-MAESTRO.md render.yaml
-          git diff --cached --quiet && echo "Sin cambios de código fuente" || git commit -m "Sincronizar código fuente extraído desde MIAPROYECTO.zip"
-          git push
       - uses: actions/setup-node@v4
         with:
           node-version: 22
