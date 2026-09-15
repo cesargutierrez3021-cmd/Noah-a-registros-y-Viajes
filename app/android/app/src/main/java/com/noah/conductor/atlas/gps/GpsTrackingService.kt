@@ -1,5 +1,6 @@
 package com.noah.conductor.atlas.gps
 
+import com.noah.conductor.atlas.burbuja.BurbujaService
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -95,6 +96,13 @@ class GpsTrackingService : Service() {
                 val loc = result.lastLocation ?: return
                 guardarPunto(loc.latitude, loc.longitude, loc.accuracy, loc.time)
                 listener?.onLocation(loc.latitude, loc.longitude, loc.accuracy, loc.time)
+                // 2026-09-15, pedido explícito del usuario: "en la burbuja a veces no me hace
+                // el conteo de los kilómetros" — además de reenviar al JS (`listener`, que
+                // depende de que el WebView siga viva), se avisa DIRECTO a BurbujaService
+                // (mismo proceso, nativo a nativo) para que el km de la burbuja no dependa de
+                // que la app siga corriendo. Ver el comentario completo en
+                // BurbujaService.actualizarKmDesdeGps().
+                BurbujaService.instanciaActiva?.actualizarKmDesdeGps(loc.latitude, loc.longitude, loc.accuracy, loc.time)
             }
         }
 

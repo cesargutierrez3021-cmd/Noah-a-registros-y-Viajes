@@ -35,6 +35,11 @@ import kotlin.math.abs
 class BurbujaService : Service(), TextToSpeech.OnInitListener {
     companion object {
         @Volatile var activo: Boolean = false
+        // 2026-09-15, pedido explícito del usuario: "en la burbuja a veces no me hace el
+        // conteo de los kilómetros". Referencia estática para que GpsTrackingService pueda
+        // avisarle a la burbuja directo, nativo-a-nativo, sin pasar por el WebView — ver
+        // `actualizarKmDesdeGps()` más abajo para el porqué.
+        @Volatile var instanciaActiva: BurbujaService? = null
         const val ACCION_MOSTRAR = "mostrar"
         const val ACCION_ACTUALIZAR = "actualizar"
         const val EXTRA_KM = "km"
@@ -79,6 +84,10 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private var inicioViajeMs = 0L
     private var kmAcumulados = 0.0
     private var viajesContados = 0
+    // Último punto GPS aceptado por `actualizarKmDesdeGps()` (nativo, ver comentario ahí).
+    private var ultimoLatNativo: Double? = null
+    private var ultimoLngNativo: Double? = null
+    private var ultimoTimestampNativoMs: Long = 0L
     private var tts: TextToSpeech? = null
     private val handler = Handler(Looper.getMainLooper())
     private val reloj = object : Runnable {
@@ -93,6 +102,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     override fun onCreate() {
         super.onCreate()
         activo = true
+        instanciaActiva = this
         val apariencia = getSharedPreferences("mia-burbuja", MODE_PRIVATE)
         colorAcento = apariencia.getString(EXTRA_COLOR_ACENTO, colorAcento) ?: colorAcento
         colorFg = apariencia.getString(EXTRA_COLOR_FG, colorFg) ?: colorFg
@@ -141,6 +151,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         activo = false
+        if (instanciaActiva === this) instanciaActiva = null
         handler.removeCallbacksAndMessages(null); tts?.stop(); tts?.shutdown()
         getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", false).apply()
         vistaManija?.let { runCatching { windowManager.removeView(it) } }
@@ -152,6 +163,9 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private fun iniciarViaje(anunciar: Boolean) {
         if (enViaje) return
         enViaje = true; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
+        // Viaje nuevo, punto de referencia nuevo — si se dejara el de un viaje anterior,
+        // el primer punto de este viaje calcularía distancia contra un lugar viejo.
+        ultimoLatNativo = null; ultimoLngNativo = null; ultimoTimestampNativoMs = 0L
         handler.removeCallbacks(reloj); handler.post(reloj)
         if (anunciar) hablar("Viaje iniciado")
         actualizarTextos("0.0", "0m")
@@ -167,6 +181,65 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
             .putFloat("viaje_km", kmFinal.toFloat()).putLong("viaje_inicio", inicioMs)
             .putLong("viaje_fin", finMs).putLong("viaje_tiempo", duracionMs).apply()
         if (anunciar) BurbujaPlugin.instanciaActiva?.notificarAccion("terminar", kmFinal, inicioMs, finMs, duracionMs)
+    }
+
+    /**
+     * 2026-09-15, pedido explícito del usuario: "en la burbuja a veces no me hace el conteo
+     * de los kilómetros... dentro de la aplicación sí, a veces sí los coge". Causa real: antes
+     * el km que ve la burbuja llegaba SOLO por un viaje redondo nativo→JS→nativo
+     * (GpsTrackingService entrega el punto a GpsTrackingPlugin, que se lo pasa a
+     * domain/viajes/gps.ts, que llama a `actualizarBurbuja()`). Ese viaje redondo depende de
+     * que el WebView/Activity siga viva — Android la puede matar por presión de memoria
+     * mientras el conductor pasa horas con la app minimizada (usando Uber en primer plano),
+     * SIN matar los foreground services (BurbujaService y GpsTrackingService sí sobreviven).
+     * Cuando eso pasa, `GpsTrackingPlugin.handleOnDestroy()` deja `GpsTrackingService.listener
+     * = null` — los puntos se siguen guardando bien en SharedPreferences (por eso "dentro de
+     * la aplicación, a veces sí los coge": al reabrir se recupera toda la traza persistida),
+     * pero la burbuja deja de enterarse en vivo, porque nada la actualiza mientras tanto.
+     *
+     * Fix: GpsTrackingService llama ACÁ directo (mismo proceso, sin pasar por el WebView) cada
+     * vez que recibe un punto nuevo — la burbuja cuenta los km sola, sin depender de que la
+     * app siga viva. El filtro de abajo (precisión/velocidad/distancia mínima) es el mismo
+     * criterio que ya usa `domain/viajes/gps.ts` (`puntoValido`) para no acumular ruido del
+     * GPS — aproximado, no bit a bit idéntico: el km definitivo del viaje lo sigue calculando
+     * el lado JS sobre la traza completa persistida al cerrar el viaje; esto es solo para que
+     * el número que el conductor VE mientras maneja no se quede pegado.
+     */
+    fun actualizarKmDesdeGps(lat: Double, lng: Double, precisionMetros: Float, timestampMs: Long) {
+        if (!enViaje) return
+        if (precisionMetros <= 0f || precisionMetros > PRECISION_MAXIMA_M) return
+
+        val latAnterior = ultimoLatNativo
+        val lngAnterior = ultimoLngNativo
+        val timestampAnterior = ultimoTimestampNativoMs
+
+        if (latAnterior == null || lngAnterior == null) {
+            ultimoLatNativo = lat; ultimoLngNativo = lng; ultimoTimestampNativoMs = timestampMs
+            return
+        }
+
+        val distanciaM = distanciaHaversineM(latAnterior, lngAnterior, lat, lng)
+        val dtS = (timestampMs - timestampAnterior) / 1000.0
+        val velocidadMs = if (dtS > 0) distanciaM / dtS else Double.MAX_VALUE
+        val umbralMinimoM = kotlin.math.max(8.0, (precisionMetros + 10) * 0.5)
+        val esValido = dtS > 0.0 && dtS <= INTERVALO_MAXIMO_S && velocidadMs <= VELOCIDAD_MAXIMA_MS && distanciaM >= umbralMinimoM
+
+        // "anterior" avanza siempre que la precisión alcance, sea válido o no el movimiento en
+        // sí — mismo criterio que `puntoValido()`/`anterior` en domain/viajes/gps.ts.
+        ultimoLatNativo = lat; ultimoLngNativo = lng; ultimoTimestampNativoMs = timestampMs
+        if (!esValido) return
+
+        kmAcumulados += distanciaM / 1000.0
+        actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
+    }
+
+    private fun distanciaHaversineM(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val r = 6371000.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val a = kotlin.math.sin(dLat / 2).let { it * it } +
+            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) * kotlin.math.sin(dLng / 2).let { it * it }
+        return r * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
     }
 
     private fun hablar(texto: String) { tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "mia-viaje-${System.currentTimeMillis()}") }
