@@ -13,6 +13,7 @@ import { sincronizarRegistrosMantenimientoPendientes } from './domain/mantenimie
 import { sincronizarGastosPendientes } from './domain/gastos/sync'
 import { sincronizarDeudasPendientes } from './domain/deudas/sync'
 import { sincronizarHogarPendiente } from './domain/hogar/sync'
+import { sincronizarAhorroPendiente } from './domain/ahorro/sync'
 import { registrarSincronizacionAutomatica } from './lib/autoSync'
 
 /**
@@ -47,6 +48,7 @@ export function App() {
     registrarSincronizacionAutomatica('gastos', sincronizarGastosPendientes)
     registrarSincronizacionAutomatica('deudas', sincronizarDeudasPendientes)
     registrarSincronizacionAutomatica('hogar', sincronizarHogarPendiente)
+    registrarSincronizacionAutomatica('ahorro', sincronizarAhorroPendiente)
   }, [])
 
   return (

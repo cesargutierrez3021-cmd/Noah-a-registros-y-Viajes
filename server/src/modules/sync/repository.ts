@@ -7,6 +7,8 @@ import type {
   GastoSyncEntrada,
   DeudaSyncEntrada,
   AbonoDeudaSyncEntrada,
+  MetaAhorroSyncEntrada,
+  AbonoAhorroSyncEntrada,
   ConceptoFijoSyncEntrada,
   GastoHogarSyncEntrada,
 } from './types.js'
@@ -178,6 +180,49 @@ export const repositorioSync = {
     }
 
     await prisma.abonoDeuda.upsert({
+      where: { id: abono.id },
+      create: { id: abono.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ninguna meta de ahorro con ese id. */
+  async buscarMetaAhorroPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.metaAhorro.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /** Upsert por id — MetaAhorro es mutable (saldoActual sube con cada abono), mismo criterio que Deuda. */
+  async guardarMetaAhorro(usuarioId: string, meta: MetaAhorroSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      nombre: meta.nombre,
+      montoObjetivo: meta.montoObjetivo,
+      saldoActual: meta.saldoActual,
+      creadaEnISO: new Date(meta.creadaEnISO),
+    }
+
+    await prisma.metaAhorro.upsert({
+      where: { id: meta.id },
+      create: { id: meta.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ningún abono de ahorro con ese id. */
+  async buscarAbonoAhorroPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.abonoAhorro.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /** Upsert por id. `metaId` es FK real, mismo criterio que guardarAbonoDeuda (la traducción P2003 → 409 vive en service.ts). */
+  async guardarAbonoAhorro(usuarioId: string, abono: AbonoAhorroSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      metaId: abono.metaId,
+      monto: abono.monto,
+      fechaISO: new Date(abono.fechaISO),
+    }
+
+    await prisma.abonoAhorro.upsert({
       where: { id: abono.id },
       create: { id: abono.id, ...datos },
       update: datos,

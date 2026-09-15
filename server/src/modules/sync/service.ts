@@ -6,6 +6,8 @@ import type {
   GastoSyncEntrada,
   DeudaSyncEntrada,
   AbonoDeudaSyncEntrada,
+  MetaAhorroSyncEntrada,
+  AbonoAhorroSyncEntrada,
   ConceptoFijoSyncEntrada,
   GastoHogarSyncEntrada,
 } from './types.js'
@@ -101,6 +103,28 @@ export const servicioSync = {
       const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
       if (esViolacionDeFK) {
         throw new ErrorSync('La deuda de este abono todavía no está sincronizada. Reintentá en un momento.', 409)
+      }
+      throw err
+    }
+  },
+
+  /** Mismo criterio que sincronizarDeuda, invertido: ver schema.prisma (modelo MetaAhorro) sobre por qué saldoActual sube en vez de bajar. */
+  async sincronizarMetaAhorro(usuarioId: string, meta: MetaAhorroSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarMetaAhorroPorId(meta.id)
+    verificarPertenencia(usuarioId, existente, 'Esta meta de ahorro ya pertenece a otra cuenta.')
+    await repositorioSync.guardarMetaAhorro(usuarioId, meta)
+  },
+
+  /** Mismo criterio que sincronizarAbonoDeuda (incluida la traducción P2003 → 409), `metaId` en vez de `deudaId`. */
+  async sincronizarAbonoAhorro(usuarioId: string, abono: AbonoAhorroSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarAbonoAhorroPorId(abono.id)
+    verificarPertenencia(usuarioId, existente, 'Este abono ya pertenece a otra cuenta.')
+    try {
+      await repositorioSync.guardarAbonoAhorro(usuarioId, abono)
+    } catch (err) {
+      const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
+      if (esViolacionDeFK) {
+        throw new ErrorSync('La meta de este abono todavía no está sincronizada. Reintentá en un momento.', 409)
       }
       throw err
     }

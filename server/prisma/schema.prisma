@@ -26,6 +26,8 @@ model Usuario {
   gastos         Gasto[]
   deudas         Deuda[]
   abonosDeuda    AbonoDeuda[]
+  metasAhorro    MetaAhorro[]
+  abonosAhorro   AbonoAhorro[]
   conceptosFijos ConceptoFijo[]
   gastosHogar    GastoHogar[]
 
@@ -241,6 +243,44 @@ model AbonoDeuda {
   @@index([usuarioId])
   @@index([deudaId])
   @@map("abonos_deuda")
+}
+
+/// 2026-09-15, pedido explícito del usuario tras ver la maqueta visual:
+/// "Ahorro" estaba mencionado desde el diseño de paneles (Panel "Casa y
+/// Deudas" = Hogar/Deudas/Ahorro) pero nunca se había construido — ver el
+/// comentario que quedó en CasaYDeudasScreen.tsx. Mismo patrón exacto que
+/// Deuda/AbonoDeuda, invertido: acá `saldoActual` SUBE con cada abono en vez
+/// de bajar, y nunca pasa de `montoObjetivo` (mismo criterio que Deuda nunca
+/// baja de 0 — ver domain/ahorro/store.ts del cliente).
+model MetaAhorro {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nombre             String
+  montoObjetivo      Float     @map("monto_objetivo")
+  saldoActual        Float     @map("saldo_actual")
+  creadaEnISO        DateTime  @map("creada_en")
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+  abonos             AbonoAhorro[]
+
+  @@index([usuarioId])
+  @@map("metas_ahorro")
+}
+
+/// Historial de abonos a una meta de ahorro. Append-only, mismo criterio que AbonoDeuda.
+model AbonoAhorro {
+  id                 String     @id
+  usuarioId          String     @map("usuario_id")
+  usuario            Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  metaId             String     @map("meta_id")
+  meta               MetaAhorro @relation(fields: [metaId], references: [id], onDelete: Cascade)
+  monto              Float
+  fechaISO           DateTime   @map("fecha")
+  sincronizadoEnISO  DateTime   @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@index([metaId])
+  @@map("abonos_ahorro")
 }
 
 /// Bloque 3, sección 3/4. Plantilla de gasto recurrente (ej. "Arriendo,

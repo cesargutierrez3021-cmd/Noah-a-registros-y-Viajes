@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { servicioSync, ErrorSync } from './service.js'
-import { esquemaViajeSync, esquemaJornadaSync, esquemaRegistroMantenimientoSync, esquemaGastoSync, esquemaDeudaSync, esquemaAbonoDeudaSync, esquemaConceptoFijoSync, esquemaGastoHogarSync } from './schemas.js'
+import { esquemaViajeSync, esquemaJornadaSync, esquemaRegistroMantenimientoSync, esquemaGastoSync, esquemaDeudaSync, esquemaAbonoDeudaSync, esquemaMetaAhorroSync, esquemaAbonoAhorroSync, esquemaConceptoFijoSync, esquemaGastoHogarSync } from './schemas.js'
 import { requiereAutenticacion } from '../auth/middleware.js'
 import { async } from '../../http/asyncHandler.js'
 import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
@@ -165,6 +165,51 @@ rutasSync.post(
       // reintentos esperables, no con nada sospechoso.
       if (err instanceof ErrorSync && err.codigoHttp === 403) {
         logEventoSeguridad({ tipo: 'sync_conflicto_pertenencia', ip: req.ip ?? 'desconocida', detalle: `abonoDeudaId=${abono.id}` })
+      }
+      throw err
+    }
+  }),
+)
+
+/**
+ * POST /sync/ahorro — 2026-09-15. Mismo patrón exacto que /sync/deudas
+ * (upsert, mutable, un recurso por request) — ver schema.prisma (modelo MetaAhorro).
+ */
+rutasSync.post(
+  '/ahorro',
+  requiereAutenticacion,
+  limitadorSync,
+  async(async (req: Request, res: Response) => {
+    const meta = esquemaMetaAhorroSync.parse(req.body)
+    try {
+      await servicioSync.sincronizarMetaAhorro(req.usuarioId!, meta)
+      res.json({ id: meta.id, sincronizado: true })
+    } catch (err) {
+      if (err instanceof ErrorSync) {
+        logEventoSeguridad({ tipo: 'sync_conflicto_pertenencia', ip: req.ip ?? 'desconocida', detalle: `metaAhorroId=${meta.id}` })
+      }
+      throw err
+    }
+  }),
+)
+
+/**
+ * POST /sync/ahorro/abonos — mismo patrón exacto que /sync/deudas/abonos: el
+ * cliente sube la meta antes que sus abonos (domain/ahorro/sync.ts), puede
+ * igual recibir un 409 si el abono llega primero (FK real a MetaAhorro).
+ */
+rutasSync.post(
+  '/ahorro/abonos',
+  requiereAutenticacion,
+  limitadorSync,
+  async(async (req: Request, res: Response) => {
+    const abono = esquemaAbonoAhorroSync.parse(req.body)
+    try {
+      await servicioSync.sincronizarAbonoAhorro(req.usuarioId!, abono)
+      res.json({ id: abono.id, sincronizado: true })
+    } catch (err) {
+      if (err instanceof ErrorSync && err.codigoHttp === 403) {
+        logEventoSeguridad({ tipo: 'sync_conflicto_pertenencia', ip: req.ip ?? 'desconocida', detalle: `abonoAhorroId=${abono.id}` })
       }
       throw err
     }

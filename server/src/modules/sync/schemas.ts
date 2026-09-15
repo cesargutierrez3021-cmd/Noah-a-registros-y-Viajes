@@ -72,6 +72,21 @@ export const esquemaAbonoDeudaSync = z.object({
   fechaISO: z.string(),
 })
 
+export const esquemaMetaAhorroSync = z.object({
+  id: z.string().uuid('El id de la meta debe ser el UUID generado en el cliente'),
+  nombre: z.string().min(1),
+  montoObjetivo: z.number().positive(),
+  saldoActual: z.number().nonnegative(),
+  creadaEnISO: z.string(),
+})
+
+export const esquemaAbonoAhorroSync = z.object({
+  id: z.string().uuid('El id del abono debe ser el UUID generado en el cliente'),
+  metaId: z.string().uuid('metaId debe ser el UUID de una meta ya creada'),
+  monto: z.number().positive(),
+  fechaISO: z.string(),
+})
+
 export const esquemaConceptoFijoSync = z.object({
   id: z.string().uuid('El id del concepto fijo debe ser el UUID generado en el cliente'),
   nombre: z.string().min(1),

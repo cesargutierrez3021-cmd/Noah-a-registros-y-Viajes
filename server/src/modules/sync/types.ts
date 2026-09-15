@@ -109,6 +109,26 @@ export interface AbonoDeudaSyncEntrada {
   fechaISO: string
 }
 
+/**
+ * Lo que el cliente manda por meta de ahorro (2026-09-15). Mismo patrón que
+ * DeudaSyncEntrada, invertido: `saldoActual` sube con cada abono en vez de bajar.
+ */
+export interface MetaAhorroSyncEntrada {
+  id: string
+  nombre: string
+  montoObjetivo: number
+  saldoActual: number
+  creadaEnISO: string
+}
+
+/** Lo que el cliente manda por abono a una meta de ahorro. Mismo patrón que AbonoDeudaSyncEntrada. */
+export interface AbonoAhorroSyncEntrada {
+  id: string
+  metaId: string
+  monto: number
+  fechaISO: string
+}
+
 /** Lo que el cliente manda por concepto fijo de hogar (Bloque 3, sección 3). Se reenvía completo cada vez que cambia (monto o activo). */
 export interface ConceptoFijoSyncEntrada {
   id: string

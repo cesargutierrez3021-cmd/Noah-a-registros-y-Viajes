@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { SeccionDeudas } from './SeccionDeudas'
 import { SeccionHogar } from './SeccionHogar'
+import { SeccionAhorro } from './SeccionAhorro'
 
-type SubSeccion = 'deudas' | 'hogar'
+type SubSeccion = 'deudas' | 'hogar' | 'ahorro'
 
 /**
- * Bloque 4, ítem 11 (parte no-visual) — Panel "Casa y Deudas": Deudas y Hogar
- * como sub-secciones con un simple toggle (mismo patrón de sub-tabs que ya
- * tenía NOAH), no rutas separadas. Ahorro queda mencionado en el plan como
- * sub-sección futura — no existe `domain/ahorro` todavía, así que no se
- * inventa acá, solo Deudas y Hogar (los dos dominios que sí existen).
+ * Bloque 4, ítem 11 (parte no-visual) — Panel "Casa y Deudas": Deudas, Hogar
+ * y Ahorro como sub-secciones con un simple toggle (mismo patrón de sub-tabs
+ * que ya tenía NOAH), no rutas separadas. Ahorro (2026-09-15, pedido
+ * explícito del usuario) ya no es solo la mención en el plan — domain/ahorro
+ * existe, mismo patrón exacto que domain/deudas invertido (ver
+ * domain/ahorro/types.ts).
  */
 export function CasaYDeudasScreen() {
   const [subSeccion, setSubSeccion] = useState<SubSeccion>('deudas')
@@ -25,9 +27,12 @@ export function CasaYDeudasScreen() {
         <button type="button" onClick={() => setSubSeccion('hogar')} className={subSeccion === 'hogar' ? 'active' : ''}>
           Hogar
         </button>
+        <button type="button" onClick={() => setSubSeccion('ahorro')} className={subSeccion === 'ahorro' ? 'active' : ''}>
+          Ahorro
+        </button>
       </div>
 
-      {subSeccion === 'deudas' ? <SeccionDeudas /> : <SeccionHogar />}
+      {subSeccion === 'deudas' ? <SeccionDeudas /> : subSeccion === 'hogar' ? <SeccionHogar /> : <SeccionAhorro />}
     </div></section>
   )
 }
