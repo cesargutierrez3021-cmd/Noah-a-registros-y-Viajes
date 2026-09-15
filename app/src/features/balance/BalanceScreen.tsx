@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useViajes } from '../../domain/viajes/store'
 import { useGastos } from '../../domain/gastos/store'
 import { useDeudas } from '../../domain/deudas/store'
 import { useHogar } from '../../domain/hogar/store'
+import { useAuth } from '../../domain/auth/store'
 import { calcularBalanceGeneral } from '../../domain/balance/calculos'
 
 function formatoPesos(monto: number): string {
@@ -23,6 +25,7 @@ export function BalanceScreen() {
   const { gastos, cargar: cargarGastos } = useGastos()
   const { deudas, cargar: cargarDeudas } = useDeudas()
   const { gastos: gastosHogar, cargar: cargarHogar } = useHogar()
+  const { autenticado } = useAuth()
 
   useEffect(() => {
     void cargarViajes()
@@ -40,6 +43,13 @@ export function BalanceScreen() {
         Cruce de todo lo que entró (viajes) contra todo lo que salió (gastos operativos + gastos de hogar). La deuda
         pendiente se muestra aparte — es una obligación futura, no un gasto ya hecho.
       </p>
+
+      {!autenticado() && (
+        <div className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, marginBottom: 16 }}>
+          <span className="texto-mute">Estos datos hoy solo viven en este teléfono — si lo pierdes o cambias de equipo, se pierden con él.</span>
+          <Link to="/cuenta"><button type="button">Crear cuenta gratis para guardarlos</button></Link>
+        </div>
+      )}
 
       <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <li className="tarjeta-viaje">

@@ -9,11 +9,16 @@ import { useAuth } from '../../domain/auth/store'
  * (server/src/modules/auth/service.ts: "Ya existe una cuenta con ese email"
  * al registrar, "Email o contraseña incorrectos" al iniciar sesión).
  *
- * Al lograr sesión, vuelve a la pantalla de conversación (Fase 10) — es la
- * única pantalla que hoy necesita estar autenticado, así que tiene sentido
- * que sea el destino por defecto después de loguearse. Si en el futuro más
- * pantallas necesitan sesión, esto se generaliza a "volver a la última
+ * Al lograr sesión, vuelve al panel de Trabajo ("/") — es a donde se vuelve
+ * siempre, sea cual sea el panel desde el que se llegó acá (MiaBurbuja,
+ * Planes o Balance, ver App.tsx). Si en el futuro hace falta volver
+ * exactamente a donde se estaba, esto se generaliza a "volver a la última
  * pantalla protegida que se intentó abrir".
+ *
+ * Ya no tiene pestaña propia en la barra de navegación (2026-09-15, ver
+ * App.tsx) — se llega acá solo desde un punto que de verdad necesita una
+ * cuenta, así que lleva su propio "Volver" (mismo patrón que
+ * AgregarViajeManualScreen.tsx, la otra pantalla fuera de la barra).
  *
  * "Olvidé mi contraseña" es un tercer modo del mismo toggle (no una pantalla
  * aparte, mismo criterio que login/registro) con dos pasos adentro: pedir el
@@ -71,6 +76,7 @@ export function CuentaScreen() {
   if (autenticado()) {
     return (
       <section className="pantalla"><div className="app-panel">
+        <button type="button" onClick={() => navegar('/')} style={{ marginBottom: 16 }}>← Volver</button>
         <h1 className="titulo-pantalla">Cuenta</h1>
         <p className="texto-mute" style={{ marginBottom: 16 }}>Ya iniciaste sesión.</p>
         <button type="button" onClick={cerrarSesion}>Cerrar sesión</button>
@@ -83,6 +89,7 @@ export function CuentaScreen() {
 
   return (
     <section className="pantalla"><div className="app-panel">
+      <button type="button" onClick={() => navegar('/')} style={{ marginBottom: 16 }}>← Volver</button>
       <h1 className="titulo-pantalla">{titulo}</h1>
 
       {avisoRecuperacion && (
