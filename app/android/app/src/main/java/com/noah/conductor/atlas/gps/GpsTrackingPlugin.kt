@@ -2,7 +2,10 @@ package com.noah.conductor.atlas.gps
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -136,7 +139,51 @@ class GpsTrackingPlugin : Plugin(), GpsTrackingService.GpsLocationListener {
         } else {
             context.startService(intent)
         }
+        // 2026-09-15, bug real reportado ("la mayoría de los viajes queda en cero
+        // kilómetros"): sin esto, en varios fabricantes (Xiaomi/Samsung/Huawei/Oppo,
+        // muy comunes en Colombia) el sistema puede parar en silencio la captura de
+        // GPS en segundo plano aunque el foreground service siga vivo — la
+        // notificación se ve, pero las ubicaciones dejan de llegar. `forzar = false`:
+        // esto NO interrumpe con la pantalla de sistema en cada viaje, solo la
+        // primera vez que corre en la instalación (ver el guard de SharedPreferences
+        // en `solicitarIgnorarOptimizacionBateriaInterna`) — cubre tanto instalaciones
+        // nuevas que no vieron el paso de Onboarding (todavía sin publicar cuando
+        // este fix se hizo) como el arranque real del servicio en cualquier caso.
+        solicitarIgnorarOptimizacionBateriaInterna(forzar = false)
         call.resolve()
+    }
+
+    private fun estaExentoDeOptimizacionBateria(): Boolean {
+        val pm = context.getSystemService(android.content.Context.POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /**
+     * `forzar = true` (paso explícito de Onboarding, con explicación en pantalla antes
+     * de preguntar) siempre abre la pantalla de sistema si todavía no está exenta.
+     * `forzar = false` (arranque real del servicio, ver `beginService()`) solo la abre
+     * la PRIMERA vez en toda la instalación — evita interrumpir con la pantalla de
+     * sistema en cada viaje si el conductor ya la vio y decidió qué hacer.
+     */
+    private fun solicitarIgnorarOptimizacionBateriaInterna(forzar: Boolean) {
+        if (estaExentoDeOptimizacionBateria()) return
+        val prefs = context.getSharedPreferences("mia-gps", android.content.Context.MODE_PRIVATE)
+        if (!forzar && prefs.getBoolean("bateria_solicitada", false)) return
+        prefs.edit().putBoolean("bateria_solicitada", true).apply()
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:" + context.packageName)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        runCatching { context.startActivity(intent) }
+    }
+
+    /** Paso explícito de Onboarding (domain/onboarding/permisos.ts) — con explicación en pantalla antes de preguntar. */
+    @PluginMethod
+    fun solicitarIgnorarOptimizacionBateria(call: PluginCall) {
+        solicitarIgnorarOptimizacionBateriaInterna(forzar = true)
+        val r = JSObject()
+        r.put("exento", estaExentoDeOptimizacionBateria())
+        call.resolve(r)
     }
 
     @PluginMethod

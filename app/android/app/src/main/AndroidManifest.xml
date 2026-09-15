@@ -10,6 +10,12 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- 2026-09-15, bug real reportado ("la mayoría de los viajes queda en cero
+         kilómetros"): en Xiaomi/Samsung/Huawei/Oppo (muy comunes en Colombia), el
+         sistema puede parar la captura de GPS en segundo plano aunque el foreground
+         service siga vivo, salvo que el conductor excluya la app de la optimización
+         de batería a mano. Ver GpsTrackingPlugin.kt, solicitarIgnorarOptimizacionBateria(). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Ya requeridos por los plugins reutilizados del proyecto viejo (D-1) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />

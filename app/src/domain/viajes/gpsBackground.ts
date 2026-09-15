@@ -27,6 +27,16 @@ interface GpsTrackingPlugin {
   clearPersistedTrack(): Promise<void>;
   /** Solo pide el permiso (foreground + background) — no arranca el foreground service. Ver domain/onboarding. */
   solicitarPermisos(): Promise<{concedido: boolean}>;
+  /**
+   * 2026-09-15, bug real reportado ("la mayoría de los viajes queda en cero
+   * kilómetros"): pide excluir la app de la optimización de batería — sin
+   * esto, varios fabricantes (Xiaomi/Samsung/Huawei/Oppo) pueden parar la
+   * captura de GPS en segundo plano en silencio. Paso explícito de
+   * Onboarding; el arranque real del servicio (`beginService()`, nativo)
+   * también lo pide una sola vez si el Onboarding no alcanzó a cubrirlo
+   * (instalación de antes de este fix).
+   */
+  solicitarIgnorarOptimizacionBateria(): Promise<{exento: boolean}>;
   addListener(
     eventName: 'locationUpdate',
     listenerFunc: (punto: PuntoGpsCrudo) => void
@@ -56,6 +66,12 @@ export async function detenerCapturaSegundoPlano(): Promise<void> {
 export async function solicitarPermisosUbicacion(): Promise<boolean> {
   const r = await GpsTracking.solicitarPermisos()
   return r.concedido
+}
+
+/** Onboarding (2026-09-15, bug real corregido): pide excluir la app de la optimización de batería del fabricante. */
+export async function solicitarIgnorarOptimizacionBateria(): Promise<boolean> {
+  const r = await GpsTracking.solicitarIgnorarOptimizacionBateria()
+  return r.exento
 }
 
 export function suscribirsePuntosGps(

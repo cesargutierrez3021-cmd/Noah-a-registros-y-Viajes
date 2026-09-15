@@ -3,7 +3,7 @@ import type { Viaje, Plataforma, PuntoGPS, ViajeManualInput } from './types'
 import { PLATAFORMAS_DISPONIBLES } from './types'
 import { repositorioViajes, crearViajeDesdeCiere, crearViajeManual } from './repository'
 import { calcularDistanciaReal } from './distancia'
-import { iniciarSeguimientoGPS, obtenerUbicacionActual, type SeguidorGPS } from './gps'
+import { iniciarSeguimientoGPS, obtenerUbicacionActual, filtrarRecorridoValido, type SeguidorGPS } from './gps'
 import { obtenerLocalidad, obtenerZonaCustom } from './geofencing'
 import { Capacitor } from '@capacitor/core'
 import { obtenerTrazaPersistida, limpiarTrazaPersistida } from './gpsBackground'
@@ -89,6 +89,52 @@ let seguidorActivo: SeguidorGPS | null = null
 const CLAVE_ACTIVO = 'mia:viaje-en-curso'
 function calcularKmLocal(puntos: PuntoGPS[]): number { return calcularDistanciaReal({ plataforma:'Particular', inicioISO:'', finISO:'', recorrido:puntos, puntoDeRecogidaISO:null, distanciaReportadaPlataforma:null, ingreso:0, ingresoPendiente:false }).kmTotalesReales }
 function guardarActivo(v: ViajeEnCurso | null){ if(v) localStorage.setItem(CLAVE_ACTIVO, JSON.stringify(v)); else localStorage.removeItem(CLAVE_ACTIVO) }
+
+/**
+ * 2026-09-15, pedido explícito del usuario (bug real, tercera vez reportado):
+ * "la mayoría de los viajes queda siempre en cero". Antes de esto revisé de
+ * nuevo el umbral de movimiento de `puntoValido()` (gps.ts) con la teoría de
+ * que estaba descartando movimiento real a velocidad de tráfico urbano — una
+ * simulación completa de un viaje real demostró que esa teoría estaba MAL
+ * (el filtro viejo da 101-159% de la distancia real; aflojarlo sobrecontaba
+ * hasta 326%), así que ese umbral quedó IGUAL — ver el comentario largo en
+ * gps.ts. La causa real es otra: `GpsTrackingService.kt` (nativo) guarda
+ * CADA punto en `SharedPreferences` pase lo que pase, pero solo se lo
+ * reenvía al lado JS (`viajeEnCurso.recorrido`, acá en el store) si el
+ * WebView/Activity sigue viva en ese momento — Android la puede matar por
+ * presión de memoria mientras el conductor pasa horas con la app minimizada
+ * (mismo mecanismo ya documentado en BurbujaService.kt, ronda anterior), y en
+ * varios fabricantes (Xiaomi/Samsung/Huawei/Oppo) el sistema además puede
+ * parar la captura de GPS en segundo plano en silencio si la app no está
+ * excluida de la optimización de batería (ver GpsTrackingPlugin.kt,
+ * solicitarIgnorarOptimizacionBateria()). Si algo de eso pasa a mitad de un
+ * viaje, `viajeEnCurso.recorrido` en el store de JS se queda corto — le
+ * faltan los puntos capturados mientras el WebView estaba caída — y el viaje
+ * se guarda con menos kilómetros de los reales, a veces con recorrido casi
+ * vacío si la caída duró la mayor parte del viaje.
+ *
+ * Acá, al CERRAR un viaje, se compara el recorrido que alcanzó a llegar en
+ * vivo contra la traza completa que el nativo persistió sola — si la
+ * persistida tiene más puntos (señal de que al JS le faltaron capturas), se
+ * usa esa en su lugar, filtrada con el mismo criterio de siempre
+ * (`filtrarRecorridoValido`, gps.ts — la traza persistida es CRUDA, sin
+ * filtrar, así que no se puede usar tal cual sin pasarla por el mismo
+ * filtro que ya usa la captura en vivo). Es una simple lectura de
+ * `SharedPreferences` vía el plugin (no un GPS nuevo, no hay que esperar un
+ * fix) — no reintroduce el riesgo de bloquear el siguiente viaje de la
+ * burbuja que se corrigió en la ronda del bug de zona.
+ */
+async function recorridoDefinitivo(recorridoEnVivo: PuntoGPS[]): Promise<PuntoGPS[]> {
+  if (!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android')) return recorridoEnVivo
+  try {
+    const crudos = await obtenerTrazaPersistida()
+    if (crudos.length === 0) return recorridoEnVivo
+    const filtrados = filtrarRecorridoValido(crudos)
+    return filtrados.length >= recorridoEnVivo.length ? filtrados : recorridoEnVivo
+  } catch {
+    return recorridoEnVivo
+  }
+}
 
 const CLAVE_PLATAFORMA_PREFERIDA = 'mia:plataformaPreferida'
 function leerPlataformaPreferida(): Plataforma | null {
@@ -184,11 +230,15 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     seguidorActivo?.detener()
     seguidorActivo = null
 
+    // Lectura rápida de SharedPreferences vía el plugin (no un GPS nuevo, no
+    // hay que esperar un fix) — ver el comentario largo en
+    // `recorridoDefinitivo` más arriba sobre por qué hace falta.
+    const recorrido = await recorridoDefinitivo(enCurso.recorrido)
     const viaje = crearViajeDesdeCiere(enCurso.id, {
       plataforma: enCurso.plataforma,
       inicioISO: enCurso.inicioISO,
       finISO: new Date().toISOString(),
-      recorrido: enCurso.recorrido,
+      recorrido,
       puntoDeRecogidaISO: enCurso.puntoDeRecogidaISO,
       distanciaReportadaPlataforma: null,
       ingreso: 0,
@@ -207,7 +257,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     // no puede quedar bloqueado por esto (ver comentario en
     // `resolverZonaSiHizoFalta` más abajo, y el bug de viajes perdidos de
     // una ronda anterior que este mismo criterio evita repetir).
-    void resolverZonaSiHizoFalta(viaje.id, enCurso.recorrido)
+    void resolverZonaSiHizoFalta(viaje.id, recorrido)
   },
 
   finalizarViaje: async ({ ingreso, distanciaReportadaPlataforma }) => {
@@ -217,11 +267,12 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     seguidorActivo?.detener()
     seguidorActivo = null
 
+    const recorrido = await recorridoDefinitivo(enCurso.recorrido)
     const viaje = crearViajeDesdeCiere(enCurso.id, {
       plataforma: enCurso.plataforma,
       inicioISO: enCurso.inicioISO,
       finISO: new Date().toISOString(),
-      recorrido: enCurso.recorrido,
+      recorrido,
       puntoDeRecogidaISO: enCurso.puntoDeRecogidaISO,
       distanciaReportadaPlataforma,
       ingreso,
@@ -234,7 +285,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     void ocultarBurbuja()
     guardarActivo(null)
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') void limpiarTrazaPersistida()
-    void resolverZonaSiHizoFalta(viaje.id, enCurso.recorrido)
+    void resolverZonaSiHizoFalta(viaje.id, recorrido)
     return viaje
   },
 

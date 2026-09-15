@@ -26,6 +26,24 @@ export interface SeguidorGPS {
   detener: () => void
 }
 
+/**
+ * 2026-09-15: intenté en un primer momento subir esto (35→50) y aflojar el
+ * umbral de movimiento de abajo, con la teoría de que el filtro estaba
+ * descartando movimiento real a velocidad de tráfico urbano. Una simulación
+ * completa de un viaje real (parado/lento/ciudad/avenida, con ruido GPS
+ * realista) demostró que esa teoría estaba MAL: con el filtro viejo el
+ * cálculo da 101-106% de la distancia real incluso en el peor caso (trancón
+ * total, sin ningún tramo rápido); con el filtro aflojado, sobrecuenta hasta
+ * 326% en ese mismo escenario (el "anterior" sigue avanzando con cada punto
+ * de precisión aceptable aunque no sume distancia — el filtro no pierde
+ * movimiento real, solo lo agrupa hasta que hay suficiente desplazamiento
+ * neto). Revertido — el problema real de "kilometraje en cero" está en otro
+ * lado (ver `domain/viajes/store.ts`, `recorridoDefinitivo`, y el resto de
+ * la investigación en PLAN-MAESTRO). No tocar este número sin volver a
+ * correr esa simulación primero.
+ */
+const PRECISION_MAXIMA_M = 35
+
 function puntoCrudoAPuntoGPS(punto: PuntoGpsCrudo): PuntoGPS {
   return {
     lat: punto.lat,
@@ -36,7 +54,7 @@ function puntoCrudoAPuntoGPS(punto: PuntoGpsCrudo): PuntoGPS {
 
 function puntoValido(punto: PuntoGpsCrudo, anterior: PuntoGPS | null): boolean {
   if (!Number.isFinite(punto.lat) || !Number.isFinite(punto.lng)) return false
-  if (punto.precisionMetros <= 0 || punto.precisionMetros > 35) return false
+  if (punto.precisionMetros <= 0 || punto.precisionMetros > PRECISION_MAXIMA_M) return false
   if (!anterior) return true
   const a = anterior
   const R = 6371000
@@ -54,18 +72,53 @@ function puntoValido(punto: PuntoGpsCrudo, anterior: PuntoGPS | null): boolean {
   return true
 }
 
+/**
+ * Procesa UN punto crudo contra el "anterior" vigente — misma lógica que
+ * antes vivía inline en la suscripción en vivo (`iniciarSeguimientoNativo`),
+ * ahora compartida (D-18) con `filtrarRecorridoValido` de abajo, que aplica
+ * el mismo criterio sobre una traza completa ya capturada (recuperación de
+ * `obtenerTrazaPersistida()`), no solo en vivo punto a punto.
+ */
+function procesarPuntoCrudo(
+  punto: PuntoGpsCrudo,
+  anterior: PuntoGPS | null,
+): { anteriorSiguiente: PuntoGPS | null; puntoValidoListo: PuntoGPS | null } {
+  if (!puntoValido(punto, anterior)) {
+    const anteriorSiguiente = punto.precisionMetros > 0 && punto.precisionMetros <= PRECISION_MAXIMA_M ? puntoCrudoAPuntoGPS(punto) : anterior
+    return { anteriorSiguiente, puntoValidoListo: null }
+  }
+  const listo = puntoCrudoAPuntoGPS(punto)
+  return { anteriorSiguiente: listo, puntoValidoListo: listo }
+}
+
+/**
+ * 2026-09-15, pedido explícito del usuario: aplica el mismo filtro de
+ * `puntoValido` sobre una traza COMPLETA ya capturada (no en vivo) — la usa
+ * `domain/viajes/store.ts` al cerrar un viaje, para reconstruir el recorrido
+ * a partir de la traza persistida por el servicio nativo (`GpsTrackingService`)
+ * en vez de confiar solo en lo que alcanzó a llegar al store de JS en vivo
+ * (que puede quedar incompleto si el WebView estuvo caído parte del viaje —
+ * ver el comentario largo en store.ts, `recorridoDefinitivo`).
+ */
+export function filtrarRecorridoValido(puntos: PuntoGpsCrudo[]): PuntoGPS[] {
+  let anterior: PuntoGPS | null = null
+  const validos: PuntoGPS[] = []
+  for (const punto of puntos) {
+    const { anteriorSiguiente, puntoValidoListo } = procesarPuntoCrudo(punto, anterior)
+    anterior = anteriorSiguiente
+    if (puntoValidoListo) validos.push(puntoValidoListo)
+  }
+  return validos
+}
+
 async function iniciarSeguimientoNativo(onPunto: (p: PuntoGPS) => void): Promise<SeguidorGPS> {
   // Primero la suscripción, después arrancar el servicio: así no se pierde
   // ningún punto emitido justo al arrancar.
   let anterior: PuntoGPS | null = null
   const suscripcion = await suscribirsePuntosGps((punto) => {
-    if (!puntoValido(punto, anterior)) {
-      if (punto.precisionMetros <= 35) anterior = puntoCrudoAPuntoGPS(punto)
-      return
-    }
-    const listo = puntoCrudoAPuntoGPS(punto)
-    anterior = listo
-    onPunto(listo)
+    const { anteriorSiguiente, puntoValidoListo } = procesarPuntoCrudo(punto, anterior)
+    anterior = anteriorSiguiente
+    if (puntoValidoListo) onPunto(puntoValidoListo)
   })
 
   try {

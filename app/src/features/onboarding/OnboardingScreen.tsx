@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { solicitarNotificaciones, solicitarUbicacion, solicitarBurbuja, solicitarMicrofono } from '../../domain/onboarding/permisos'
+import { solicitarNotificaciones, solicitarUbicacion, solicitarIgnorarOptimizacionBateria, solicitarBurbuja, solicitarMicrofono } from '../../domain/onboarding/permisos'
 import { useTema, previsualizarTema } from '../../domain/tema/store'
 import { TEMAS_DISPONIBLES } from '../../domain/tema/types'
 import type { Tema } from '../../domain/tema/types'
 import { useVehiculo } from '../../domain/vehiculo/store'
 import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
 
-type Paso = 'bienvenida' | 'notificaciones' | 'ubicacion' | 'burbuja' | 'microfono' | 'tema' | 'vehiculo'
+type Paso = 'bienvenida' | 'notificaciones' | 'ubicacion' | 'bateria' | 'burbuja' | 'microfono' | 'tema' | 'vehiculo'
 
-const ORDEN: Paso[] = ['bienvenida', 'notificaciones', 'ubicacion', 'burbuja', 'microfono', 'tema', 'vehiculo']
+const ORDEN: Paso[] = ['bienvenida', 'notificaciones', 'ubicacion', 'bateria', 'burbuja', 'microfono', 'tema', 'vehiculo']
 
 /**
  * Se muestra mientras falte tema o vehículo por elegir (App.tsx decide esto
@@ -65,7 +65,7 @@ export function OnboardingScreen() {
         <>
           <h1 className="titulo-pantalla">Bienvenido a MIA</h1>
           <p className="texto-mute" style={{ marginBottom: 24 }}>
-            Antes de empezar, te vamos a pedir 4 permisos — cada uno con una razón concreta, ninguno es obligatorio para seguir.
+            Antes de empezar, te vamos a pedir 5 permisos — cada uno con una razón concreta, ninguno es obligatorio para seguir.
           </p>
           <button type="button" onClick={siguiente}>Empezar</button>
         </>
@@ -87,6 +87,16 @@ export function OnboardingScreen() {
           detalle="Precisa y siempre activa — así MIA mide tus kilómetros reales aunque guardes el teléfono a mitad de un viaje."
           pidiendo={pidiendo}
           onPermitir={() => void manejarPermiso(solicitarUbicacion)}
+          onOmitir={siguiente}
+        />
+      )}
+
+      {paso === 'bateria' && (
+        <PasoPermiso
+          titulo="Sin restricciones de batería"
+          detalle="En algunos celulares (Xiaomi, Samsung, Huawei, Oppo) el sistema puede parar la medición de GPS en segundo plano para ahorrar batería, aunque MIA siga corriendo. Excluir la app de esa optimización evita que tus kilómetros queden en cero."
+          pidiendo={pidiendo}
+          onPermitir={() => void manejarPermiso(solicitarIgnorarOptimizacionBateria)}
           onOmitir={siguiente}
         />
       )}
