@@ -1,4 +1,4 @@
-import type { ContextoIntent, ContextoMantenimientoItem, Intencion } from './types.js'
+import type { ContextoDesgloseItem, ContextoIntent, ContextoMantenimientoItem, Intencion } from './types.js'
 
 /**
  * Arma la respuesta en texto para las intenciones que saben usar `contexto` — punto 3 de
@@ -43,6 +43,12 @@ export function armarRespuesta(intencion: Intencion, contexto?: ContextoIntent):
     case 'mantenimientos_pendientes':
       return armarRespuestaMantenimiento(contexto?.mantenimiento)
 
+    case 'mejor_zona':
+      return armarRespuestaMejorDe(contexto?.porZona, 'zona', 'donde más recoges y mejor te va')
+
+    case 'mejor_horario':
+      return armarRespuestaMejorDe(contexto?.porFranja, 'horario', 'en el que mejor te va')
+
     default:
       // No debería pasar nunca en la práctica: router.ts solo llama a esta
       // función con `regla.intencion`, y `ReglaIntent` excluye 'no_reconocida'
@@ -69,6 +75,22 @@ function armarRespuestaMantenimiento(items?: ContextoMantenimientoItem[]): strin
   if (vencidos.length > 0) partes.push(`vencido: ${vencidos.map((i) => i.nombre).join(', ')}`)
   if (proximos.length > 0) partes.push(`próximo a vencer: ${proximos.map((i) => i.nombre).join(', ')}`)
   return `Tienes ${partes.join(' — ')}.`
+}
+
+/**
+ * Compartida por 'mejor_zona' y 'mejor_horario' — mismo cálculo (el de mayor
+ * ingreso total), solo cambia la palabra ("zona"/"horario") y el contexto
+ * que se le pasa. No asume que `items` ya viene ordenado por ingreso (aunque
+ * desglosePorZona sí lo hace) — busca el máximo acá mismo, más robusto que
+ * confiar en el orden de quien llama.
+ */
+function armarRespuestaMejorDe(items: ContextoDesgloseItem[] | undefined, etiqueta: string, calificativo: string): string {
+  if (!items) return sinDatos(etiqueta === 'zona' ? 'de zonas' : 'de horarios')
+  const conViajes = items.filter((i) => i.resumen.cantidadViajes > 0)
+  if (conViajes.length === 0) return `Todavía no tengo viajes suficientes para saber tu mejor ${etiqueta}.`
+
+  const mejor = conViajes.reduce((a, b) => (b.resumen.ingresos > a.resumen.ingresos ? b : a))
+  return `Tu mejor ${etiqueta} es ${mejor.clave} — ${calificativo}, con ${formatearDinero(mejor.resumen.ingresos)} en ${contarViajes(mejor.resumen.cantidadViajes)}.`
 }
 
 function contarViajes(cantidad: number): string {

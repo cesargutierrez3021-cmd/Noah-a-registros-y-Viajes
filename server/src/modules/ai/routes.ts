@@ -34,11 +34,19 @@ const esquemaContextoMantenimientoItem = z.object({
   diasFaltantes: z.number().nullable(),
 })
 
+// 2026-09-15: mismo shape que ContextoDesgloseItem (server) / DesglosePor<T> (cliente) — para 'mejor_zona'/'mejor_horario'.
+const esquemaContextoDesgloseItem = z.object({
+  clave: z.string(),
+  resumen: esquemaContextoResumen,
+})
+
 const esquemaContexto = z
   .object({
     hoy: esquemaContextoResumen.optional(),
     semana: esquemaContextoResumen.optional(),
     mantenimiento: z.array(esquemaContextoMantenimientoItem).optional(),
+    porZona: z.array(esquemaContextoDesgloseItem).optional(),
+    porFranja: z.array(esquemaContextoDesgloseItem).optional(),
   })
   .optional()
 

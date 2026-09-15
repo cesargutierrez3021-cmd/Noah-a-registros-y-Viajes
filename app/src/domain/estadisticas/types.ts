@@ -12,6 +12,14 @@
 
 export type UnidadPeriodo = 'dia' | 'semana' | 'mes'
 
+/**
+ * 2026-09-15, pedido explícito del usuario: saber en qué franja del día le
+ * va mejor. Cuatro cortes fijos (no configurables todavía — D-18, no
+ * construir sin necesidad confirmada): mañana 5-12, mediodía 12-14, tarde
+ * 14-19, noche 19-5 (cruza medianoche). Ver `franjaHoraria()` en calculos.ts.
+ */
+export type FranjaHoraria = 'mañana' | 'mediodía' | 'tarde' | 'noche'
+
 export interface ResumenViajes {
   cantidadViajes: number
   kmTotales: number

@@ -4,6 +4,7 @@ import { useViajes } from '../../domain/viajes/store'
 import { useJornada } from '../../domain/jornada/store'
 import { sincronizarViajesPendientes } from '../../domain/viajes/sync'
 import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
+import { fechaNegocioISO, limitesDiaBogotaISODesdeClave } from '../../lib/fechas'
 import type { Plataforma } from '../../domain/viajes/types'
 
 const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap', 'Rappi', 'Particular']
@@ -15,6 +16,7 @@ export function SeccionViajesYJornada() {
     useJornada()
 
   const [ingreso, setIngreso] = useState('')
+  const [diaHistorial, setDiaHistorial] = useState(() => fechaNegocioISO())
 
   useEffect(() => {
     void cargar()
@@ -80,20 +82,40 @@ export function SeccionViajesYJornada() {
         </div>
       )}
 
+      <h3 className="texto-mute" style={{ marginTop: 8 }}>Historial</h3>
+      <div className="tarjeta-viaje" style={{ marginBottom: 12 }}>
+        <label className="texto-mute" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          Día
+          <input type="date" value={diaHistorial} onChange={(e) => setDiaHistorial(e.target.value)} style={{ flex: 1 }} />
+        </label>
+      </div>
+
       {cargando ? (
         <p className="texto-mute">Cargando viajes…</p>
-      ) : viajes.length === 0 ? (
-        <p className="texto-mute" style={{ marginBottom: 16 }}>Todavía no hay viajes registrados.</p>
       ) : (
-        <ul className="lista-viajes" style={{ marginBottom: 16, maxHeight: 280, overflowY: 'auto' }}>
-          {viajes.slice(0, 20).map((v) => (
-            <li key={v.id} className="tarjeta-viaje">
-              <span className="tarjeta-viaje__plataforma">{v.plataforma}</span>
-              <span className="tarjeta-viaje__km">{v.distancia.kmTotalesReales.toFixed(1)} km reales</span>
-              <span className="tarjeta-viaje__ingreso">${v.ingreso.toLocaleString('es-CO')}</span>
-            </li>
-          ))}
-        </ul>
+        (() => {
+          const { desde, hasta } = limitesDiaBogotaISODesdeClave(diaHistorial)
+          const delDia = viajes.filter((v) => v.estado === 'finalizado' && v.inicioISO >= desde && v.inicioISO < hasta)
+          if (delDia.length === 0) {
+            return <p className="texto-mute" style={{ marginBottom: 16 }}>Sin viajes ese día.</p>
+          }
+          return (
+            <ul className="lista-viajes" style={{ marginBottom: 16, maxHeight: 320, overflowY: 'auto' }}>
+              {delDia.map((v) => (
+                <li key={v.id} className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+                  <span className="tarjeta-viaje__plataforma">
+                    {v.plataforma} · {v.distancia.kmTotalesReales.toFixed(1)} km · ${v.ingreso.toLocaleString('es-CO')}
+                  </span>
+                  <span className="texto-mute">
+                    {(v.localidadInicio ?? v.zonaInicio ?? v.localidad ?? v.zona) ?? 'Zona no detectada'}
+                    {' → '}
+                    {(v.localidadFin ?? v.zonaFin ?? v.localidad ?? v.zona) ?? 'Zona no detectada'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )
+        })()
       )}
     </div>
   )

@@ -16,6 +16,8 @@ export type Intencion =
   | 'viajes_hoy'
   | 'resumen_semana'
   | 'mantenimientos_pendientes'
+  | 'mejor_zona'
+  | 'mejor_horario'
   | 'no_reconocida' // ninguna regla matcheó Y el clasificador IA tampoco resolvió (o es el stub)
 
 export interface ResultadoIntent {
@@ -83,10 +85,24 @@ export interface ContextoTrabajoDetallado {
  * Todo opcional a propósito: si el cliente no manda nada, el backend solo confirma la
  * intención detectada, igual que en la versión anterior de esta ruta.
  */
+/**
+ * Mismo shape que `DesglosePor<T>` del cliente (app/src/domain/estadisticas/types.ts).
+ * 2026-09-15, pedido explícito del usuario: MIA tiene que poder decir "en qué zona/franja
+ * te va mejor" con reglas, sin tocar IA — mismo criterio que el resto del Intent Router.
+ */
+export interface ContextoDesgloseItem {
+  clave: string
+  resumen: ContextoResumen
+}
+
 export interface ContextoIntent {
   hoy?: ContextoResumen
   semana?: ContextoResumen
   mantenimiento?: ContextoMantenimientoItem[]
+  /** Salida de domain/estadisticas/calculos.ts → desglosePorZona (zona de RECOGIDA, no de destino). */
+  porZona?: ContextoDesgloseItem[]
+  /** Salida de domain/estadisticas/calculos.ts → desglosePorFranjaHoraria. */
+  porFranja?: ContextoDesgloseItem[]
 }
 
 /**

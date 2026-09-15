@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
-import { agruparPorPeriodo, calcularResumen, desglosePorPlataforma, desglosePorZona } from '../../domain/estadisticas/calculos'
+import { agruparPorPeriodo, calcularResumen, desglosePorPlataforma, desglosePorZona, desglosePorFranjaHoraria } from '../../domain/estadisticas/calculos'
 import type { UnidadPeriodo } from '../../domain/estadisticas/types'
 
 const ETIQUETAS_UNIDAD: Record<UnidadPeriodo, string> = { dia: 'Día', semana: 'Semana', mes: 'Mes' }
@@ -21,6 +21,7 @@ export function SeccionEstadisticas() {
   const porPeriodo = agruparPorPeriodo(viajes, unidad)
   const porPlataforma = desglosePorPlataforma(viajes)
   const porZona = desglosePorZona(viajes)
+  const porFranja = desglosePorFranjaHoraria(viajes)
 
   return (
     <div id="seccion-estadisticas">
@@ -71,11 +72,29 @@ export function SeccionEstadisticas() {
 
       {porZona.length > 0 && (
         <>
-          <h3 className="texto-mute">Por zona (Bogotá)</h3>
-          <ul className="lista-viajes" style={{ marginBottom: 24 }}>
+          <h3 className="texto-mute">Por zona donde recoges (Bogotá)</h3>
+          <ul className="lista-viajes" style={{ marginBottom: 16 }}>
             {porZona.map(({ clave, resumen }) => (
               <li key={clave} className="tarjeta-viaje">
                 <span>{clave}</span>
+                <span>{resumen.cantidadViajes} viajes</span>
+                <span>{formatoMoneda(resumen.ingresos)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {porFranja.length > 0 && (
+        <>
+          <h3 className="texto-mute">Por franja horaria</h3>
+          <p className="texto-mute" style={{ fontSize: '0.8rem', marginBottom: 8 }}>
+            Mañana 5-12 · Mediodía 12-14 · Tarde 14-19 · Noche 19-5 — según la hora en que recoges, no en la que cierras.
+          </p>
+          <ul className="lista-viajes" style={{ marginBottom: 24 }}>
+            {porFranja.map(({ clave, resumen }) => (
+              <li key={clave} className="tarjeta-viaje">
+                <span style={{ textTransform: 'capitalize' }}>{clave}</span>
                 <span>{resumen.cantidadViajes} viajes</span>
                 <span>{formatoMoneda(resumen.ingresos)}</span>
               </li>

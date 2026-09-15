@@ -7,7 +7,7 @@ import type { ContextoConversacionEnvio } from '../../domain/conversacion/api'
 import { useViajes } from '../../domain/viajes/store'
 import { useMantenimiento } from '../../domain/mantenimiento/store'
 import { useAuth } from '../../domain/auth/store'
-import { agruparPorPeriodo, calcularResumen } from '../../domain/estadisticas/calculos'
+import { agruparPorPeriodo, calcularResumen, desglosePorZona, desglosePorFranjaHoraria } from '../../domain/estadisticas/calculos'
 
 /**
  * Bloque 4, ítem 12 (parte no-visual). MIA deja de ser una ruta/pestaña
@@ -72,6 +72,10 @@ export function MiaBurbuja() {
     return {
       hoy: puntoHoy?.resumen,
       semana: puntoSemana?.resumen,
+      // 2026-09-15: "en qué zona/horario me va mejor" — mismas funciones que
+      // ya usa SeccionEstadisticas.tsx (D-18: no se recalcula nada aparte).
+      porZona: desglosePorZona(viajes),
+      porFranja: desglosePorFranjaHoraria(viajes),
       mantenimiento: itemsMantenimiento.map((item) => {
         const alerta = alertas.find((a) => a.item.id === item.id)
         return {

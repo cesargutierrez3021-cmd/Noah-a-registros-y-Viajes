@@ -25,6 +25,16 @@ export const REGLAS_INTENT: ReglaIntent[] = [
     intencion: 'mantenimientos_pendientes',
     disparadores: ['que mantenimiento', 'mantenimientos pendientes', 'algo pendiente de mantenimiento', 'me toca algo del carro'],
   },
+  {
+    // 2026-09-15, pedido explícito del usuario: "zona" se refiere a dónde RECOGE
+    // (ver desglosePorZona en el cliente), no a dónde deja al pasajero.
+    intencion: 'mejor_zona',
+    disparadores: ['mejor zona', 'que zona me conviene', 'en que zona gano mas', 'donde me va mejor', 'donde recojo mas'],
+  },
+  {
+    intencion: 'mejor_horario',
+    disparadores: ['mejor horario', 'que horario me conviene', 'en que horario gano mas', 'mejor franja', 'a que hora me va mejor'],
+  },
 ]
 
 /** Quita tildes y pasa a minúsculas — así "cuántos" y "cuantos" matchean igual. */

@@ -31,3 +31,16 @@ export function limitesSemanaBogotaISO(fecha: Date = new Date()) {
 }
 
 export function limitesMesBogotaISO(fecha: Date = new Date()) { const {year,month}=componentesBogota(fecha); const inicio=Date.UTC(year,month-1,1,5); const fin=Date.UTC(year,month,1,5); return {desde:new Date(inicio).toISOString(),hasta:new Date(fin).toISOString()} }
+
+/** Límites [desde, hasta) del día de negocio dado, en formato YYYY-MM-DD (Bogotá) — para el selector de día del Historial. */
+export function limitesDiaBogotaISODesdeClave(claveDia: string) {
+  const [year, month, day] = claveDia.split('-').map(Number)
+  const inicio = Date.UTC(year, month - 1, day, 5, 0, 0, 0)
+  return { desde: new Date(inicio).toISOString(), hasta: new Date(inicio + 86400000).toISOString() }
+}
+
+/** Hora local (0-23) en Bogotá de un ISO dado — para franjas horarias (domain/estadisticas). */
+export function horaLocalBogota(fechaISO: string): number {
+  const partes = new Intl.DateTimeFormat('en-US', { timeZone: ZONA_HORARIA_NEGOCIO, hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(fechaISO))
+  return Number(partes.find((p) => p.type === 'hour')?.value ?? 0)
+}

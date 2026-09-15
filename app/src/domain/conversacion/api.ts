@@ -27,12 +27,21 @@ export interface ContextoPuntoPeriodoEnvio {
   resumen: ContextoResumenEnvio
 }
 
+/** Mismo shape que ContextoDesgloseItem del backend — ver domain/estadisticas/types.ts (DesglosePor<T>) del lado del cliente. */
+export interface ContextoDesgloseItemEnvio {
+  clave: string
+  resumen: ContextoResumenEnvio
+}
+
 export interface ContextoConversacionEnvio {
   hoy?: ContextoResumenEnvio
   semana?: ContextoResumenEnvio
   mantenimiento?: ContextoMantenimientoItemEnvio[]
   historial?: ContextoPuntoPeriodoEnvio[]
   turnosPrevios?: TurnoConversacion[]
+  /** 2026-09-15: para que MIA responda "mejor zona"/"mejor horario" con reglas, sin IA. */
+  porZona?: ContextoDesgloseItemEnvio[]
+  porFranja?: ContextoDesgloseItemEnvio[]
 }
 
 /**

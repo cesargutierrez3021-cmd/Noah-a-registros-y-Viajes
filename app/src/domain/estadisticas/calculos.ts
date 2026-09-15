@@ -1,9 +1,11 @@
 import type { Viaje } from '../viajes/types'
 import type { Jornada } from '../jornada/types'
 import type { Gasto } from '../gastos/types'
+import { horaLocalBogota } from '../../lib/fechas'
 import type {
   CostoPorKm,
   DesglosePor,
+  FranjaHoraria,
   PuntoPeriodo,
   RentabilidadPorHora,
   ResumenViajes,
@@ -88,13 +90,22 @@ export function desglosePorPlataforma(viajes: Viaje[]): DesglosePor<string>[] {
     .sort((a, b) => b.resumen.ingresos - a.resumen.ingresos)
 }
 
-/** Desglose por localidad de Bogotá (domain/viajes/zonasBogota.ts). Viajes sin zona detectada se agrupan aparte. */
+/**
+ * Desglose por zona de RECOGIDA (domain/viajes/zonasBogota.ts) — a propósito
+ * `zonaInicio`, no `zonaFin`: 2026-09-15, pedido explícito del usuario —
+ * "qué suena mejor" se decide por dónde recoges al pasajero, no por dónde lo
+ * dejas (ahí ya cobraste, esa zona no te sirve para decidir dónde pararte la
+ * próxima vez). `zona` queda como respaldo para viajes viejos, de antes de
+ * que existiera la separación inicio/fin (ver migración
+ * 20260914090000_viaje_zonas_inicio_fin). Viajes sin zona detectada
+ * (manuales, o GPS que no alcanzó a ubicar) se agrupan aparte.
+ */
 export function desglosePorZona(viajes: Viaje[]): DesglosePor<string>[] {
   const finalizados = soloFinalizados(viajes)
   const grupos = new Map<string, Viaje[]>()
 
   for (const viaje of finalizados) {
-    const clave = viaje.zona ?? SIN_ZONA
+    const clave = viaje.zonaInicio ?? viaje.zona ?? SIN_ZONA
     const lista = grupos.get(clave) ?? []
     lista.push(viaje)
     grupos.set(clave, lista)
@@ -103,6 +114,38 @@ export function desglosePorZona(viajes: Viaje[]): DesglosePor<string>[] {
   return Array.from(grupos.entries())
     .map(([clave, viajesDeLaZona]) => ({ clave, resumen: calcularResumen(viajesDeLaZona) }))
     .sort((a, b) => b.resumen.ingresos - a.resumen.ingresos)
+}
+
+/**
+ * A qué franja horaria pertenece un ISO, en hora de Bogotá (nunca UTC crudo
+ * — mismo criterio que `fechaNegocioISO`, D-18: reutiliza `horaLocalBogota`
+ * en vez de sacar la hora a mano). Cortes fijos, ver FranjaHoraria en types.ts.
+ */
+export function franjaHoraria(fechaISO: string): FranjaHoraria {
+  const hora = horaLocalBogota(fechaISO)
+  if (hora >= 5 && hora < 12) return 'mañana'
+  if (hora >= 12 && hora < 14) return 'mediodía'
+  if (hora >= 14 && hora < 19) return 'tarde'
+  return 'noche' // 19:00–4:59, cruza medianoche
+}
+
+/** Desglose por franja horaria de INICIO del viaje — mismo criterio de "recogida" que desglosePorZona. */
+export function desglosePorFranjaHoraria(viajes: Viaje[]): DesglosePor<FranjaHoraria>[] {
+  const finalizados = soloFinalizados(viajes)
+  const grupos = new Map<FranjaHoraria, Viaje[]>()
+
+  for (const viaje of finalizados) {
+    const clave = franjaHoraria(viaje.inicioISO)
+    const lista = grupos.get(clave) ?? []
+    lista.push(viaje)
+    grupos.set(clave, lista)
+  }
+
+  // Orden fijo del día, no por ingreso — a diferencia de zona/plataforma, acá
+  // el orden cronológico es más legible que ordenar por plata (D-18: no
+  // copiar el mismo criterio de orden sin pensar si aplica).
+  const ORDEN: FranjaHoraria[] = ['mañana', 'mediodía', 'tarde', 'noche']
+  return ORDEN.filter((f) => grupos.has(f)).map((clave) => ({ clave, resumen: calcularResumen(grupos.get(clave)!) }))
 }
 
 const UNA_HORA_MS = 3_600_000
