@@ -945,6 +945,214 @@ textarea:focus {
   to { transform: translateX(-4px); }
 }
 
+/* "Frasco de ahorro" (2026-09-15) — ver components/graficos/GraficoAhorroMeta.tsx */
+.balance-ahorro {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px 26px;
+  border-radius: var(--radio-tarjeta-grande, 22px);
+  background: var(--gradiente-app-card, var(--color-superficie));
+  border: 1px solid var(--color-borde-suave);
+  overflow: hidden;
+  isolation: isolate;
+}
+.balance-ahorro::before {
+  content: '';
+  position: absolute;
+  inset: -20% -10%;
+  background: radial-gradient(circle at 50% 30%, rgba(183, 164, 255, 0.22), transparent 65%);
+  z-index: -1;
+  pointer-events: none;
+}
+.balance-ahorro--vacio {
+  padding: 34px 22px;
+  gap: 8px;
+}
+.balance-ahorro__vacio-icono {
+  font-size: 2.6rem;
+  opacity: 0.7;
+}
+.balance-ahorro__texto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.balance-ahorro__porcentaje {
+  font-size: 2.3rem;
+  font-weight: 800;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #e4d9ff, #9a86e8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.balance-ahorro__ola {
+  animation: balance-ahorro-ola 3.6s linear infinite;
+}
+.balance-ahorro__ola--2 {
+  animation-duration: 5.2s;
+  animation-direction: reverse;
+}
+@keyframes balance-ahorro-ola {
+  from { transform: translateX(0); }
+  to { transform: translateX(-200px); }
+}
+.balance-ahorro__burbuja {
+  fill: rgba(255, 255, 255, 0.55);
+  animation: balance-ahorro-burbuja 3.4s ease-in infinite;
+}
+@keyframes balance-ahorro-burbuja {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 0.85; }
+  90% { opacity: 0.15; }
+  100% { transform: translateY(-150px); opacity: 0; }
+}
+.balance-ahorro--estatico .balance-ahorro__ola,
+.balance-ahorro--estatico .balance-ahorro__burbuja {
+  animation: none;
+}
+.balance-ahorro--cumplida .balance-ahorro__porcentaje {
+  background: linear-gradient(135deg, #ffe9a8, #f0c987);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.balance-ahorro__chispas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.balance-ahorro__chispas span {
+  position: absolute;
+  color: #f0c987;
+  font-size: 1rem;
+  opacity: 0;
+  animation: balance-ahorro-chispa 2.4s ease-in-out infinite;
+}
+.balance-ahorro__chispas span:nth-child(1) { top: 14%; left: 18%; animation-delay: 0s; }
+.balance-ahorro__chispas span:nth-child(2) { top: 22%; left: 78%; animation-delay: 0.4s; }
+.balance-ahorro__chispas span:nth-child(3) { top: 55%; left: 8%; animation-delay: 0.9s; }
+.balance-ahorro__chispas span:nth-child(4) { top: 68%; left: 86%; animation-delay: 1.3s; }
+.balance-ahorro__chispas span:nth-child(5) { top: 40%; left: 50%; animation-delay: 1.7s; }
+@keyframes balance-ahorro-chispa {
+  0%, 100% { opacity: 0; transform: scale(0.6) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(90deg); }
+}
+
+/* Acordeones "papeleta" (2026-09-15) — ver components/AcordeonResumen.tsx.
+   Usados en Balance para los resúmenes de Deudas/Hogar/Vehículo: pedido
+   explícito del usuario de que no fuera scroll infinito sino desplegables,
+   "no solo letras y números" al abrirse. */
+.acordeon-resumen {
+  border-radius: var(--radio-tarjeta-grande, 20px);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-suave);
+  overflow: hidden;
+}
+.acordeon-resumen + .acordeon-resumen {
+  margin-top: 10px;
+}
+.acordeon-resumen__cabecera {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-texto);
+}
+.acordeon-resumen__icono {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex: none;
+}
+.acordeon-resumen__titulos {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.acordeon-resumen__titulos strong {
+  font-size: 0.96rem;
+}
+.acordeon-resumen__titulos .texto-mute {
+  font-size: 0.78rem;
+}
+.acordeon-resumen__chevron {
+  font-size: 1.2rem;
+  color: var(--color-texto-tenue);
+  transition: transform 0.3s ease;
+  flex: none;
+}
+.acordeon-resumen__chevron--abierto {
+  transform: rotate(180deg);
+}
+.acordeon-resumen__panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s ease;
+}
+.acordeon-resumen__panel--abierto {
+  grid-template-rows: 1fr;
+}
+.acordeon-resumen__panel-interior {
+  overflow: hidden;
+}
+.acordeon-resumen__papeleta {
+  margin: 0 14px 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--color-superficie-2);
+  border: 1px dashed var(--color-borde);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.28s ease 0.05s, transform 0.28s ease 0.05s;
+}
+.acordeon-resumen__panel--abierto .acordeon-resumen__papeleta {
+  opacity: 1;
+  transform: translateY(0);
+}
+.acordeon-resumen__fila {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.acordeon-resumen__fila-linea {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.86rem;
+}
+.acordeon-resumen__barra {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-borde-suave);
+  overflow: hidden;
+}
+.acordeon-resumen__barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
 /* Tarjetas ejecutivas de mantenimiento (2026-09-15) — ver features/trabajo/TarjetaMantenimiento.tsx */
 .tarjeta-mantenimiento__imagen--animada {
   animation: tarjeta-mantenimiento-respirar 6s ease-in-out infinite;
