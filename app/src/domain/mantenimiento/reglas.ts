@@ -32,6 +32,11 @@ export const CATALOGO_MANTENIMIENTO: PlantillaItemMantenimiento[] = [
   { nombre: 'Batería', criterio: 'dias', intervaloKm: null, intervaloDias: 730, imagen: null },
   { nombre: 'SOAT', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null },
   { nombre: 'Revisión técnico-mecánica', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null },
+  { nombre: 'Líquido de frenos', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: 'liquido_de_frenos' },
+  { nombre: 'Aceite y retenes de horquilla', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'aceite_y_retenes_horquilla' },
+  { nombre: 'Reglaje de válvulas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'reglaje_de_valvulas' },
+  { nombre: 'Rodamientos de dirección', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_direccion' },
+  { nombre: 'Rodamientos de rueda', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_rueda' },
 ]
 
 /** Margen de aviso antes de vencer: dentro de esto se marca "próximo a vencer". */

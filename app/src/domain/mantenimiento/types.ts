@@ -35,6 +35,11 @@ export type ImagenMantenimiento =
   | 'balanceo'
   | 'filtro_de_aire'
   | 'pastillas_de_freno'
+  | 'liquido_de_frenos'
+  | 'aceite_y_retenes_horquilla'
+  | 'reglaje_de_valvulas'
+  | 'rodamientos_de_direccion'
+  | 'rodamientos_de_rueda'
 
 export interface ItemMantenimiento {
   id: string

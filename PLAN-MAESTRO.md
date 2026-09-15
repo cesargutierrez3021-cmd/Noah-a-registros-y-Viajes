@@ -1027,3 +1027,20 @@ Pedido explícito del usuario, con un paquete visual propio ("Paquete de tarjeta
 **Verificado:** `npm run build` limpio en `app/` y `server/`, transparencia de las imágenes confirmada por código (canal alfa con rango 0-255 antes y después de la conversión). **No verificado:** cómo se ve de verdad en un teléfono (la respiración de la imagen, el llenado de la barra) — mismo límite de siempre, sin poder correr la app en este entorno.
 
 **Pendiente explícito del usuario — todavía NO se generó ni se mandó el APK de esta ronda:** dijo que viene otra corrección antes de pedirlo.
+
+## 2026-09-15 (misma sesión, quinta ronda) — 5 categorías más de mantenimiento ("se me faltaron")
+
+El usuario mandó un segundo paquete (`moto-new-maintenance-package.zip`) con 5 categorías que no venían en el primero: Líquido de frenos, Aceite y retenes de horquilla, Reglaje de válvulas, Rodamientos de dirección, Rodamientos de rueda — cada una con su imagen real (PNG 1920×1920, 3-5.6 MB) y un `service_interval` en texto. Mismo patrón exacto del primer paquete, sin decisiones de diseño nuevas:
+
+- Imágenes optimizadas igual que las primeras 7: PNG → WebP 480×480, calidad 82, método 6 (28 MB → ~186 KB las 5 nuevas), copiadas a `app/src/assets/mantenimiento/`.
+- `ImagenMantenimiento` (types.ts) extendido con las 5 claves nuevas.
+- `CATALOGO_MANTENIMIENTO` (reglas.ts) extendido con las 5 plantillas nuevas, interpretando `service_interval`: "12 meses" → `dias`/365 (Líquido de frenos); "20.000 km" → `km`/20000 (Aceite y retenes de horquilla, Reglaje de válvulas); "30.000 km" → `km`/30000 (Rodamientos de dirección, Rodamientos de rueda). Igual que el resto del catálogo, son valores SUGERIDOS — el usuario los edita antes de confirmar (mismo flujo de `SeccionMantenimiento.tsx`, sin cambios ahí).
+- `IMAGENES_MANTENIMIENTO` (tarjetasMantenimiento.ts) extendido con los 5 imports/entradas nuevos. El JSON de este paquete no traía paleta propia (mismo `style` "realista-minimalista, serio y ejecutivo") → se reutiliza `PALETA_TARJETA_MANTENIMIENTO` sin cambios.
+- `TarjetaMantenimiento.tsx` y `SeccionMantenimiento.tsx`: sin cambios — ya eran genéricos/data-driven desde la ronda anterior, recogen el catálogo ampliado automáticamente.
+- Catálogo total ahora: 15 ítems (12 con imagen ejecutiva, 3 sin imagen: Batería/SOAT/Revisión técnico-mecánica).
+
+**Sin cambios de backend:** mismo razonamiento que la ronda anterior — `ItemMantenimiento` no sincroniza.
+
+**Verificado:** `npm run build` limpio en `app/` y `server/`.
+
+**Pendiente explícito del usuario — todavía NO se generó ni se mandó el APK:** sigue en pie la instrucción de la ronda anterior ("no me mandes el link todavía... ya te aviso"); este mensaje solo agregó datos a esa misma corrección pendiente.

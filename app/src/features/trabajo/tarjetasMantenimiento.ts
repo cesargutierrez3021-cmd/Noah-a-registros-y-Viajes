@@ -7,6 +7,11 @@ import imgMantenimientoGeneral from '../../assets/mantenimiento/04_mantenimiento
 import imgBalanceo from '../../assets/mantenimiento/05_balanceo.webp'
 import imgFiltroDeAire from '../../assets/mantenimiento/06_filtro_aire.webp'
 import imgPastillasDeFreno from '../../assets/mantenimiento/07_pastillas_freno.webp'
+import imgLiquidoDeFrenos from '../../assets/mantenimiento/moto-brake-fluid.webp'
+import imgAceiteYRetenesHorquilla from '../../assets/mantenimiento/moto-fork-service.webp'
+import imgReglajeDeValvulas from '../../assets/mantenimiento/moto-valves.webp'
+import imgRodamientosDeDireccion from '../../assets/mantenimiento/moto-steering-bearing.webp'
+import imgRodamientosDeRueda from '../../assets/mantenimiento/moto-wheel-bearing.webp'
 
 /**
  * 2026-09-15, pedido explícito del usuario: "Paquete de tarjetas ejecutivas
@@ -23,6 +28,11 @@ export const IMAGENES_MANTENIMIENTO: Record<ImagenMantenimiento, string> = {
   balanceo: imgBalanceo,
   filtro_de_aire: imgFiltroDeAire,
   pastillas_de_freno: imgPastillasDeFreno,
+  liquido_de_frenos: imgLiquidoDeFrenos,
+  aceite_y_retenes_horquilla: imgAceiteYRetenesHorquilla,
+  reglaje_de_valvulas: imgReglajeDeValvulas,
+  rodamientos_de_direccion: imgRodamientosDeDireccion,
+  rodamientos_de_rueda: imgRodamientosDeRueda,
 }
 
 /**
