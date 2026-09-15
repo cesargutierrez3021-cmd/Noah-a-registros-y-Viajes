@@ -12,6 +12,7 @@ import { OnboardingScreen } from './features/onboarding/OnboardingScreen'
 import { AvisoBanner } from './features/avisos/AvisoBanner'
 import { AvisosScreen } from './features/avisos/AvisosScreen'
 import { useTema } from './domain/tema/store'
+import { useVehiculo } from './domain/vehiculo/store'
 import { sincronizarViajesPendientes } from './domain/viajes/sync'
 import { sincronizarJornadasPendientes } from './domain/jornada/sync'
 import { sincronizarRegistrosMantenimientoPendientes } from './domain/mantenimiento/sync'
@@ -48,14 +49,18 @@ import { registrarSincronizacionAutomatica } from './lib/autoSync'
  *
  * Onboarding + temas (2026-09-15, pedido explícito del usuario): antes de
  * mostrar cualquier panel, la primera vez que se abre la app se debe pedir
- * los 4 permisos y elegir tema (OnboardingScreen). `useTema().yaElegido` es
- * la misma bandera que ya usa el store para saber si aplicar el tema
- * guardado — se reusa acá para decidir si el onboarding ya se completó
- * (D-18: no se agrega una segunda bandera separada). El tema se puede
- * volver a cambiar después desde /ajustes (ícono ⚙ en la barra).
+ * los 4 permisos, elegir tema y elegir vehículo (OnboardingScreen).
+ * `useTema().yaElegido` es la misma bandera que ya usa el store para saber
+ * si aplicar el tema guardado — se reusa acá para decidir si el onboarding
+ * ya se completó (D-18: no se agrega una segunda bandera separada). Mismo
+ * criterio para `useVehiculo().yaElegido`: si falta cualquiera de las dos,
+ * OnboardingScreen decide sola en qué paso arrancar (ver ese archivo). El
+ * tema y el vehículo se pueden volver a cambiar después desde /ajustes
+ * (ícono ⚙ en la barra).
  */
 export function App() {
-  const { yaElegido } = useTema()
+  const { yaElegido: temaYaElegido } = useTema()
+  const { yaElegido: vehiculoYaElegido } = useVehiculo()
 
   useEffect(() => {
     registrarSincronizacionAutomatica('viajes', sincronizarViajesPendientes)
@@ -68,7 +73,7 @@ export function App() {
     registrarEscuchaBurbuja()
   }, [])
 
-  if (!yaElegido) {
+  if (!temaYaElegido || !vehiculoYaElegido) {
     return <OnboardingScreen />
   }
 

@@ -10,9 +10,10 @@
  * features/trabajo/SeccionMantenimiento.tsx). Dominio chico a propósito,
  * mismo patrón que domain/tema: una sola preferencia local, sin sync.
  */
-export type TipoVehiculo = 'moto' | 'carro'
+export type TipoVehiculo = 'moto' | 'carro' | 'ambos'
 
 export const VEHICULOS_DISPONIBLES: { valor: TipoVehiculo; nombre: string; descripcion: string }[] = [
   { valor: 'moto', nombre: 'Moto', descripcion: 'Catálogo de mantenimiento para moto: aceite, llantas, balanceo, horquilla, válvulas, rodamientos.' },
   { valor: 'carro', nombre: 'Carro', descripcion: 'Catálogo de mantenimiento para carro: aceite, frenos, suspensión, batería, bujías, refrigerante.' },
+  { valor: 'ambos', nombre: 'Ambos', descripcion: 'Manejas carro y moto: en Mantenimiento vas a ver las dos pestañas, una por cada catálogo.' },
 ]

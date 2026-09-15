@@ -3,31 +3,36 @@ import { solicitarNotificaciones, solicitarUbicacion, solicitarBurbuja, solicita
 import { useTema, previsualizarTema } from '../../domain/tema/store'
 import { TEMAS_DISPONIBLES } from '../../domain/tema/types'
 import type { Tema } from '../../domain/tema/types'
+import { useVehiculo } from '../../domain/vehiculo/store'
+import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
 
-type Paso = 'bienvenida' | 'notificaciones' | 'ubicacion' | 'burbuja' | 'microfono' | 'tema'
+type Paso = 'bienvenida' | 'notificaciones' | 'ubicacion' | 'burbuja' | 'microfono' | 'tema' | 'vehiculo'
 
-const ORDEN: Paso[] = ['bienvenida', 'notificaciones', 'ubicacion', 'burbuja', 'microfono', 'tema']
+const ORDEN: Paso[] = ['bienvenida', 'notificaciones', 'ubicacion', 'burbuja', 'microfono', 'tema', 'vehiculo']
 
 /**
- * Se muestra UNA sola vez, la primera vez que se abre la app (App.tsx decide
- * esto mirando `useTema().yaElegido` — elegir un tema es a propósito el
- * último paso, así que "ya eligió tema" y "ya completó el onboarding" son
- * la misma pregunta, sin necesitar una segunda bandera guardada aparte).
+ * Se muestra mientras falte tema o vehículo por elegir (App.tsx decide esto
+ * mirando `useTema().yaElegido` y `useVehiculo().yaElegido`). El paso inicial
+ * arranca en 'vehiculo' cuando el tema ya está elegido pero el vehículo no
+ * (2026-09-15, pedido explícito del usuario: "elegir vehículo" se agrega
+ * como paso nuevo DESPUÉS de que ya existían usuarios con tema elegido — a
+ * esos no hay que volver a pedirles permisos ni tema, solo el paso nuevo).
  *
  * Cada paso de permiso sigue el mismo patrón: explicar en una frase por qué
  * hace falta, un botón que pide el permiso de verdad (domain/onboarding/permisos.ts),
  * y avanza al siguiente paso pase lo que pase (conceda o no) — nunca bloquea.
  */
 export function OnboardingScreen() {
-  const { elegirTema } = useTema()
-  const [paso, setPaso] = useState<Paso>('bienvenida')
+  const { yaElegido: temaYaElegido, elegirTema } = useTema()
+  const { elegirVehiculo } = useVehiculo()
+  const [paso, setPaso] = useState<Paso>(temaYaElegido ? 'vehiculo' : 'bienvenida')
   const [pidiendo, setPidiendo] = useState(false)
   /** Tema que se está VIENDO ahora mismo (repintado real, ver previsualizarTema) — todavía no confirmado. */
   const [temaPrevia, setTemaPrevia] = useState<Tema>('verde')
 
   function siguiente() {
     const i = ORDEN.indexOf(paso)
-    setPaso(ORDEN[i + 1] ?? 'tema')
+    setPaso(ORDEN[i + 1] ?? 'vehiculo')
   }
 
   async function manejarPermiso(solicitar: () => Promise<boolean>) {
@@ -47,8 +52,11 @@ export function OnboardingScreen() {
 
   function manejarConfirmarTema() {
     elegirTema(temaPrevia)
-    // No hace falta navegar a ningún lado — App.tsx re-renderiza a los
-    // paneles normales apenas `yaElegido` pasa a true.
+    // 2026-09-15: antes 'tema' era el último paso, así que no hacía falta
+    // avanzar acá — App.tsx desmontaba OnboardingScreen apenas `yaElegido`
+    // pasaba a true. Ahora hay un paso más (vehiculo) después, así que este
+    // mismo componente sigue montado y hay que avanzar explícitamente.
+    siguiente()
   }
 
   return (
@@ -139,6 +147,29 @@ export function OnboardingScreen() {
           </div>
 
           <button type="button" onClick={manejarConfirmarTema}>Confirmar {TEMAS_DISPONIBLES.find((t) => t.valor === temaPrevia)?.nombre}</button>
+        </>
+      )}
+
+      {paso === 'vehiculo' && (
+        <>
+          <h1 className="titulo-pantalla">¿Qué vehículo manejas?</h1>
+          <p className="texto-mute" style={{ marginBottom: 20 }}>
+            Así te mostramos el catálogo de mantenimiento correcto. Podés cambiarlo cuando quieras desde Ajustes.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {VEHICULOS_DISPONIBLES.map((v) => (
+              <button
+                key={v.valor}
+                type="button"
+                onClick={() => elegirVehiculo(v.valor)}
+                style={{ textAlign: 'left', padding: 16, border: '1px solid var(--color-borde)' }}
+              >
+                <strong style={{ display: 'block', marginBottom: 4 }}>{v.nombre}</strong>
+                <span className="texto-mute">{v.descripcion}</span>
+              </button>
+            ))}
+          </div>
         </>
       )}
     </div>

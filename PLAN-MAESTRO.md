@@ -1143,3 +1143,29 @@ El usuario mandó capturas reales del teléfono (no de Ajustes, del Balance de v
 **Reemplazo directo:** mismos nombres de archivo en `app/src/assets/cristal3d/` (2.8MB → 208KB en WebP), sin tocar `Cristal3D.tsx` ni la posición/rotación de cada placa — el componente ya estaba armado para recibir estas 5+5 imágenes, solo hacía falta que el recorte fuera bueno.
 
 **Verificado con render real, no solo a ojo sobre negro:** Playwright contra `/ajustes` con ambas variantes — comparado contra las capturas del teléfono que mandó el usuario, ya no aparece el halo ni el pedazo de fondo. `npm run build` limpio en `app/` y `server/`. **No verificado:** el teléfono real del usuario (sigue siendo el límite de este entorno).
+
+## 2026-09-15 (misma sesión, decimosegunda ronda) — Vehículo pasa al Onboarding, opción "Ambos", tabs Moto/Carro y arreglo del scroll manual en Mantenimiento
+
+Pedido explícito del usuario, tres partes en un mismo mensaje: (a) elegir vehículo (moto/carro) debía estar en Onboarding, no solo enterrado en Ajustes — se dio cuenta de esto recién cuando Mantenimiento le exigió ir a Ajustes a elegirlo; (b) faltaba una tercera opción "Ambos" para conductores que trabajan con los dos vehículos; (c) tocar un ítem del catálogo en Mantenimiento SÍ abre el formulario de km/días, pero queda debajo del catálogo largo, fuera de la pantalla — "yo pensé que estaba dañado el botón" — hay que traerlo a la vista solo, sin scroll manual.
+
+**a) `domain/vehiculo/types.ts`:** `TipoVehiculo` gana `'ambos'`; tercera entrada en `VEHICULOS_DISPONIBLES`. El selector de Ajustes (`AjustesScreen.tsx`) ya mapeaba genéricamente sobre `VEHICULOS_DISPONIBLES` — la tercera opción aparece ahí sola, sin tocar ese archivo (D-18).
+
+**b) `domain/vehiculo/store.ts`:** gana `yaElegido: boolean`, mismo patrón exacto que `domain/tema/store.ts` (mirar si hay algo guardado en `localStorage` al cargar el módulo, sin preguntarle a ningún servidor). `leerVehiculoGuardado` ahora acepta `'ambos'`. `elegirVehiculo` marca `yaElegido: true` al elegir.
+
+**c) `App.tsx`:** el gate que decide si se muestra `OnboardingScreen` pasa de depender solo de `useTema().yaElegido` a depender de `useTema().yaElegido` **y** `useVehiculo().yaElegido` — si falta cualquiera de los dos, sigue en Onboarding.
+
+**d) `OnboardingScreen.tsx`:** nuevo paso `'vehiculo'`, agregado al final de `ORDEN` (después de `'tema'`) — un solo tap y avanza (mismo patrón simple que los pasos de permiso, no el preview-y-confirma de tema, porque acá no hay nada que "previsualizar"). El paso inicial (`useState`) arranca directo en `'vehiculo'` cuando `useTema().yaElegido` ya es `true` al montar — así a los usuarios que ya venían usando la app (con tema elegido de antes) no se les repiten los 4 permisos ni la pantalla de tema, solo se les pide el paso nuevo.
+
+**Bug propio detectado y corregido en el camino:** antes, `manejarConfirmarTema()` solo llamaba `elegirTema(...)` sin avanzar `paso` — funcionaba porque `tema` era el último paso y `App.tsx` desmontaba `OnboardingScreen` entero apenas `yaElegido` pasaba a `true`. Ahora que hay un paso más después (`vehiculo`), `App.tsx` ya no desmonta nada al confirmar tema (sigue faltando elegir vehículo) — sin el `siguiente()` agregado, la pantalla se quedaba trabada mostrando "Elige tu tema" para siempre. Detectado corriendo el flujo real con Playwright, no a simple vista.
+
+**e) `SeccionMantenimiento.tsx` — tabs Moto/Carro para 'ambos':** `CATALOGO_MANTENIMIENTO` solo tiene entradas `'moto'`/`'carro'` (nunca `'ambos'`, a propósito — ver comentario en `domain/mantenimiento/reglas.ts`), así que filtrar directo por `tipoVehiculo` rompía (devolvía vacío) para conductores con "Ambos". Se agregó estado local `pestanaCatalogo: 'moto' | 'carro'` (arranca en `'moto'`) y un switcher de dos botones, visible SOLO cuando `tipoVehiculo === 'ambos'` — para 'moto'/'carro' puro se mantiene el texto simple de antes, sin pestañas de más. La lista de ítems ya agregados no necesita pestañas (es la misma lista sin importar el vehículo).
+
+**f) `SeccionMantenimiento.tsx` — scroll automático al form de edición:** el bloque `editandoPlantilla && (...)` ya se abría correctamente al tocar un ítem del catálogo, pero quedaba renderizado varias pantallas más abajo (después de una lista larga de botones del catálogo) — el usuario tenía que scrollear a mano para encontrarlo, y pensó que el botón estaba roto. Se agregó un `ref` al contenedor del formulario y un `useEffect` que dispara `scrollIntoView({ behavior: 'smooth', block: 'center' })` apenas `editandoPlantilla` deja de ser `null` — así el formulario aparece centrado en la pantalla de inmediato, sin tocar nada del layout "como quedó, como está" (pedido explícito del usuario de no tocar lo de arriba).
+
+**Verificado con Playwright, 4 escenarios reales, no solo compilación:**
+1. Instalación nueva (`localStorage` vacío): tras "Empezar" → 4 permisos ("Ahora no") → tema → confirmar, el siguiente paso es "¿Qué vehículo manejas?" (antes del fix del bug de arriba, esto fallaba — se quedaba trabado en "Elige tu tema").
+2. Usuario existente (`mia:tema` ya en `localStorage`, sin `mia:tipoVehiculo`): al abrir la app arranca directo en "¿Qué vehículo manejas?", sin repetir permisos ni tema.
+3. `tipoVehiculo = 'ambos'`: en Mantenimiento → "Agregar del catálogo" aparecen las pestañas Moto/Carro, cada una filtra su propio catálogo (confirmado con screenshot de las dos).
+4. Tocar "Cambio de aceite" en el catálogo: el formulario de km/días queda visible en pantalla de inmediato (`isVisible() === true` sin ningún scroll manual del test).
+
+`npm run build` limpio en `app/` y `server/` (server sin cambios este round, se compiló igual por hábito). **No verificado:** el teléfono real del usuario.

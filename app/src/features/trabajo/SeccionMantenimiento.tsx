@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
 import { useMantenimiento } from '../../domain/mantenimiento/store'
 import { sincronizarRegistrosMantenimientoPendientes } from '../../domain/mantenimiento/sync'
@@ -10,6 +10,7 @@ import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
 import { TarjetaMantenimiento } from './TarjetaMantenimiento'
 import { IMAGENES_MANTENIMIENTO } from './tarjetasMantenimiento'
 import type { CriterioIntervalo, PlantillaItemMantenimiento } from '../../domain/mantenimiento/types'
+import type { TipoVehiculo } from '../../domain/vehiculo/types'
 
 /**
  * 2026-09-15, pedido explícito del usuario: "cuando entra al catálogo y yo
@@ -30,10 +31,20 @@ export function SeccionMantenimiento() {
   const nombreVehiculo = VEHICULOS_DISPONIBLES.find((v) => v.valor === tipoVehiculo)?.nombre ?? tipoVehiculo
 
   const [mostrarCatalogo, setMostrarCatalogo] = useState(false)
+  /**
+   * 2026-09-15, pedido explícito del usuario: "en ese caso de ambos, tiene
+   * que aparecer en mantenimiento... las dos pestañas, moto y carro" —
+   * CATALOGO_MANTENIMIENTO solo tiene entradas 'moto'/'carro' (nunca
+   * 'ambos', ver domain/mantenimiento/reglas.ts), así que cuando el
+   * conductor eligió 'ambos' hace falta esta pestaña aparte para saber cuál
+   * de los dos catálogos mostrar. Arranca en 'moto' por default.
+   */
+  const [pestanaCatalogo, setPestanaCatalogo] = useState<'moto' | 'carro'>('moto')
   const [editandoPlantilla, setEditandoPlantilla] = useState<PlantillaItemMantenimiento | null>(null)
   const [criterioEdicion, setCriterioEdicion] = useState<CriterioIntervalo>('km_o_dias')
   const [kmEdicion, setKmEdicion] = useState('')
   const [diasEdicion, setDiasEdicion] = useState('')
+  const refEdicion = useRef<HTMLDivElement | null>(null)
 
   const [mostrarFormPersonalizado, setMostrarFormPersonalizado] = useState(false)
   const [nombreNuevo, setNombreNuevo] = useState('')
@@ -49,7 +60,8 @@ export function SeccionMantenimiento() {
   const kmActual = calcularResumen(viajes).kmTotales
   const listaAlertas = alertas(kmActual)
   const nombresYaAgregados = new Set(items.map((i) => i.nombre))
-  const catalogoDelVehiculo = CATALOGO_MANTENIMIENTO.filter((p) => p.vehiculo === tipoVehiculo)
+  const vehiculoDelCatalogo: TipoVehiculo = tipoVehiculo === 'ambos' ? pestanaCatalogo : tipoVehiculo
+  const catalogoDelVehiculo = CATALOGO_MANTENIMIENTO.filter((p) => p.vehiculo === vehiculoDelCatalogo)
 
   function abrirEdicionCatalogo(plantilla: PlantillaItemMantenimiento) {
     setEditandoPlantilla(plantilla)
@@ -57,6 +69,19 @@ export function SeccionMantenimiento() {
     setKmEdicion(plantilla.intervaloKm !== null ? String(plantilla.intervaloKm) : '')
     setDiasEdicion(plantilla.intervaloDias !== null ? String(plantilla.intervaloDias) : '')
   }
+
+  /**
+   * 2026-09-15, pedido explícito del usuario: "yo pensé que no pasaba nada...
+   * el problema es que a mí me toca hacer manualmente scroll hacia abajo...
+   * que ahí mismo se me abra la ventana" — al tocar un ítem del catálogo el
+   * formulario SÍ se abre, pero queda debajo del catálogo largo y fuera de
+   * la vista. Apenas aparece, lo traemos a la vista solo.
+   */
+  useEffect(() => {
+    if (editandoPlantilla) {
+      refEdicion.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [editandoPlantilla])
 
   async function confirmarAgregarDesdeCatalogo() {
     if (!editandoPlantilla) return
@@ -123,9 +148,28 @@ export function SeccionMantenimiento() {
         </button>
         {mostrarCatalogo && (
           <>
-            <p className="texto-mute" style={{ fontSize: '0.78rem', margin: 0 }}>
-              Catálogo de {nombreVehiculo}. ¿Manejas otro vehículo? Cambialo en Ajustes.
-            </p>
+            {tipoVehiculo === 'ambos' ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setPestanaCatalogo('moto')}
+                  style={{ flex: 1, fontWeight: pestanaCatalogo === 'moto' ? 'bold' : 'normal', border: pestanaCatalogo === 'moto' ? '2px solid var(--color-acento)' : '1px solid var(--color-borde)' }}
+                >
+                  Moto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPestanaCatalogo('carro')}
+                  style={{ flex: 1, fontWeight: pestanaCatalogo === 'carro' ? 'bold' : 'normal', border: pestanaCatalogo === 'carro' ? '2px solid var(--color-acento)' : '1px solid var(--color-borde)' }}
+                >
+                  Carro
+                </button>
+              </div>
+            ) : (
+              <p className="texto-mute" style={{ fontSize: '0.78rem', margin: 0 }}>
+                Catálogo de {nombreVehiculo}. ¿Manejas otro vehículo? Cambialo en Ajustes.
+              </p>
+            )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {catalogoDelVehiculo.filter((p) => !nombresYaAgregados.has(p.nombre)).map((plantilla) => (
                 <button
@@ -149,7 +193,7 @@ export function SeccionMantenimiento() {
       </div>
 
       {editandoPlantilla && (
-        <div className="tarjeta-viaje" style={{ marginBottom: 12, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
+        <div ref={refEdicion} className="tarjeta-viaje" style={{ marginBottom: 12, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
           <strong>{editandoPlantilla.nombre}</strong>
           <p className="texto-mute" style={{ fontSize: '0.8rem', margin: 0 }}>
             ¿A cuántos km lo cambiás, a cuánto tiempo, o los dos? Esto es solo una sugerencia — tu moto puede ser distinta.
