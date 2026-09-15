@@ -6,9 +6,11 @@ import { useDeudas } from '../../domain/deudas/store'
 import { useHogar } from '../../domain/hogar/store'
 import { useAhorro } from '../../domain/ahorro/store'
 import { useAuth } from '../../domain/auth/store'
+import { useTema } from '../../domain/tema/store'
 import { calcularBalanceGeneral } from '../../domain/balance/calculos'
-import { GraficoOrbital } from './GraficoOrbital'
 import { AnilloMeta } from '../../components/graficos/AnilloMeta'
+import { GraficoDistribucion } from '../../components/graficos/GraficoDistribucion'
+import type { ItemDistribucion } from '../../domain/estiloGrafico/types'
 
 function formatoPesos(monto: number): string {
   return `$${Math.round(monto).toLocaleString('es-CO')}`
@@ -30,6 +32,8 @@ export function BalanceScreen() {
   const { gastos: gastosHogar, cargar: cargarHogar } = useHogar()
   const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
   const { autenticado } = useAuth()
+  const { tema } = useTema()
+  const animado = tema !== 'papel'
 
   useEffect(() => {
     void cargarViajes()
@@ -49,6 +53,22 @@ export function BalanceScreen() {
   const objetivoAhorroTotal = metasAhorro.reduce((acc, m) => acc + m.montoObjetivo, 0)
   const porcentajeAhorro = objetivoAhorroTotal > 0 ? (balance.ahorroTotal / objetivoAhorroTotal) * 100 : 0
 
+  // 2026-09-15, pedido explícito del usuario, con referencia visual propia:
+  // Hogar/Deudas/Ahorro/Libre, las 4 sumando 100% entre sí — NO % del
+  // ingreso total (una deuda acumulada puede superar el ingreso de un solo
+  // período, eso rompería el sentido de "4 porciones de una torta"). Libre
+  // (balance neto) se recorta a 0 para este reparto si diera negativo — un
+  // "libre" negativo no es una porción positiva de nada, ya se ve en rojo
+  // en la lista de abajo.
+  const librePositivo = Math.max(balance.balanceNeto, 0)
+  const sumaCuatro = balance.gastosDeHogar + balance.deudaPendienteTotal + balance.ahorroTotal + librePositivo
+  const itemsDistribucion: ItemDistribucion[] = [
+    { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#c98500', porcentaje: sumaCuatro > 0 ? (balance.gastosDeHogar / sumaCuatro) * 100 : 0 },
+    { clave: 'deudas', etiqueta: 'Deudas', monto: balance.deudaPendienteTotal, color: '#d95926', porcentaje: sumaCuatro > 0 ? (balance.deudaPendienteTotal / sumaCuatro) * 100 : 0 },
+    { clave: 'ahorro', etiqueta: 'Ahorro', monto: balance.ahorroTotal, color: '#199e70', porcentaje: sumaCuatro > 0 ? (balance.ahorroTotal / sumaCuatro) * 100 : 0 },
+    { clave: 'libre', etiqueta: 'Libre', monto: librePositivo, color: '#3987e5', porcentaje: sumaCuatro > 0 ? (librePositivo / sumaCuatro) * 100 : 0 },
+  ]
+
   return (
     <section className="pantalla"><div className="app-panel">
       <div className="app-hero"><div className="app-eyebrow">MIA · RESUMEN</div><h1 className="app-title">Balance general</h1></div>
@@ -57,13 +77,9 @@ export function BalanceScreen() {
         pendiente y el ahorro se muestran aparte — son plata que no se gastó, no un flujo de este período.
       </p>
 
-      <GraficoOrbital
-        ingresos={balance.ingresosTotales}
-        gastosOperativos={balance.gastosOperativos}
-        gastosDeHogar={balance.gastosDeHogar}
-        ahorro={balance.ahorroTotal}
-        balanceNeto={balance.balanceNeto}
-      />
+      <div style={{ marginBottom: 20 }}>
+        <GraficoDistribucion items={itemsDistribucion} total={sumaCuatro} />
+      </div>
 
       {metasAhorro.length > 0 && (
         <div className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'center', gap: 4, marginBottom: 16, paddingTop: 20, paddingBottom: 16 }}>
@@ -73,6 +89,7 @@ export function BalanceScreen() {
             color="#199e70"
             valorCentral={`${Math.round(porcentajeAhorro)}%`}
             etiqueta={`${formatoPesos(balance.ahorroTotal)} de ${formatoPesos(objetivoAhorroTotal)}`}
+            animado={animado}
           />
         </div>
       )}

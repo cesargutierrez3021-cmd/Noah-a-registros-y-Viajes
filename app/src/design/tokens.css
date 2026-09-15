@@ -117,6 +117,75 @@
   --radio-chip: 10px;
 }
 
+/**
+ * TEMA "Papel" (2026-09-15, pedido explícito del usuario: "blanco y negro,
+ * pero predomine el blanco... muy serio, muy formal... nada de animaciones").
+ * Fondo casi blanco, texto casi negro, sin degradados (son colores planos —
+ * un degradado "se mueve" visualmente, no calza con "serio") y esquinas
+ * cuadradas en vez de redondeadas. Casi monocromo a propósito: solo error/
+ * advertencia/éxito usan un color real (apagado, no vivo) porque esos 3
+ * estados necesitan distinguirse incluso en blanco y negro — todo lo demás
+ * (acento, botones, tarjetas) es negro/gris.
+ *
+ * "Nada de animaciones" tiene DOS partes, no una: el bloque de acá abajo
+ * (`[data-tema='papel'] *`) apaga toda animación/transición CSS (las de
+ * `@keyframes`, como `cristal3d-flotar`/`prisma-recorrer`/`mia-pulso-mate`).
+ * Pero el punto que orbita en AnilloMeta.tsx es SVG `<animateTransform>`
+ * (SMIL, no CSS) — a ESE no lo apaga ningún CSS, por eso además cada
+ * pantalla que usa gráficos (Balance, Estadísticas, GraficoDistribucion)
+ * calcula `animado = tema !== 'papel'` y se lo pasa como prop. Las dos
+ * partes hacen falta — quitar cualquiera de las dos deja animaciones vivas.
+ */
+[data-tema='papel'] {
+  --color-fondo: #fafaf9;
+  --color-fondo-profundo: #f0f0ee;
+  --color-superficie: #ffffff;
+  --color-superficie-2: #f5f5f3;
+  --color-superficie-alta: #ececea;
+  --color-borde: #d8d8d4;
+  --color-borde-suave: #e6e6e2;
+
+  --color-texto: #161615;
+  --color-texto-mute: #5c5c58;
+  --color-texto-tenue: #8a8a85;
+  --color-texto-sobre-acento: #ffffff;
+
+  --color-acento: #161615; /* negro — sin tonalidad, a propósito */
+  --color-acento-2: #3a3a37;
+  --color-lila: #161615;
+  --color-coral: #7a2e26;
+  --color-danger: #8c2f26;
+  --color-error-insignia: #8c2f26;
+  --color-advertencia-insignia: #7a611f;
+  --color-exito: #2f5f42;
+
+  --gradiente-cta: #161615; /* plano, no degradado — un degradado "se mueve" al ojo */
+  --gradiente-tarjeta: #ffffff;
+  --gradiente-app-card: #ffffff;
+  --gradiente-primario: #161615;
+  --gradiente-fondo-pantalla: #fafaf9;
+  --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --sombra-tarjeta-alta: 0 2px 6px rgba(0, 0, 0, 0.08);
+  --anillo-foco: 0 0 0 2px rgba(0, 0, 0, 0.18);
+
+  --fuente-display: Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --fuente-cuerpo: Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --fuente-etiqueta: 'Courier New', ui-monospace, monospace;
+
+  --radio-tarjeta: 4px;
+  --radio-tarjeta-grande: 4px;
+  --radio-boton: 3px;
+  --radio-chip: 3px;
+}
+
+/* Parte 1/2 de "nada de animaciones" en el tema Papel — ver el comentario grande de arriba. */
+[data-tema='papel'] *,
+[data-tema='papel'] *::before,
+[data-tema='papel'] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
 /* Animación de pulso muy leve — el documento del tema oro la pide para la burbuja MIA
    ("lenta, discreta y ambiental"); Verde no la usa, pero declararla acá no le cuesta nada. */
 @keyframes mia-pulso-mate {
@@ -386,15 +455,16 @@
 
 .tt-pildora {
   flex-shrink: 0;
-  padding: 8px 14px;
+  padding: 6px 11px;
   border-radius: 999px;
   border: 1px solid var(--tt-borde);
   background: var(--tt-fondo-alto);
   color: var(--tt-texto-mute);
   font-family: var(--tt-fuente-cuerpo);
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -734,7 +804,7 @@ textarea:focus {
   margin: 0 auto;
 }
 
-/* Gráfica orbital de Balance (2026-09-15) — ver GraficoOrbital.tsx para la
+/* Estilo "Cristal 3D"/"Prisma" de Balance (2026-09-15) — ver components/graficos/ para la
    lógica de color/movimiento; acá solo el layout alrededor del <svg>. */
 .balance-orbital {
   display: flex;
@@ -773,6 +843,115 @@ textarea:focus {
 .balance-orbital__nombre {
   color: var(--color-texto-mute);
 }
+
+/* Estilo "Cristal 3D" (2026-09-15) — ver components/graficos/Cristal3D.tsx */
+.cristal3d__panel {
+  width: 148px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cristal3d__etiqueta {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.cristal3d__valor {
+  font-size: 1.5rem;
+  color: var(--color-texto);
+}
+.cristal3d__monto {
+  font-size: 0.75rem;
+  color: var(--color-texto-mute);
+}
+.cristal3d__panel--animado {
+  animation: cristal3d-flotar 5.5s ease-in-out infinite;
+}
+@keyframes cristal3d-flotar {
+  0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
+  50% { transform: translateY(-7px) rotate(var(--rot, 0deg)); }
+}
+
+/* Estilo "Prisma" (2026-09-15) — ver components/graficos/Prisma.tsx */
+.prisma {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.prisma__total {
+  flex: none;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: color-mix(in srgb, var(--color-acento) 16%, var(--color-superficie));
+}
+.prisma__total-icono {
+  font-size: 1.1rem;
+}
+.prisma__total-valor {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.prisma__barras {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.prisma__fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.prisma__barra {
+  position: relative;
+  flex: 1;
+  height: 22px;
+  border-radius: 0 999px 999px 0;
+  overflow: visible;
+}
+.prisma__punto {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-texto);
+  transform: translate(-50%, -50%);
+}
+.prisma__punto--animado {
+  animation: prisma-recorrer 3.2s ease-in-out infinite;
+}
+@keyframes prisma-recorrer {
+  0%, 100% { left: 6%; }
+  50% { left: 94%; }
+}
+.prisma__etiqueta {
+  flex: none;
+  width: 84px;
+  font-size: 0.76rem;
+  color: var(--color-texto-mute);
+}
+.prisma__porcentaje {
+  flex: none;
+  width: 40px;
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .app-hero {
   padding: 8px 2px 20px;
 }

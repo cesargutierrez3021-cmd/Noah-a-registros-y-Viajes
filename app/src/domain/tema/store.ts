@@ -9,7 +9,7 @@ function aplicarAlDocumento(tema: Tema): void {
 
 function leerTemaGuardado(): Tema | null {
   const crudo = localStorage.getItem(CLAVE_TEMA)
-  return crudo === 'verde' || crudo === 'oro' ? crudo : null
+  return crudo === 'verde' || crudo === 'oro' || crudo === 'papel' ? crudo : null
 }
 
 interface EstadoTema {

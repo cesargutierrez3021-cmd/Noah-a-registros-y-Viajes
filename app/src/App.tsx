@@ -9,6 +9,8 @@ import { CuentaScreen } from './features/auth/CuentaScreen'
 import { PlanesScreen } from './features/planes/PlanesScreen'
 import { AjustesScreen } from './features/ajustes/AjustesScreen'
 import { OnboardingScreen } from './features/onboarding/OnboardingScreen'
+import { AvisoBanner } from './features/avisos/AvisoBanner'
+import { AvisosScreen } from './features/avisos/AvisosScreen'
 import { useTema } from './domain/tema/store'
 import { sincronizarViajesPendientes } from './domain/viajes/sync'
 import { sincronizarJornadasPendientes } from './domain/jornada/sync'
@@ -72,6 +74,9 @@ export function App() {
 
   return (
     <HashRouter>
+      {/* Pedido explícito del usuario: "el recordatorio tiene que aparecerme como un mensajito en la parte de arriba... en todas las pantallas" — afuera de <Routes>, mismo criterio que <MiaBurbuja/>. */}
+      <AvisoBanner />
+
       <div className="app-shell">
         <Routes>
           <Route path="/" element={<TrabajoScreen />} />
@@ -81,33 +86,50 @@ export function App() {
           <Route path="/cuenta" element={<CuentaScreen />} />
           <Route path="/planes" element={<PlanesScreen />} />
           <Route path="/ajustes" element={<AjustesScreen />} />
+          <Route path="/avisos" element={<AvisosScreen />} />
         </Routes>
       </div>
 
       <MiaBurbuja />
 
-      <Link
-        to="/ajustes"
-        aria-label="Ajustes"
-        style={{
-          position: 'fixed',
-          top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-          right: 12,
-          zIndex: 20,
-          width: 36,
-          height: 36,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: '50%',
-          background: 'var(--color-superficie)',
-          border: '1px solid var(--color-borde)',
-          fontSize: 18,
-          textDecoration: 'none',
-        }}
-      >
-        ⚙
-      </Link>
+      <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 12, zIndex: 20, display: 'flex', gap: 8 }}>
+        <Link
+          to="/avisos"
+          aria-label="Avisos"
+          style={{
+            width: 36,
+            height: 36,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            background: 'var(--color-superficie)',
+            border: '1px solid var(--color-borde)',
+            fontSize: 18,
+            textDecoration: 'none',
+          }}
+        >
+          🔔
+        </Link>
+        <Link
+          to="/ajustes"
+          aria-label="Ajustes"
+          style={{
+            width: 36,
+            height: 36,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            background: 'var(--color-superficie)',
+            border: '1px solid var(--color-borde)',
+            fontSize: 18,
+            textDecoration: 'none',
+          }}
+        >
+          ⚙
+        </Link>
+      </div>
 
       <nav className="barra-navegacion">
         <NavLink to="/" end className={({ isActive }) => `barra-navegacion__item${isActive ? ' barra-navegacion__item--activo' : ''}`}>

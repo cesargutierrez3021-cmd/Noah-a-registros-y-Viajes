@@ -3,6 +3,7 @@ import { useViajes } from '../../domain/viajes/store'
 import { agruparPorPeriodo, calcularResumen, desglosePorPlataforma, desglosePorZona, desglosePorFranjaHoraria } from '../../domain/estadisticas/calculos'
 import type { ResumenViajes, UnidadPeriodo } from '../../domain/estadisticas/types'
 import { AnilloMeta } from '../../components/graficos/AnilloMeta'
+import { useTema } from '../../domain/tema/store'
 
 const ETIQUETAS_UNIDAD: Record<UnidadPeriodo, string> = { dia: 'Día', semana: 'Semana', mes: 'Mes' }
 
@@ -20,7 +21,7 @@ function formatoMoneda(valor: number): string {
  * Colores: "Por franja horaria" es SIEMPRE el mismo set fijo de 4
  * categorías (mañana/mediodía/tarde/noche) — mismo caso que Balance, se
  * reusa el mismo orden validado con la skill dataviz (azul/naranja/aqua/
- * amarillo, ver GraficoOrbital.tsx). "Por plataforma" y "Por zona" NO son
+ * amarillo, ver components/graficos/GraficoDistribucion.tsx). "Por plataforma" y "Por zona" NO son
  * un set fijo (el conductor puede trabajar 2 plataformas o 15 zonas
  * distintas) — ahí un color por entrada dejaría de ser seguro contra
  * daltonismo apenas hay más de 3-4 al mismo tiempo (ver el propio validador
@@ -39,6 +40,8 @@ function porcentajesDeIngresos(items: { clave: string; resumen: ResumenViajes }[
 
 export function SeccionEstadisticas() {
   const { viajes, cargar } = useViajes()
+  const { tema } = useTema()
+  const animado = tema !== 'papel'
   const [unidad, setUnidad] = useState<UnidadPeriodo>('dia')
 
   useEffect(() => {
@@ -100,6 +103,7 @@ export function SeccionEstadisticas() {
                   etiqueta={clave}
                   detalle={`${resumen.cantidadViajes} viajes`}
                   tamano={84}
+                  animado={animado}
                 />
               ))}
           </div>
@@ -123,6 +127,7 @@ export function SeccionEstadisticas() {
                   etiqueta={clave}
                   detalle={`${resumen.cantidadViajes} viajes`}
                   tamano={84}
+                  animado={animado}
                 />
               ))}
           </div>
@@ -144,6 +149,7 @@ export function SeccionEstadisticas() {
                 valorCentral={`${Math.round(porcentaje)}%`}
                 etiqueta={clave}
                 detalle={`${resumen.cantidadViajes} viajes`}
+                animado={animado}
               />
             ))}
           </div>

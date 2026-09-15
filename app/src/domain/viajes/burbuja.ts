@@ -43,6 +43,7 @@ const Burbuja = registerPlugin<BurbujaPlugin>('Burbuja')
 const COLORES_POR_TEMA: Record<Tema, ColoresBurbuja> = {
   verde: { colorAcento: '#6ee7c8', colorFg: '#f3f7f5', colorSurface: '#070a0d' },
   oro: { colorAcento: '#aa9671', colorFg: '#eeeae0', colorSurface: '#0c0c0c' },
+  papel: { colorAcento: '#161615', colorFg: '#161615', colorSurface: '#fafaf9' },
 }
 
 function coloresDelTemaActivo(): ColoresBurbuja {

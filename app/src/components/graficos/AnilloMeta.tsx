@@ -9,7 +9,7 @@
  * El aro de fondo + el arco de progreso son estáticos (SVG `stroke-dasharray`,
  * sin animación — el progreso en sí no "camina"). El movimiento real, pedido
  * explícito ("tiene que tener movimiento"), es el punto que orbita sobre el
- * aro con `animateTransform`, igual mecánica que GraficoOrbital.tsx.
+ * aro con `animateTransform`.
  */
 
 const RADIO = 40
@@ -22,6 +22,7 @@ export function AnilloMeta({
   etiqueta,
   detalle,
   tamano = 108,
+  animado = true,
 }: {
   /** 0-100 (se recorta ahí para el trazo; el texto central puede mostrar más si querés). */
   porcentaje: number
@@ -30,6 +31,8 @@ export function AnilloMeta({
   etiqueta: string
   detalle?: string
   tamano?: number
+  /** false para el tema "Carbón y hueso" (2026-09-15, pedido explícito: "nada de animaciones") — el punto queda fijo arriba del anillo. */
+  animado?: boolean
 }) {
   const porcentajeTrazo = Math.max(0, Math.min(100, porcentaje))
   const avance = (porcentajeTrazo / 100) * CIRCUNFERENCIA
@@ -54,11 +57,15 @@ export function AnilloMeta({
           {valorCentral}
         </text>
 
-        {/* El punto que orbita — la parte con movimiento de verdad. */}
-        <g>
-          <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur={duracionOrbita} repeatCount="indefinite" />
-          <circle cx={50 + RADIO} cy="50" r="4" fill={color} />
-        </g>
+        {/* El punto que orbita — la parte con movimiento de verdad. Fijo si animado=false. */}
+        {animado ? (
+          <g>
+            <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur={duracionOrbita} repeatCount="indefinite" />
+            <circle cx={50 + RADIO} cy="50" r="4" fill={color} />
+          </g>
+        ) : (
+          <circle cx="50" cy={50 - RADIO} r="4" fill={color} />
+        )}
       </svg>
       <span className="texto-mute" style={{ fontSize: '0.78rem', textAlign: 'center' }}>{etiqueta}</span>
       {detalle && <span className="texto-mute" style={{ fontSize: '0.72rem', textAlign: 'center' }}>{detalle}</span>}

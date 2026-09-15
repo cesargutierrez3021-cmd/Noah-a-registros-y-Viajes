@@ -172,7 +172,7 @@ export function SeccionPulso() {
           Resumen
         </button>
         <button type="button" className={`tt-pildora ${vista === 'mantenimiento' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('mantenimiento')}>
-          Mantenimiento y gastos
+          Mantenim. y gastos
         </button>
         <button type="button" className={`tt-pildora ${vista === 'estadisticas' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('estadisticas')}>
           Estadísticas
