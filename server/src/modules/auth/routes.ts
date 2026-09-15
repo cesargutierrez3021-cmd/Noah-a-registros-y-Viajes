@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { servicioAuth } from './service.js'
 import { repositorioAuth } from './repository.js'
-import { esquemaCredenciales, esquemaTokenRefresco } from './schemas.js'
+import { esquemaCredenciales, esquemaTokenRefresco, esquemaSolicitarRecuperacion, esquemaRestablecerContrasena } from './schemas.js'
 import { requiereAutenticacion } from './middleware.js'
 import { async } from '../../http/asyncHandler.js'
 import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
@@ -62,6 +62,34 @@ rutasAuth.post(
     const { tokenRefresco } = esquemaTokenRefresco.parse(req.body)
     const tokens = await servicioAuth.refrescarSesion(tokenRefresco)
     res.json(tokens)
+  }),
+)
+
+/**
+ * POST /auth/olvide-contrasena — pide un código de recuperación por email.
+ * Mismo límite de tasa que login/registro: es una ruta pública sin sesión,
+ * el mismo riesgo de abuso (spam de emails a una cuenta ajena) que fuerza
+ * bruta de contraseña.
+ */
+rutasAuth.post(
+  '/olvide-contrasena',
+  limitadorAuth,
+  async(async (req: Request, res: Response) => {
+    const { email } = esquemaSolicitarRecuperacion.parse(req.body)
+    await servicioAuth.solicitarRecuperacion(email)
+    // Mensaje idéntico exista o no la cuenta — ver servicioAuth.solicitarRecuperacion.
+    res.json({ mensaje: 'Si el email existe, te enviamos un código de recuperación.' })
+  }),
+)
+
+/** POST /auth/restablecer-contrasena — segundo paso: código + contraseña nueva. */
+rutasAuth.post(
+  '/restablecer-contrasena',
+  limitadorAuth,
+  async(async (req: Request, res: Response) => {
+    const { email, codigo, contrasenaNueva } = esquemaRestablecerContrasena.parse(req.body)
+    await servicioAuth.restablecerContrasena(email, codigo, contrasenaNueva)
+    res.json({ mensaje: 'Contraseña actualizada. Inicia sesión de nuevo.' })
   }),
 )
 

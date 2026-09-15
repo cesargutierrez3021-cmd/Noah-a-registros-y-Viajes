@@ -19,6 +19,7 @@ model Usuario {
   creadoEnISO    DateTime @default(now()) @map("creado_en")
   planes         PlanDeUsuario[]
   tokensRefresco TokenRefresco[]
+  codigosRecuperacion CodigoRecuperacionContrasena[]
   viajes         Viaje[]
   jornadas       Jornada[]
   registrosMantenimiento RegistroMantenimiento[]
@@ -43,6 +44,24 @@ model TokenRefresco {
   creadoEnISO   DateTime @default(now()) @map("creado_en")
 
   @@map("tokens_refresco")
+}
+
+/// "Olvidé mi contraseña" — código numérico de 6 dígitos, no un link (la app es
+/// móvil, sin deep-link configurado — más simple pedirle al usuario que teclee
+/// el código que le llega por email que armar universal links para Android).
+/// Se guarda hasheado (mismo criterio que TokenRefresco): igual sirve para
+/// invalidar un código sin poder leerlo si la base de datos se filtra.
+model CodigoRecuperacionContrasena {
+  id            String   @id @default(uuid())
+  usuarioId     String   @map("usuario_id")
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  codigoHash    String   @map("codigo_hash")
+  expiraEnISO   DateTime @map("expira_en")
+  usadoEnISO    DateTime? @map("usado_en")
+  creadoEnISO   DateTime @default(now()) @map("creado_en")
+
+  @@index([usuarioId])
+  @@map("codigos_recuperacion_contrasena")
 }
 
 /// Catálogo de planes. Fase 7 solo necesitaba que existiera "gratis"; Fase 11 agrega

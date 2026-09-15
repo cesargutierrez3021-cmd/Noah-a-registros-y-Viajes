@@ -1,0 +1,43 @@
+name: ci
+
+# Corre en cada push y cada PR — antes de esto, un error de compilación
+# (como el que rompió el deploy de Render y el build del APK el 2026-09-14)
+# solo se descubría cuando el despliegue real fallaba. Esto lo detecta en
+# minutos, sobre cualquier rama, sin depender de que alguien recuerde correr
+# `npm run build` a mano antes de subir.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run build
+
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build

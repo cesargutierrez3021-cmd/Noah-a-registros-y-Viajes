@@ -24,3 +24,13 @@ export async function iniciarSesion(email: string, contrasena: string): Promise<
 export async function refrescarSesion(tokenRefresco: string): Promise<RespuestaTokens> {
   return post<RespuestaTokens>('/auth/refrescar', { tokenRefresco })
 }
+
+/** POST /auth/olvide-contrasena — paso 1 de "olvidé mi contraseña". Respuesta genérica siempre, el backend nunca revela si el email existe. */
+export async function solicitarRecuperacion(email: string): Promise<{ mensaje: string }> {
+  return post<{ mensaje: string }>('/auth/olvide-contrasena', { email })
+}
+
+/** POST /auth/restablecer-contrasena — paso 2: código de 6 dígitos recibido por email + contraseña nueva. */
+export async function restablecerContrasena(email: string, codigo: string, contrasenaNueva: string): Promise<{ mensaje: string }> {
+  return post<{ mensaje: string }>('/auth/restablecer-contrasena', { email, codigo, contrasenaNueva })
+}

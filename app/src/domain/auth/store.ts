@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { guardarTokens, borrarTokens, haySesion, URL_BASE } from '../../lib/api'
-import { registrarse, iniciarSesion } from './api'
+import { registrarse, iniciarSesion, solicitarRecuperacion, restablecerContrasena } from './api'
 import type { Usuario } from './types'
 
 /**
@@ -21,6 +21,8 @@ interface EstadoAuth {
   registrarse: (email: string, contrasena: string) => Promise<boolean>
   iniciarSesion: (email: string, contrasena: string) => Promise<boolean>
   cerrarSesion: () => void
+  solicitarRecuperacion: (email: string) => Promise<boolean>
+  restablecerContrasena: (email: string, codigo: string, contrasenaNueva: string) => Promise<boolean>
 }
 
 export const useAuth = create<EstadoAuth>((set) => ({
@@ -59,6 +61,30 @@ export const useAuth = create<EstadoAuth>((set) => ({
   cerrarSesion: () => {
     borrarTokens()
     set({ usuario: null })
+  },
+
+  solicitarRecuperacion: async (email) => {
+    set({ cargando: true, error: null })
+    try {
+      await solicitarRecuperacion(email)
+      set({ cargando: false })
+      return true
+    } catch (error) {
+      set({ cargando: false, error: mensajeDeError(error) })
+      return false
+    }
+  },
+
+  restablecerContrasena: async (email, codigo, contrasenaNueva) => {
+    set({ cargando: true, error: null })
+    try {
+      await restablecerContrasena(email, codigo, contrasenaNueva)
+      set({ cargando: false })
+      return true
+    } catch (error) {
+      set({ cargando: false, error: mensajeDeError(error) })
+      return false
+    }
   },
 }))
 
