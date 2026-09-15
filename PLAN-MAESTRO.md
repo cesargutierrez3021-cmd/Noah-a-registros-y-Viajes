@@ -1070,3 +1070,17 @@ El usuario mandó "Los de carro": dos paquetes (`car-maintenance-part1.zip` + `c
 **Pendiente explícito del usuario — todavía NO se generó ni se mandó el APK:** sigue sin pedirse.
 
 **Además pendiente en esta misma sesión, todavía sin procesar:** el usuario mandó un paquete nuevo (`prism-crystal-orbit-package.zip`) con "dos gráficas diferentes" para agregar al selector de estilo de Balance (`domain/estiloGrafico`, junto a Anillos/Cristal3D/Prisma que ya existen) — extraído a scratchpad, todavía sin integrar.
+
+## 2026-09-15 (misma sesión, séptima ronda) — Cristal 3D y Prisma "ejecutivo" (paquete prism-crystal-orbit)
+
+Procesado el paquete pendiente de la ronda anterior. Contenido real (confirmado leyendo `README_ES.md` y `PROMPT_OTRA_IA_ES.txt` del zip): dos versiones originales (ya existían: Cristal 3D y Prisma), dos variantes "realista-minimalista" de esas mismas dos (grafito + beige/dorado, mismo lenguaje que las tarjetas ejecutivas de mantenimiento), y un componente orbital aparte que el propio paquete pide explícitamente NO mezclar con estas dos tarjetas ("No agregues la gráfica orbital a estas dos tarjetas... se entrega como componente independiente"). El usuario confirmó por mensaje: "Son dos gráficas diferentes, toca agregarlas" — coincide exactamente con las 2 variantes, no con la órbita (que además ya existe en la app como `AnillosOrbitales`, con datos de 6 categorías distintos a los 4 de Balance) — se dejó fuera de esta ronda a propósito.
+
+**D-18 (reuso, no reinvención):** en vez de crear componentes nuevos, `Cristal3D.tsx` y `Prisma.tsx` ganaron una prop `variante?: 'clasico' | 'ejecutivo'` (default `'clasico'`, sin romper nada de lo que ya llamaba a estos componentes sin pasarla). La variante 'ejecutivo' reusa exactamente la misma estructura, animaciones y clases CSS — solo cambia de dónde sale el color: en vez de `item.color` (uno distinto por categoría, arcoíris) usa 4 tonos de dorado apagado fijos (`TONOS_EJECUTIVOS` en el `paletaEjecutiva.ts` nuevo) y una superficie grafito fija (`SUPERFICIE_EJECUTIVA`) en vez de `var(--color-superficie)` — mismo criterio ya establecido con `PALETA_TARJETA_MANTENIMIENTO`: paleta fija, no la del tema activo (Verde/Oro/Papel). `paletaEjecutiva.ts` vive en `components/graficos/` (no se importó desde `features/trabajo/tarjetasMantenimiento.ts` — `components/` no depende de `features/`, D-8) y repite los mismos hex del espíritu "grafito/dorado" a propósito, igual que ya hace `TarjetaMantenimiento.tsx`.
+
+**Dos estilos nuevos en `domain/estiloGrafico`:** `'cristal3d_ejecutivo'` y `'prisma_ejecutivo'`, agregados a `EstiloGrafico` y a `ESTILOS_DISPONIBLES` (con su nombre/descripción para el selector) y a `VALORES_VALIDOS` del store — mismo mecanismo de siempre (`localStorage`, sin sync). `GraficoDistribucion.tsx` (el despachador único de Balance) y la vista previa de `AjustesScreen.tsx` ("Diseño de estadísticas") ahora manejan los 5 estilos: Anillos, Cristal 3D, Cristal 3D ejecutivo, Prisma, Prisma ejecutivo.
+
+**Sin cambios de backend ni de dominio de mantenimiento** — esto es puramente de la distribución de dinero en Balance, no toca mantenimiento ni vehículo.
+
+**Verificado:** `npm run build` limpio en `app/` y `server/`. **No verificado:** cómo se ve de verdad en un teléfono — mismo límite de siempre de este entorno.
+
+**Pendiente explícito del usuario — todavía NO se generó ni se mandó el APK:** sigue sin pedirse.

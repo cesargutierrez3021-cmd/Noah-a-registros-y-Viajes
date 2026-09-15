@@ -22,6 +22,8 @@ export function GraficoDistribucion({ items, total }: { items: ItemDistribucion[
   const animado = tema !== 'papel'
 
   if (estilo === 'cristal3d') return <Cristal3D items={items} animado={animado} />
+  if (estilo === 'cristal3d_ejecutivo') return <Cristal3D items={items} animado={animado} variante="ejecutivo" />
   if (estilo === 'prisma') return <Prisma items={items} total={total} animado={animado} />
+  if (estilo === 'prisma_ejecutivo') return <Prisma items={items} total={total} animado={animado} variante="ejecutivo" />
   return <AnillosOrbitales items={items} animado={animado} />
 }

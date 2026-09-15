@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { EstiloGrafico } from './types'
 
 const CLAVE = 'mia:estilo-grafico'
-const VALORES_VALIDOS: EstiloGrafico[] = ['anillos', 'cristal3d', 'prisma']
+const VALORES_VALIDOS: EstiloGrafico[] = ['anillos', 'cristal3d', 'prisma', 'cristal3d_ejecutivo', 'prisma_ejecutivo']
 
 function leerGuardado(): EstiloGrafico | null {
   const crudo = localStorage.getItem(CLAVE)
