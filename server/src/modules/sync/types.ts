@@ -99,6 +99,7 @@ export interface DeudaSyncEntrada {
   saldoInicial: number
   saldoActual: number
   cuotaProgramada: { monto: number; frecuencia: string } | null
+  fechaLimiteISO: string | null
   creadaEnISO: string
 }
 

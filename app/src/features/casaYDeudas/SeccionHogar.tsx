@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useHogar } from '../../domain/hogar/store'
 import { sincronizarHogarPendiente } from '../../domain/hogar/sync'
+import { CampoMonto } from '../../components/CampoMonto'
 
 export function SeccionHogar() {
   const { gastos, conceptos, cargando, cargar, agregarGastoUnico, agregarConceptoFijo, actualizarMontoConceptoFijo, desactivarConceptoFijo } = useHogar()
@@ -103,7 +104,7 @@ export function SeccionHogar() {
         </label>
         <label className="texto-mute">
           Monto
-          <input type="number" inputMode="decimal" placeholder="Ej. 120000" value={montoUnico} onChange={(e) => setMontoUnico(e.target.value)} style={{ display: 'block', width: '100%' }} />
+          <CampoMonto valor={montoUnico} onValorCambia={setMontoUnico} placeholder="Ej. 120.000" />
         </label>
         {errorUnico && <p style={{ color: '#ff6b6b' }}>{errorUnico}</p>}
         <button type="button" onClick={() => void manejarAgregarUnico()} disabled={guardandoUnico}>
@@ -119,7 +120,7 @@ export function SeccionHogar() {
         </label>
         <label className="texto-mute">
           Monto esperado cada mes
-          <input type="number" inputMode="decimal" placeholder="Ej. 500000" value={montoFijo} onChange={(e) => setMontoFijo(e.target.value)} style={{ display: 'block', width: '100%' }} />
+          <CampoMonto valor={montoFijo} onValorCambia={setMontoFijo} placeholder="Ej. 500.000" />
         </label>
         <label className="texto-mute">
           Día del mes en que se paga
@@ -139,12 +140,10 @@ export function SeccionHogar() {
             <strong>{c.nombre}</strong>
             <span className="texto-mute">${c.montoEsperado.toLocaleString('es-CO')} — día {c.diaDelMes} de cada mes</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="number"
-                inputMode="decimal"
+              <CampoMonto
+                valor={montosEdicion[c.id] ?? ''}
+                onValorCambia={(crudo) => setMontosEdicion((actuales) => ({ ...actuales, [c.id]: crudo }))}
                 placeholder="Nuevo monto"
-                value={montosEdicion[c.id] ?? ''}
-                onChange={(e) => setMontosEdicion((actuales) => ({ ...actuales, [c.id]: e.target.value }))}
                 style={{ flex: 1 }}
               />
               <button type="button" onClick={() => void manejarActualizarMonto(c.id)}>Actualizar monto</button>

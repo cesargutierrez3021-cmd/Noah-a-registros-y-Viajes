@@ -24,6 +24,19 @@ export interface Deuda {
   saldoActual: number
   /** Cuota recurrente esperada (para mostrar "te toca pagar X cada Y"), opcional — no genera abonos solo, el usuario los carga a mano. */
   cuotaProgramada: CuotaProgramada | null
+  /**
+   * 2026-09-15, pedido explícito del usuario: "hay que ponerle fecha límite...
+   * si no, ¿cómo me va a emitir la alerta de cuándo se va a vencer si no
+   * tiene fecha límite?" — antes la única forma de generar un aviso de
+   * vencimiento (domain/avisos/calculos.ts) era proyectar una fecha a partir
+   * de `creadaEnISO` + `cuotaProgramada.frecuencia`, una aproximación honesta
+   * pero que dejaba SIN ningún aviso a cualquier deuda sin cuota programada
+   * (el checkbox "tiene cuota fija" es opcional). Esta es una fecha real que
+   * el conductor pone a mano y puede actualizar cuando quiera (ver
+   * `store.ts`, `actualizarFechaLimite`) — null = sin fecha puesta todavía,
+   * sin aviso (mismo comportamiento que antes para esas deudas).
+   */
+  fechaLimiteISO: string | null
   creadaEnISO: string
   /**
    * Deuda es mutable (`saldoActual` cambia) pero deliberadamente no se puede

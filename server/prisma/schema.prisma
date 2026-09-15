@@ -224,6 +224,10 @@ model Deuda {
   /// separadas porque es opcional como bloque completo, no campo por campo (D-8: no hay razón
   /// técnica para partirlo en dos columnas nullable en vez de un solo objeto).
   cuotaProgramada    Json?     @map("cuota_programada")
+  /// 2026-09-15, pedido explícito del usuario: fecha real de vencimiento, puesta a mano por el
+  /// conductor (antes solo existía `cuotaProgramada`, opcional, sin ancla de fecha real) — ver
+  /// domain/avisos/calculos.ts en el cliente para cómo se usa en la alerta de "por vencer".
+  fechaLimiteISO     DateTime? @map("fecha_limite")
   creadaEnISO        DateTime  @map("creada_en")
   sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
   abonos             AbonoDeuda[]

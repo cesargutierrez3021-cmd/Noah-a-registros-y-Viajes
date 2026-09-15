@@ -105,14 +105,29 @@ export function GraficoAhorroMeta({ metas, animado }: { metas: MetaAhorro[]; ani
             <stop offset="0%" stopColor="#ffffff" stopOpacity="0.16" />
             <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
           </linearGradient>
+          {/*
+            2026-09-15, pedido explícito del usuario: "me gustaría que el
+            tarro fuera más cristalino, negro, transparentoso... no que sea
+            negro, sino no se llenaría la barra" — vidrio ahumado, no vidrio
+            blanco/claro como antes, pero MUY transparente en el medio (12%
+            de opacidad) para que el líquido se siga viendo clarísimo a
+            cualquier nivel; solo se oscurece un poco arriba/abajo, como el
+            reflejo real de un vidrio oscuro grueso.
+          */}
+          <linearGradient id="balanceAhorroVidrioCuerpo" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#04060a" stopOpacity="0.55" />
+            <stop offset="18%" stopColor="#04060a" stopOpacity="0.12" />
+            <stop offset="82%" stopColor="#04060a" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#04060a" stopOpacity="0.55" />
+          </linearGradient>
         </defs>
 
-        {/* Tapa, decorativa — no forma parte del recorte del líquido. */}
-        <rect x={ANCHO / 2 - 34} y={10} width={68} height={16} rx={6} fill="#c9bff0" opacity={0.55} />
-        <rect x={ANCHO / 2 - 30} y={18} width={60} height={16} rx={5} fill="#8a7bc4" opacity={0.5} />
+        {/* Tapa, decorativa — no forma parte del recorte del líquido. Metal oscuro, a tono con el vidrio ahumado del cuerpo. */}
+        <rect x={ANCHO / 2 - 34} y={10} width={68} height={16} rx={6} fill="#2c3040" opacity={0.75} />
+        <rect x={ANCHO / 2 - 30} y={18} width={60} height={16} rx={5} fill="#1a1d27" opacity={0.7} />
 
-        {/* Cuerpo del frasco (contorno). */}
-        <rect x={FRASCO_X} y={FRASCO_Y} width={FRASCO_ANCHO} height={FRASCO_ALTO} rx={FRASCO_RADIO} fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.28)" strokeWidth={2} />
+        {/* Cuerpo del frasco: vidrio ahumado transparente, con un borde brillante para que se lea "cristal", no una silueta plana. */}
+        <rect x={FRASCO_X} y={FRASCO_Y} width={FRASCO_ANCHO} height={FRASCO_ALTO} rx={FRASCO_RADIO} fill="url(#balanceAhorroVidrioCuerpo)" stroke="rgba(255,255,255,0.32)" strokeWidth={2} />
 
         <g clipPath="url(#balanceAhorroClip)">
           {/* Bloque de líquido — llega hasta bien abajo del viewBox para no dejar hueco cuando la ola se mueve. */}

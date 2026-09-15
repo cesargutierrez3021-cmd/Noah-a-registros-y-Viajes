@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAhorro } from '../../domain/ahorro/store'
 import { sincronizarAhorroPendiente } from '../../domain/ahorro/sync'
+import { CampoMonto } from '../../components/CampoMonto'
 
 /** Mismo patrón exacto que SeccionDeudas.tsx, invertido: el saldo SUBE hacia el objetivo en vez de bajar. */
 export function SeccionAhorro() {
@@ -63,7 +64,7 @@ export function SeccionAhorro() {
         </label>
         <label className="texto-mute">
           Meta (monto a juntar)
-          <input type="number" inputMode="decimal" placeholder="Ej. 300000" value={montoObjetivo} onChange={(e) => setMontoObjetivo(e.target.value)} style={{ display: 'block', width: '100%' }} />
+          <CampoMonto valor={montoObjetivo} onValorCambia={setMontoObjetivo} placeholder="Ej. 300.000" />
         </label>
         {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
         <button type="button" onClick={() => void manejarAgregar()} disabled={guardando}>
@@ -84,12 +85,10 @@ export function SeccionAhorro() {
                 ${m.saldoActual.toLocaleString('es-CO')} de ${m.montoObjetivo.toLocaleString('es-CO')} · {porcentaje}%
               </span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="number"
-                  inputMode="decimal"
+                <CampoMonto
+                  valor={montosAbono[m.id] ?? ''}
+                  onValorCambia={(crudo) => setMontosAbono((actuales) => ({ ...actuales, [m.id]: crudo }))}
                   placeholder="Monto a abonar"
-                  value={montosAbono[m.id] ?? ''}
-                  onChange={(e) => setMontosAbono((actuales) => ({ ...actuales, [m.id]: e.target.value }))}
                   style={{ flex: 1 }}
                 />
                 <button type="button" onClick={() => void manejarAbonar(m.id)}>Abonar</button>

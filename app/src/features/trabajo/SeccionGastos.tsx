@@ -4,6 +4,7 @@ import { sincronizarGastosPendientes } from '../../domain/gastos/sync'
 import { CATEGORIAS_GASTO } from '../../domain/gastos/types'
 import type { CategoriaGasto } from '../../domain/gastos/types'
 import { useVehiculo } from '../../domain/vehiculo/store'
+import { CampoMonto } from '../../components/CampoMonto'
 
 export function SeccionGastos() {
   const { gastos, cargando, cargar, agregarGasto } = useGastos()
@@ -71,7 +72,7 @@ export function SeccionGastos() {
         </label>
         <label className="texto-mute">
           Monto
-          <input type="number" inputMode="decimal" placeholder="Ej. 40000" value={monto} onChange={(e) => setMonto(e.target.value)} style={{ display: 'block', width: '100%' }} />
+          <CampoMonto valor={monto} onValorCambia={setMonto} placeholder="Ej. 40.000" />
         </label>
         {categoria === 'gasolina' && (
           <label className="texto-mute">

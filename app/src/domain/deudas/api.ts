@@ -9,6 +9,7 @@ export async function subirDeuda(deuda: Deuda): Promise<void> {
     saldoInicial: deuda.saldoInicial,
     saldoActual: deuda.saldoActual,
     cuotaProgramada: deuda.cuotaProgramada,
+    fechaLimiteISO: deuda.fechaLimiteISO,
     creadaEnISO: deuda.creadaEnISO,
   })
 }

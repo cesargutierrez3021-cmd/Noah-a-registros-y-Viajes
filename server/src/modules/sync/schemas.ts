@@ -79,6 +79,9 @@ export const esquemaDeudaSync = z.object({
   saldoInicial: z.number().positive(),
   saldoActual: z.number().nonnegative(),
   cuotaProgramada: esquemaCuotaProgramada.nullable(),
+  // .optional() además de .nullable() — clientes viejos (antes de este campo) no lo mandan
+  // en absoluto, no solo `null` (mismo patrón que `ingresoPendiente` en esquemaViajeSync).
+  fechaLimiteISO: z.string().nullable().optional().default(null),
   creadaEnISO: z.string(),
 })
 

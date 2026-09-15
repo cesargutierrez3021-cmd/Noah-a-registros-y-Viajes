@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useDeudas } from '../../domain/deudas/store'
 import { sincronizarDeudasPendientes } from '../../domain/deudas/sync'
 import type { FrecuenciaCuota } from '../../domain/deudas/types'
+import { CampoMonto } from '../../components/CampoMonto'
 
 const FRECUENCIAS: { valor: FrecuenciaCuota; etiqueta: string }[] = [
   { valor: 'semanal', etiqueta: 'Semanal' },
@@ -10,16 +11,18 @@ const FRECUENCIAS: { valor: FrecuenciaCuota; etiqueta: string }[] = [
 ]
 
 export function SeccionDeudas() {
-  const { deudas, cargando, cargar, agregarDeuda, abonar } = useDeudas()
+  const { deudas, cargando, cargar, agregarDeuda, abonar, actualizarFechaLimite } = useDeudas()
 
   const [nombre, setNombre] = useState('')
   const [saldoInicial, setSaldoInicial] = useState('')
   const [tieneCuota, setTieneCuota] = useState(false)
   const [montoCuota, setMontoCuota] = useState('')
   const [frecuenciaCuota, setFrecuenciaCuota] = useState<FrecuenciaCuota>('mensual')
+  const [fechaLimite, setFechaLimite] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [montosAbono, setMontosAbono] = useState<Record<string, string>>({})
+  const [fechasEdicion, setFechasEdicion] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void cargar()
@@ -47,12 +50,13 @@ export function SeccionDeudas() {
     }
     setGuardando(true)
     try {
-      await agregarDeuda(nombre.trim(), saldoNumero, cuota)
+      await agregarDeuda(nombre.trim(), saldoNumero, cuota, fechaLimite ? new Date(fechaLimite).toISOString() : null)
       void sincronizarDeudasPendientes()
       setNombre('')
       setSaldoInicial('')
       setTieneCuota(false)
       setMontoCuota('')
+      setFechaLimite('')
     } finally {
       setGuardando(false)
     }
@@ -65,6 +69,14 @@ export function SeccionDeudas() {
     await abonar(deudaId, monto)
     void sincronizarDeudasPendientes()
     setMontosAbono((actuales) => ({ ...actuales, [deudaId]: '' }))
+  }
+
+  async function manejarActualizarFecha(deudaId: string) {
+    const fecha = fechasEdicion[deudaId]
+    if (!fecha) return
+    await actualizarFechaLimite(deudaId, new Date(fecha).toISOString())
+    void sincronizarDeudasPendientes()
+    setFechasEdicion((actuales) => ({ ...actuales, [deudaId]: '' }))
   }
 
   const activas = deudas.filter((d) => d.saldoActual > 0)
@@ -83,8 +95,15 @@ export function SeccionDeudas() {
         </label>
         <label className="texto-mute">
           Saldo inicial
-          <input type="number" inputMode="decimal" placeholder="Ej. 500000" value={saldoInicial} onChange={(e) => setSaldoInicial(e.target.value)} style={{ display: 'block', width: '100%' }} />
+          <CampoMonto valor={saldoInicial} onValorCambia={setSaldoInicial} placeholder="Ej. 500.000" />
         </label>
+        <label className="texto-mute">
+          Fecha límite de pago (opcional)
+          <input type="date" value={fechaLimite} onChange={(e) => setFechaLimite(e.target.value)} style={{ display: 'block', width: '100%' }} />
+        </label>
+        <p className="texto-mute" style={{ fontSize: '0.78rem', margin: 0 }}>
+          Ponele una fecha para que MIA te avise cuando se esté por vencer — sin fecha, no hay forma de avisarte.
+        </p>
         <label className="texto-mute">
           <input type="checkbox" checked={tieneCuota} onChange={(e) => setTieneCuota(e.target.checked)} /> Tiene cuota fija programada
         </label>
@@ -92,7 +111,7 @@ export function SeccionDeudas() {
           <>
             <label className="texto-mute">
               Monto de la cuota
-              <input type="number" inputMode="decimal" placeholder="Ej. 50000" value={montoCuota} onChange={(e) => setMontoCuota(e.target.value)} style={{ display: 'block', width: '100%' }} />
+              <CampoMonto valor={montoCuota} onValorCambia={setMontoCuota} placeholder="Ej. 50.000" />
             </label>
             <label className="texto-mute">
               Frecuencia
@@ -125,16 +144,26 @@ export function SeccionDeudas() {
                 Cuota: ${d.cuotaProgramada.monto.toLocaleString('es-CO')} {FRECUENCIAS.find((f) => f.valor === d.cuotaProgramada!.frecuencia)?.etiqueta.toLowerCase()}
               </span>
             )}
+            <span className="texto-mute">
+              {d.fechaLimiteISO ? `Vence: ${new Date(d.fechaLimiteISO).toLocaleDateString('es-CO')}` : 'Sin fecha límite puesta — no te va a avisar'}
+            </span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="number"
-                inputMode="decimal"
+              <CampoMonto
+                valor={montosAbono[d.id] ?? ''}
+                onValorCambia={(crudo) => setMontosAbono((actuales) => ({ ...actuales, [d.id]: crudo }))}
                 placeholder="Monto a abonar"
-                value={montosAbono[d.id] ?? ''}
-                onChange={(e) => setMontosAbono((actuales) => ({ ...actuales, [d.id]: e.target.value }))}
                 style={{ flex: 1 }}
               />
               <button type="button" onClick={() => void manejarAbonar(d.id)}>Abonar</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="date"
+                value={fechasEdicion[d.id] ?? ''}
+                onChange={(e) => setFechasEdicion((actuales) => ({ ...actuales, [d.id]: e.target.value }))}
+                style={{ flex: 1 }}
+              />
+              <button type="button" onClick={() => void manejarActualizarFecha(d.id)}>{d.fechaLimiteISO ? 'Cambiar fecha' : 'Poner fecha límite'}</button>
             </div>
           </li>
         ))}

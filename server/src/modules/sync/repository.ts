@@ -148,6 +148,7 @@ export const repositorioSync = {
       saldoInicial: deuda.saldoInicial,
       saldoActual: deuda.saldoActual,
       cuotaProgramada: (deuda.cuotaProgramada ?? undefined) as Prisma.InputJsonValue | undefined,
+      fechaLimiteISO: deuda.fechaLimiteISO ? new Date(deuda.fechaLimiteISO) : null,
       creadaEnISO: new Date(deuda.creadaEnISO),
     }
 

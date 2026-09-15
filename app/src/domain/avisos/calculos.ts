@@ -31,15 +31,18 @@ export function calcularAvisosMantenimiento(alertas: EstadoAlerta[]): Aviso[] {
 }
 
 /**
- * Sin fecha de vencimiento real guardada en Deuda (solo `cuotaProgramada`
- * con frecuencia, no un ancla de fecha) — se usa `creadaEnISO` como primera
- * cuota y se proyecta hacia adelante por la frecuencia hasta encontrar la
- * próxima ocurrencia. Es una aproximación honesta, no una fecha exacta que
- * el usuario haya confirmado — si `domain/deudas` gana un campo real de
- * "próxima fecha de pago" más adelante, esta función se simplifica.
+ * 2026-09-15, pedido explícito del usuario: "hay que ponerle fecha límite...
+ * si no, ¿cómo me va a emitir la alerta?" — `Deuda.fechaLimiteISO` (real,
+ * puesta a mano por el conductor) es la fuente de verdad cuando existe. Si
+ * la deuda no tiene fecha puesta todavía pero sí `cuotaProgramada`, se cae
+ * de vuelta a la proyección aproximada de antes (`creadaEnISO` + frecuencia)
+ * — así las deudas que ya existían antes de este cambio (fecha límite en
+ * `null`, D-16) no se quedan sin ningún aviso de un día para otro.
  */
 export function proximaFechaCuotaDeuda(deuda: Deuda, ahoraMs: number = Date.now()): Date | null {
-  if (!deuda.cuotaProgramada || deuda.saldoActual <= 0) return null
+  if (deuda.saldoActual <= 0) return null
+  if (deuda.fechaLimiteISO) return new Date(deuda.fechaLimiteISO)
+  if (!deuda.cuotaProgramada) return null
   const intervaloDias = { semanal: 7, quincenal: 15, mensual: 30 }[deuda.cuotaProgramada.frecuencia]
   let fechaMs = new Date(deuda.creadaEnISO).getTime()
   // Tope de iteraciones por si `creadaEnISO` quedó en una fecha rara — nunca debería hacer falta en la práctica.
