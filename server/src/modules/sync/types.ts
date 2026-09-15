@@ -49,6 +49,7 @@ export interface ViajeSyncEntrada {
   kmTotalesReales: number
   distanciaReportadaPlataforma: number | null
   ingreso: number
+  ingresoPendiente: boolean
   localidad: string | null
   zona: string | null
   localidadInicio?: string | null

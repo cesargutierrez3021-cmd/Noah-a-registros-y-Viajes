@@ -122,6 +122,11 @@ model Viaje {
   kmTotalesReales               Float     @map("km_totales_reales")
   distanciaReportadaPlataforma  Float?    @map("distancia_reportada_plataforma")
   ingreso                       Float
+  /// 2026-09-16: true mientras el viaje se terminó desde la burbuja flotante
+  /// (sin abrir la app) y todavía no se le escribió el ingreso real — ver el
+  /// comentario completo en app/src/domain/viajes/types.ts. Default false
+  /// para que la migración no rompa filas que ya existían.
+  ingresoPendiente              Boolean   @default(false) @map("ingreso_pendiente")
   localidad                     String?
   zona                          String?
   localidadInicio               String? @map("localidad_inicio")

@@ -17,10 +17,15 @@ import { useConversacion } from '../conversacion/store'
  *   se usa 'Particular' como valor por defecto; el conductor puede editar
  *   esto más adelante si se agrega esa función (no existe todavía, D-18:
  *   no se inventa acá).
- * - accion "terminar": para el GPS en el momento exacto del toque y deja
- *   el viaje "esperando ingreso" — `pausarParaIngreso()` — porque el monto
- *   no se puede escribir desde la burbuja. La pantalla de Jornada y viajes
- *   se encarga de pedirlo la próxima vez que se abre la app.
+ * - accion "terminar": para el GPS en el momento exacto del toque y GUARDA
+ *   el viaje de una — `pausarParaIngreso()` — con `ingresoPendiente: true`
+ *   porque el monto no se puede escribir desde la burbuja. La pantalla de
+ *   Jornada y viajes pide el ingreso de cada viaje pendiente la próxima vez
+ *   que se abre la app. 2026-09-16: antes `viajeEnCurso` se quedaba
+ *   "ocupado" hasta ese momento, así que un segundo/tercer viaje por la
+ *   burbuja sin abrir la app quedaba ignorado en silencio (bug real
+ *   reportado por el usuario — perdía viajes). Ahora `pausarParaIngreso`
+ *   libera `viajeEnCurso` de inmediato, así que este mismo chequeo alcanza.
  * - accion "abrirVoz" (2026-09-15, pedido explícito del usuario): se tocó
  *   la manija de la burbuja — antes abría un panel "resumen" (Hoy/Semana/
  *   Mes), ahora activa a MIA. No hay forma real de escuchar/hablar sin la
@@ -37,7 +42,7 @@ export function registrarEscuchaBurbuja(): void {
     if (datos.accion === 'iniciar') {
       if (!estado.viajeEnCurso) void estado.iniciarViaje(PLATAFORMA_POR_DEFECTO_BURBUJA)
     } else if (datos.accion === 'terminar') {
-      if (estado.viajeEnCurso && !estado.viajeEnCurso.finISOPendiente) estado.pausarParaIngreso()
+      if (estado.viajeEnCurso) void estado.pausarParaIngreso()
     } else if (datos.accion === 'abrirVoz') {
       useConversacion.getState().solicitarAperturaConVoz()
     }

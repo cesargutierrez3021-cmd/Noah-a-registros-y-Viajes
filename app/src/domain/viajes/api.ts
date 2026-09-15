@@ -23,6 +23,7 @@ export async function subirViaje(viaje: Viaje): Promise<void> {
     kmTotalesReales: viaje.distancia.kmTotalesReales,
     distanciaReportadaPlataforma: viaje.distanciaReportadaPlataforma,
     ingreso: viaje.ingreso,
+    ingresoPendiente: viaje.ingresoPendiente,
     localidad: viaje.localidad,
     zona: viaje.zona,
     localidadInicio: viaje.localidadInicio,

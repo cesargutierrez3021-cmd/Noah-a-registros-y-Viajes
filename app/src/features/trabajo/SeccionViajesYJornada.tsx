@@ -20,21 +20,38 @@ const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap',
  * queda en todo el Panel Trabajo es el de arriba.
  */
 export function SeccionViajesYJornada() {
-  const { viajes, viajeEnCurso, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje } = useViajes()
+  const { viajes, viajeEnCurso, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje, completarIngreso } = useViajes()
   const { agregarViajeAJornadaAbierta, cargar: cargarJornadas } = useJornada()
 
   const [ingreso, setIngreso] = useState('')
   const [diaHistorial, setDiaHistorial] = useState(() => fechaNegocioISO())
+  /** 2026-09-16: uno por cada viaje pendiente de ingreso (puede haber varios, ver store.ts). */
+  const [ingresosPendientes, setIngresosPendientes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void cargar()
     void cargarJornadas()
   }, [cargar, cargarJornadas])
 
+  const viajesPendientesIngreso = viajes.filter((v) => v.ingresoPendiente)
+
   async function manejarFinalizar() {
     const viaje = await finalizarViaje({ ingreso: Number(ingreso) || 0, distanciaReportadaPlataforma: null })
     if (viaje) await agregarViajeAJornadaAbierta(viaje.id)
     setIngreso('')
+    void sincronizarViajesPendientes()
+    void sincronizarJornadasPendientes()
+  }
+
+  async function manejarCompletarIngreso(viajeId: string) {
+    const monto = Number(ingresosPendientes[viajeId]) || 0
+    await completarIngreso(viajeId, monto)
+    await agregarViajeAJornadaAbierta(viajeId)
+    setIngresosPendientes((prev) => {
+      const siguiente = { ...prev }
+      delete siguiente[viajeId]
+      return siguiente
+    })
     void sincronizarViajesPendientes()
     void sincronizarJornadasPendientes()
   }
@@ -62,24 +79,32 @@ export function SeccionViajesYJornada() {
         </div>
       )}
 
-      {viajeEnCurso && viajeEnCurso.finISOPendiente && (
-        <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
-          <p className="texto-mute">
-            Terminaste este viaje desde la burbuja flotante — {viajeEnCurso.plataforma}, quedan{' '}
-            {viajeEnCurso.recorrido.length} puntos GPS capturados. Solo falta el ingreso para guardarlo.
-          </p>
-          <input
-            type="number"
-            placeholder="Ingreso del viaje"
-            value={ingreso}
-            onChange={(e) => setIngreso(e.target.value)}
-            autoFocus
-          />
-          <button type="button" onClick={() => void manejarFinalizar()}>Guardar viaje</button>
+      {viajesPendientesIngreso.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {viajesPendientesIngreso.length > 1 && (
+            <p className="texto-mute">
+              Tienes {viajesPendientesIngreso.length} viajes terminados desde la burbuja esperando el ingreso — complétalos uno por uno.
+            </p>
+          )}
+          {viajesPendientesIngreso.map((v) => (
+            <div key={v.id} className="tarjeta-viaje" style={{ flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
+              <p className="texto-mute">
+                Terminaste este viaje desde la burbuja flotante — {v.plataforma}, {v.distancia.kmTotalesReales.toFixed(1)} km.
+                Solo falta el ingreso para guardarlo.
+              </p>
+              <input
+                type="number"
+                placeholder="Ingreso del viaje"
+                value={ingresosPendientes[v.id] ?? ''}
+                onChange={(e) => setIngresosPendientes((prev) => ({ ...prev, [v.id]: e.target.value }))}
+              />
+              <button type="button" onClick={() => void manejarCompletarIngreso(v.id)}>Guardar viaje</button>
+            </div>
+          ))}
         </div>
       )}
 
-      {viajeEnCurso && !viajeEnCurso.finISOPendiente && (
+      {viajeEnCurso && (
         <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
           <p className="texto-mute">
             Viaje en curso — {viajeEnCurso.plataforma} — {viajeEnCurso.recorrido.length} puntos GPS capturados
@@ -114,7 +139,8 @@ export function SeccionViajesYJornada() {
               {delDia.map((v) => (
                 <li key={v.id} className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
                   <span className="tarjeta-viaje__plataforma">
-                    {v.plataforma} · {v.distancia.kmTotalesReales.toFixed(1)} km · ${v.ingreso.toLocaleString('es-CO')}
+                    {v.plataforma} · {v.distancia.kmTotalesReales.toFixed(1)} km ·{' '}
+                    {v.ingresoPendiente ? 'Falta el ingreso' : `$${v.ingreso.toLocaleString('es-CO')}`}
                   </span>
                   <span className="texto-mute">
                     {(v.localidadInicio ?? v.zonaInicio ?? v.localidad ?? v.zona) ?? 'Zona no detectada'}

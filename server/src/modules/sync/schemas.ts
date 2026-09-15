@@ -18,6 +18,7 @@ export const esquemaViajeSync = z.object({
   kmTotalesReales: z.number().nonnegative(),
   distanciaReportadaPlataforma: z.number().nullable(),
   ingreso: z.number().nonnegative(),
+  ingresoPendiente: z.boolean().optional().default(false),
   localidad: z.string().nullable(),
   zona: z.string().nullable(),
   localidadInicio: z.string().nullable().optional(),

@@ -98,6 +98,7 @@ export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje
     zonaInicio,
     localidadFin,
     zonaFin,
+    ingresoPendiente: input.ingresoPendiente,
     pendienteDeSync: true,
   }
 }
@@ -131,6 +132,8 @@ export function crearViajeManual(id: string, input: ViajeManualInput): Viaje {
     zonaInicio: input.zona,
     localidadFin: input.localidad,
     zonaFin: input.zona,
+    // Un viaje manual siempre trae el ingreso de una vez, nunca queda pendiente.
+    ingresoPendiente: false,
     pendienteDeSync: true,
   }
 }

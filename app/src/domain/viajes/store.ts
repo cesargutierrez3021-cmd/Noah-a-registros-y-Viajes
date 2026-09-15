@@ -23,16 +23,6 @@ interface ViajeEnCurso {
   inicioISO: string
   recorrido: PuntoGPS[]
   puntoDeRecogidaISO: string | null
-  /**
-   * 2026-09-15, pedido explícito del usuario: cuando el viaje se termina
-   * desde la burbuja flotante (un solo toque, sin abrir la app), no hay
-   * forma de escribir el ingreso ahí — el GPS SÍ se detiene en el momento
-   * exacto (por eso queda guardado acá, no se recalcula después), pero el
-   * viaje se queda "pausado" esperando que el conductor abra la app y
-   * escriba el monto. Mientras esto es `null`, el viaje sigue en curso
-   * normal (igual que antes). Ver `pausarParaIngreso` más abajo.
-   */
-  finISOPendiente: string | null
 }
 
 interface EstadoViajes {
@@ -48,15 +38,27 @@ interface EstadoViajes {
   iniciarViaje: (plataforma: Plataforma) => Promise<void>
   marcarRecogida: () => void
   /**
-   * 2026-09-15 — detiene el GPS y marca `finISOPendiente` sin crear todavía
-   * el `Viaje` final (falta el ingreso). Lo dispara la burbuja flotante al
-   * tocarla para terminar un viaje. Ver `finISOPendiente` arriba.
+   * 2026-09-16 (corrección de un bug real, ver el comentario de
+   * `ingresoPendiente` en types.ts): detiene el GPS y GUARDA el viaje de
+   * una vez, con `ingreso: 0` e `ingresoPendiente: true` — ya no se queda
+   * "atascado" en `viajeEnCurso` esperando a que se abra la app. Por eso
+   * `viajeEnCurso` queda en `null` apenas termina esta función, igual que
+   * `finalizarViaje` — así la burbuja puede arrancar el siguiente viaje de
+   * inmediato, sin importar cuántos viajes queden pendientes de ingreso.
+   * Lo dispara la burbuja flotante al tocarla para terminar un viaje.
    */
-  pausarParaIngreso: () => void
+  pausarParaIngreso: () => Promise<void>
   finalizarViaje: (params: {
     ingreso: number
     distanciaReportadaPlataforma: number | null
   }) => Promise<Viaje | null>
+  /**
+   * 2026-09-16 — completa el ingreso de un viaje que quedó pendiente (ver
+   * `pausarParaIngreso`). Puede haber varios al mismo tiempo; cada uno se
+   * resuelve por separado, en cualquier orden — no hay un solo "el viaje
+   * pendiente", son todos los que tengan `ingresoPendiente: true`.
+   */
+  completarIngreso: (viajeId: string, ingreso: number) => Promise<void>
   /** Bloque 2, ítem 4 — "agregar viaje manual". No toca `viajeEnCurso` ni el
    *  GPS para nada: es un camino totalmente aparte para cargar un viaje que
    *  ya pasó y no se registró en su momento. */
@@ -70,7 +72,7 @@ function generarId(): string {
 // Vive fuera del store porque no es "estado" para renderizar, es un recurso activo.
 let seguidorActivo: SeguidorGPS | null = null
 const CLAVE_ACTIVO = 'mia:viaje-en-curso'
-function calcularKmLocal(puntos: PuntoGPS[]): number { return calcularDistanciaReal({ plataforma:'Particular', inicioISO:'', finISO:'', recorrido:puntos, puntoDeRecogidaISO:null, distanciaReportadaPlataforma:null, ingreso:0 }).kmTotalesReales }
+function calcularKmLocal(puntos: PuntoGPS[]): number { return calcularDistanciaReal({ plataforma:'Particular', inicioISO:'', finISO:'', recorrido:puntos, puntoDeRecogidaISO:null, distanciaReportadaPlataforma:null, ingreso:0, ingresoPendiente:false }).kmTotalesReales }
 function guardarActivo(v: ViajeEnCurso | null){ if(v) localStorage.setItem(CLAVE_ACTIVO, JSON.stringify(v)); else localStorage.removeItem(CLAVE_ACTIVO) }
 
 export const useViajes = create<EstadoViajes>((set, get) => ({
@@ -103,7 +105,6 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
       inicioISO: new Date().toISOString(),
       recorrido: [],
       puntoDeRecogidaISO: null,
-      finISOPendiente: null,
     }
     set({ viajeEnCurso: enCurso, errorGPS: null })
     guardarActivo(enCurso)
@@ -144,15 +145,38 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     })
   },
 
-  /** Ver `finISOPendiente` en la interfaz — usado por la burbuja al terminar un viaje sin abrir la app. */
-  pausarParaIngreso: () => {
+  /**
+   * Ver el comentario de esta función en la interfaz `EstadoViajes` de
+   * arriba — usado por la burbuja al terminar un viaje sin abrir la app.
+   * Guarda el viaje YA (con `ingresoPendiente: true`) y libera
+   * `viajeEnCurso`, para que la burbuja pueda arrancar el siguiente viaje
+   * sin esperar a que el conductor abra la app.
+   */
+  pausarParaIngreso: async () => {
     const enCurso = get().viajeEnCurso
-    if (!enCurso || enCurso.finISOPendiente) return
+    if (!enCurso) return
     seguidorActivo?.detener()
     seguidorActivo = null
-    const actualizado = { ...enCurso, finISOPendiente: new Date().toISOString() }
-    guardarActivo(actualizado)
-    set({ viajeEnCurso: actualizado })
+
+    const viaje = crearViajeDesdeCiere(enCurso.id, {
+      plataforma: enCurso.plataforma,
+      inicioISO: enCurso.inicioISO,
+      finISO: new Date().toISOString(),
+      recorrido: enCurso.recorrido,
+      puntoDeRecogidaISO: enCurso.puntoDeRecogidaISO,
+      distanciaReportadaPlataforma: null,
+      ingreso: 0,
+      ingresoPendiente: true,
+    })
+
+    await repositorioViajes.guardar(viaje)
+    set({ viajes: [viaje, ...get().viajes], viajeEnCurso: null })
+    // A diferencia de finalizarViaje, acá NO se oculta la burbuja — el
+    // conductor sigue trabajando sin haber abierto la app, así que se
+    // resetea a "lista para el próximo viaje" en vez de desaparecer.
+    void actualizarBurbuja('0.0', '0m', false, get().viajes.length)
+    guardarActivo(null)
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') void limpiarTrazaPersistida()
   },
 
   finalizarViaje: async ({ ingreso, distanciaReportadaPlataforma }) => {
@@ -165,14 +189,12 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     const viaje = crearViajeDesdeCiere(enCurso.id, {
       plataforma: enCurso.plataforma,
       inicioISO: enCurso.inicioISO,
-      // Si la burbuja ya paró el GPS esperando el ingreso, ese es el
-      // momento real en que terminó el viaje — no "ahora", que podría ser
-      // minutos/horas después (cuando el conductor por fin abre la app).
-      finISO: enCurso.finISOPendiente ?? new Date().toISOString(),
+      finISO: new Date().toISOString(),
       recorrido: enCurso.recorrido,
       puntoDeRecogidaISO: enCurso.puntoDeRecogidaISO,
       distanciaReportadaPlataforma,
       ingreso,
+      ingresoPendiente: false,
     })
 
     await repositorioViajes.guardar(viaje)
@@ -182,6 +204,14 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     guardarActivo(null)
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') void limpiarTrazaPersistida()
     return viaje
+  },
+
+  completarIngreso: async (viajeId, ingreso) => {
+    const viaje = get().viajes.find((v) => v.id === viajeId)
+    if (!viaje) return
+    const actualizado: Viaje = { ...viaje, ingreso, ingresoPendiente: false, pendienteDeSync: true }
+    await repositorioViajes.guardar(actualizado)
+    set({ viajes: get().viajes.map((v) => (v.id === viajeId ? actualizado : v)) })
   },
 
   agregarViajeManual: async (input) => {

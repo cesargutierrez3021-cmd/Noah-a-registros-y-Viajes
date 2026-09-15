@@ -49,6 +49,22 @@ export interface Viaje {
   zonaInicio: string | null
   localidadFin: string | null
   zonaFin: string | null
+  /**
+   * 2026-09-16, corrección de un bug real reportado por el usuario: cuando
+   * un viaje se termina desde la burbuja (sin abrir la app) no hay forma de
+   * escribir el ingreso ahí mismo — `ingreso` queda en 0 y este campo en
+   * `true` hasta que el conductor lo complete. Antes ese estado "pausado
+   * esperando ingreso" vivía SOLO en `viajeEnCurso` (un único slot en el
+   * store, ver store.ts) — si el conductor hacía un segundo viaje por la
+   * burbuja antes de abrir la app, `iniciarViaje` lo ignoraba en silencio
+   * (ya había "un viaje" ocupando el slot) y ese viaje se perdía por
+   * completo. Ahora el viaje se guarda de una (como cualquier otro,
+   * `estado: 'finalizado'`) apenas se toca "terminar" en la burbuja, y
+   * `viajeEnCurso` queda libre de inmediato para el siguiente — puede haber
+   * varios viajes con `ingresoPendiente: true` al mismo tiempo, cada uno se
+   * completa por separado (ver `completarIngreso` en store.ts).
+   */
+  ingresoPendiente: boolean
   /** true mientras el viaje no se ha confirmado como sincronizado con el backend. */
   pendienteDeSync: boolean
 }
@@ -62,6 +78,8 @@ export interface CierreViajeInput {
   puntoDeRecogidaISO: string | null
   distanciaReportadaPlataforma: number | null
   ingreso: number
+  /** Ver el comentario de `ingresoPendiente` en `Viaje` arriba. */
+  ingresoPendiente: boolean
 }
 
 /**

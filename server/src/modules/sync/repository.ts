@@ -43,6 +43,7 @@ export const repositorioSync = {
       kmTotalesReales: viaje.kmTotalesReales,
       distanciaReportadaPlataforma: viaje.distanciaReportadaPlataforma,
       ingreso: viaje.ingreso,
+      ingresoPendiente: viaje.ingresoPendiente,
       localidad: viaje.localidad,
       zona: viaje.zona,
       localidadInicio: viaje.localidadInicio ?? viaje.localidad,
