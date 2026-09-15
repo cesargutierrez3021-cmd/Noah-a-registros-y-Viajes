@@ -121,8 +121,8 @@ export function AjustesScreen() {
 
               <div style={{ padding: '8px 0' }}>
                 {e.valor === 'anillos' && <AnillosOrbitales items={ITEMS_MUESTRA} animado={animado} />}
-                {e.valor === 'cristal3d' && <Cristal3D items={ITEMS_MUESTRA} animado={animado} />}
-                {e.valor === 'cristal3d_ejecutivo' && <Cristal3D items={ITEMS_MUESTRA} animado={animado} variante="ejecutivo" />}
+                {e.valor === 'cristal3d' && <Cristal3D items={ITEMS_MUESTRA} total={TOTAL_MUESTRA} animado={animado} />}
+                {e.valor === 'cristal3d_ejecutivo' && <Cristal3D items={ITEMS_MUESTRA} total={TOTAL_MUESTRA} animado={animado} variante="ejecutivo" />}
                 {e.valor === 'prisma' && <Prisma items={ITEMS_MUESTRA} total={TOTAL_MUESTRA} animado={animado} />}
                 {e.valor === 'prisma_ejecutivo' && <Prisma items={ITEMS_MUESTRA} total={TOTAL_MUESTRA} animado={animado} variante="ejecutivo" />}
               </div>

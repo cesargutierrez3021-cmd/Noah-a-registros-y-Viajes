@@ -1,67 +1,92 @@
 import type { ItemDistribucion } from '../../domain/estiloGrafico/types'
-import { SUPERFICIE_EJECUTIVA, BORDE_EJECUTIVO, TONOS_EJECUTIVOS } from './paletaEjecutiva'
 import type { VarianteGrafico } from './paletaEjecutiva'
 
+import imgColorIngreso from '../../assets/cristal3d/A-color-ingreso.webp'
+import imgColorHogar from '../../assets/cristal3d/A-color-hogar.webp'
+import imgColorDeudas from '../../assets/cristal3d/A-color-deudas.webp'
+import imgColorAhorro from '../../assets/cristal3d/A-color-ahorro.webp'
+import imgColorLibre from '../../assets/cristal3d/A-color-libre.webp'
+import imgMatteIngreso from '../../assets/cristal3d/B-matte-ingreso.webp'
+import imgMatteHogar from '../../assets/cristal3d/B-matte-hogar.webp'
+import imgMatteDeudas from '../../assets/cristal3d/B-matte-deudas.webp'
+import imgMatteAhorro from '../../assets/cristal3d/B-matte-ahorro.webp'
+import imgMatteLibre from '../../assets/cristal3d/B-matte-libre.webp'
+
+function formatoPesosCorto(monto: number): string {
+  if (Math.abs(monto) >= 1_000_000) return `$${(monto / 1_000_000).toFixed(1)}M`
+  if (Math.abs(monto) >= 1_000) return `$${Math.round(monto / 1000)}K`
+  return `$${Math.round(monto)}`
+}
+
+const IMAGENES_COLOR: Record<string, string> = { ingreso: imgColorIngreso, hogar: imgColorHogar, deudas: imgColorDeudas, ahorro: imgColorAhorro, libre: imgColorLibre }
+const IMAGENES_MATTE: Record<string, string> = { ingreso: imgMatteIngreso, hogar: imgMatteHogar, deudas: imgMatteDeudas, ahorro: imgMatteAhorro, libre: imgMatteLibre }
+/** Tono dorado único de la variante ejecutiva — el mismo del grabado en las fotos B-matte-*. */
+const COLOR_TEXTO_EJECUTIVO = '#e6d9b1'
+
 /**
- * Estilo "Cristal 3D" — piso de vidrio inclinado + 4 bloques en cascada,
- * uno por categoría, cada uno con su etiqueta y porcentaje.
- *
- * 2026-09-16 (corrección pedida por el usuario, misma sesión): la primera
- * versión de este componente (ronda anterior) se apartaba de la referencia
- * que mandó ("no las hiciste exactas") — le faltaba el piso de vidrio y no
- * calzaba con `GlassStack` de `ORIGINAL_COMPONENTS.tsx` (paquete
- * "prism-crystal-orbit-package"). Reescrito calcando esa estructura y su
- * CSS (`glass-floor` + `glass-block` inclinados con `skewY`+`rotate`,
- * animación `glassFloat` con los mismos retrasos 0/.4/.8/1.2s), adaptado a
- * un ancho de teléfono en vez del stage de escritorio original.
- *
- * `variante`: 'ejecutivo' conserva la misma estructura y movimiento — solo
- * cambia a la paleta grafito/dorado fija de paletaEjecutiva.ts en vez del
- * color propio de cada categoría, sin importar el tema activo de la app.
+ * Posición en cruz calcada de la referencia real (paquete "pulse-finance-
+ * final-assets" — 5 placas de cristal fotografiadas: INGRESO al centro,
+ * las 4 categorías alrededor). `left`/`top` son el punto central de cada
+ * placa en % del stage; `rot` es su inclinación fija (la misma con la que
+ * salió fotografiada, no inventada).
  */
-export function Cristal3D({ items, animado = true, variante = 'clasico' }: { items: ItemDistribucion[]; animado?: boolean; variante?: VarianteGrafico }) {
-  // left/bottom en % y px, skewY+rotate — misma composición que block-0..3 del original, reescalada a un ancho móvil (~340-400px) en vez del stage de 1050px.
-  const bloques = [
-    { left: '2%', bottom: 32, skewY: -8, rotate: -4, delay: 0 },
-    { left: '28%', bottom: 58, skewY: 8, rotate: 3, delay: 0.4 },
-    { left: '52%', bottom: 24, skewY: -8, rotate: -2, delay: 0.8 },
-    { left: '74%', bottom: 66, skewY: 6, rotate: 4, delay: 1.2 },
-  ]
+const POSICIONES: Record<string, { left: number; top: number; width: number; rot: number; z: number; delay: number }> = {
+  ingreso: { left: 50, top: 50, width: 40, rot: 1, z: 5, delay: 1.6 },
+  hogar:   { left: 21, top: 18, width: 31, rot: -3, z: 2, delay: 0 },
+  deudas:  { left: 79, top: 21, width: 31, rot: 3, z: 3, delay: 0.4 },
+  ahorro:  { left: 21, top: 82, width: 31, rot: -5, z: 2, delay: 0.8 },
+  libre:   { left: 79, top: 82, width: 31, rot: 4, z: 3, delay: 1.2 },
+}
+
+/**
+ * Estilo "Cristal 3D" — 2026-09-16 (segunda corrección, misma sesión): ya
+ * no es un panel dibujado en CSS. El usuario mandó fotos reales generadas
+ * por IA (5 placas de vidrio grabado, fotografía de producto 3D real —
+ * "que también se dejen configurar bien sin problema") y, tras varias
+ * rondas donde el recorte/transparencia que devolvía esa IA salía roto
+ * (esquinas cortadas, fondo no transparente), terminé recortando las 10
+ * piezas yo mismo con Python (segmentación por diferencia de fondo +
+ * envolvente convexa — ver PLAN-MAESTRO para el detalle del proceso).
+ *
+ * Cada placa trae su nombre grabado en la imagen (HOGAR/DEUDAS/AHORRO/
+ * LIBRE/INGRESO) pero el número queda vacío a propósito — el dato real
+ * (porcentaje o el monto total en INGRESO) se superpone acá como texto,
+ * para que siempre sea el dato del usuario, nunca uno fijo horneado en la
+ * imagen (ver el aviso que se le dio al usuario sobre esto).
+ *
+ * `variante`: 'ejecutivo' usa el segundo lote de fotos (vidrio ahumado
+ * negro + bronce/dorado mate, la misma escena pero en ese material) en vez
+ * de swapear colores por CSS — son fotos distintas, no un filtro.
+ */
+export function Cristal3D({ items, total, animado = true, variante = 'clasico' }: { items: ItemDistribucion[]; total: number; animado?: boolean; variante?: VarianteGrafico }) {
   const ejecutivo = variante === 'ejecutivo'
-  const superficie = ejecutivo ? SUPERFICIE_EJECUTIVA : 'var(--color-superficie)'
-  const borde = ejecutivo ? BORDE_EJECUTIVO : 'var(--color-borde)'
-  // El piso toma el color de la última categoría (Libre = sky en la referencia) o el dorado ejecutivo — es un detalle ambiental, no representa un dato.
-  const colorPiso = ejecutivo ? TONOS_EJECUTIVOS[0] : (items[3]?.color ?? 'var(--color-acento)')
+  const imagenes = ejecutivo ? IMAGENES_MATTE : IMAGENES_COLOR
+
+  const placas = [
+    { clave: 'ingreso', color: COLOR_TEXTO_EJECUTIVO, texto: formatoPesosCorto(total) },
+    ...items.slice(0, 4).map((item) => ({ clave: item.clave, color: ejecutivo ? COLOR_TEXTO_EJECUTIVO : item.color, texto: `${Math.round(item.porcentaje)}%` })),
+  ]
 
   return (
-    <div style={{ position: 'relative', height: 220, marginBottom: 8 }}>
-      <div
-        className="cristal3d__piso"
-        style={{ borderColor: `color-mix(in srgb, ${colorPiso} 45%, transparent)`, background: `color-mix(in srgb, ${colorPiso} 12%, transparent)` }}
-      />
-      {items.slice(0, 4).map((item, i) => {
-        const pos = bloques[i]
-        const color = ejecutivo ? TONOS_EJECUTIVOS[i % TONOS_EJECUTIVOS.length] : item.color
+    <div className="cristal3d__stage">
+      {placas.map((placa) => {
+        const pos = POSICIONES[placa.clave]
+        if (!pos) return null
+        const src = imagenes[placa.clave]
         return (
           <div
-            key={item.clave}
-            className={animado ? 'cristal3d__panel cristal3d__panel--animado' : 'cristal3d__panel'}
-            style={{
-              position: 'absolute',
-              left: pos.left,
-              bottom: pos.bottom,
-              zIndex: i,
-              animationDelay: `${pos.delay}s`,
-              background: `linear-gradient(145deg, color-mix(in srgb, ${color} 22%, ${superficie}) 0%, transparent 68%)`,
-              borderColor: `color-mix(in srgb, ${color} 55%, ${borde})`,
-              // CSS vars en vez de `transform` directo: así la animación (que también anima `transform`) puede leer el mismo skew/ángulo sin pisarlo (ver @keyframes cristal3d-flotar).
-              ['--skew' as string]: `${pos.skewY}deg`,
-              ['--rot' as string]: `${pos.rotate}deg`,
-              transform: `skewY(${pos.skewY}deg) rotate(${pos.rotate}deg)`,
-            }}
+            key={placa.clave}
+            style={{ position: 'absolute', left: `${pos.left}%`, top: `${pos.top}%`, width: `${pos.width}%`, transform: 'translate(-50%, -50%)', zIndex: pos.z }}
           >
-            <span className="cristal3d__etiqueta" style={{ color }}>{item.etiqueta.toUpperCase()}</span>
-            <strong className="cristal3d__valor" style={ejecutivo ? { color: '#e6e2d8' } : undefined}>{Math.round(item.porcentaje)}%</strong>
+            <div
+              className={animado ? 'cristal3d__placa cristal3d__placa--animada' : 'cristal3d__placa'}
+              style={{ ['--rot' as string]: `${pos.rot}deg`, animationDelay: `${pos.delay}s` }}
+            >
+              <img src={src} alt="" style={{ width: '100%', display: 'block' }} />
+              <span className="cristal3d__dato" style={{ color: placa.color, textShadow: `0 0 9px ${placa.color}99` }}>
+                {placa.texto}
+              </span>
+            </div>
           </div>
         )
       })}
