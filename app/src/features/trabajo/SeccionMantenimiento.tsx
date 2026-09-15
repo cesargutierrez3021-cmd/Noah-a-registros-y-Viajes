@@ -5,6 +5,8 @@ import { sincronizarRegistrosMantenimientoPendientes } from '../../domain/manten
 import { calcularResumen } from '../../domain/estadisticas/calculos'
 import { CATALOGO_MANTENIMIENTO } from '../../domain/mantenimiento/reglas'
 import { useTema } from '../../domain/tema/store'
+import { useVehiculo } from '../../domain/vehiculo/store'
+import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
 import { TarjetaMantenimiento } from './TarjetaMantenimiento'
 import { IMAGENES_MANTENIMIENTO } from './tarjetasMantenimiento'
 import type { CriterioIntervalo, PlantillaItemMantenimiento } from '../../domain/mantenimiento/types'
@@ -24,6 +26,8 @@ export function SeccionMantenimiento() {
     useMantenimiento()
   const { tema } = useTema()
   const animado = tema !== 'papel'
+  const { tipoVehiculo } = useVehiculo()
+  const nombreVehiculo = VEHICULOS_DISPONIBLES.find((v) => v.valor === tipoVehiculo)?.nombre ?? tipoVehiculo
 
   const [mostrarCatalogo, setMostrarCatalogo] = useState(false)
   const [editandoPlantilla, setEditandoPlantilla] = useState<PlantillaItemMantenimiento | null>(null)
@@ -45,6 +49,7 @@ export function SeccionMantenimiento() {
   const kmActual = calcularResumen(viajes).kmTotales
   const listaAlertas = alertas(kmActual)
   const nombresYaAgregados = new Set(items.map((i) => i.nombre))
+  const catalogoDelVehiculo = CATALOGO_MANTENIMIENTO.filter((p) => p.vehiculo === tipoVehiculo)
 
   function abrirEdicionCatalogo(plantilla: PlantillaItemMantenimiento) {
     setEditandoPlantilla(plantilla)
@@ -117,24 +122,29 @@ export function SeccionMantenimiento() {
           {mostrarCatalogo ? 'Ocultar catálogo' : 'Agregar del catálogo'}
         </button>
         {mostrarCatalogo && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {CATALOGO_MANTENIMIENTO.filter((p) => !nombresYaAgregados.has(p.nombre)).map((plantilla) => (
-              <button
-                key={plantilla.nombre}
-                type="button"
-                onClick={() => abrirEdicionCatalogo(plantilla)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-              >
-                {plantilla.imagen && (
-                  <img src={IMAGENES_MANTENIMIENTO[plantilla.imagen]} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} />
-                )}
-                {plantilla.nombre}
-              </button>
-            ))}
-            {CATALOGO_MANTENIMIENTO.every((p) => nombresYaAgregados.has(p.nombre)) && (
-              <p className="texto-mute">Ya agregaste todo el catálogo.</p>
-            )}
-          </div>
+          <>
+            <p className="texto-mute" style={{ fontSize: '0.78rem', margin: 0 }}>
+              Catálogo de {nombreVehiculo}. ¿Manejas otro vehículo? Cambialo en Ajustes.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {catalogoDelVehiculo.filter((p) => !nombresYaAgregados.has(p.nombre)).map((plantilla) => (
+                <button
+                  key={plantilla.nombre}
+                  type="button"
+                  onClick={() => abrirEdicionCatalogo(plantilla)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {plantilla.imagen && (
+                    <img src={IMAGENES_MANTENIMIENTO[plantilla.imagen]} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} />
+                  )}
+                  {plantilla.nombre}
+                </button>
+              ))}
+              {catalogoDelVehiculo.every((p) => nombresYaAgregados.has(p.nombre)) && (
+                <p className="texto-mute">Ya agregaste todo el catálogo.</p>
+              )}
+            </div>
+          </>
         )}
       </div>
 

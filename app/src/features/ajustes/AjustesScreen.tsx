@@ -5,6 +5,8 @@ import { sincronizarAparienciaBurbuja } from '../../domain/viajes/burbuja'
 import { useEstiloGrafico } from '../../domain/estiloGrafico/store'
 import { ESTILOS_DISPONIBLES } from '../../domain/estiloGrafico/types'
 import type { ItemDistribucion } from '../../domain/estiloGrafico/types'
+import { useVehiculo } from '../../domain/vehiculo/store'
+import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
 import { AnillosOrbitales } from '../../components/graficos/AnillosOrbitales'
 import { Cristal3D } from '../../components/graficos/Cristal3D'
 import { Prisma } from '../../components/graficos/Prisma'
@@ -28,6 +30,7 @@ const TOTAL_MUESTRA = 4_500_000
 export function AjustesScreen() {
   const { tema, elegirTema } = useTema()
   const { estilo, elegirEstilo } = useEstiloGrafico()
+  const { tipoVehiculo, elegirVehiculo } = useVehiculo()
   const animado = tema !== 'papel'
 
   function manejarElegirTema(nuevo: typeof tema) {
@@ -41,6 +44,32 @@ export function AjustesScreen() {
       <h1 className="titulo-pantalla">Ajustes</h1>
 
       <section style={{ marginTop: 16 }}>
+        <h2 style={{ marginBottom: 4 }}>Vehículo</h2>
+        <p className="texto-mute" style={{ marginBottom: 16 }}>
+          Qué manejas — decide qué catálogo de mantenimiento te aparece en Trabajo.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {VEHICULOS_DISPONIBLES.map((v) => (
+            <button
+              key={v.valor}
+              type="button"
+              onClick={() => elegirVehiculo(v.valor)}
+              style={{
+                textAlign: 'left',
+                padding: 16,
+                border: v.valor === tipoVehiculo ? '2px solid var(--color-acento)' : '1px solid var(--color-borde)',
+              }}
+            >
+              <strong style={{ display: 'block', marginBottom: 4 }}>
+                {v.nombre} {v.valor === tipoVehiculo ? '· Actual' : ''}
+              </strong>
+              <span className="texto-mute">{v.descripcion}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ marginTop: 32 }}>
         <h2 style={{ marginBottom: 4 }}>Tema</h2>
         <p className="texto-mute" style={{ marginBottom: 16 }}>
           Cambia el estilo visual de toda la app cuando quieras.

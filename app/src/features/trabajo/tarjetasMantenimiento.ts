@@ -12,6 +12,16 @@ import imgAceiteYRetenesHorquilla from '../../assets/mantenimiento/moto-fork-ser
 import imgReglajeDeValvulas from '../../assets/mantenimiento/moto-valves.webp'
 import imgRodamientosDeDireccion from '../../assets/mantenimiento/moto-steering-bearing.webp'
 import imgRodamientosDeRueda from '../../assets/mantenimiento/moto-wheel-bearing.webp'
+import imgCarroCambioDeAceite from '../../assets/mantenimiento/car-oil.webp'
+import imgCarroFiltroDeAire from '../../assets/mantenimiento/car-air-filter.webp'
+import imgCarroCambioDeLlantas from '../../assets/mantenimiento/car-tire.webp'
+import imgCarroFrenos from '../../assets/mantenimiento/car-brakes.webp'
+import imgCarroMantenimientoGeneral from '../../assets/mantenimiento/car-general-service.webp'
+import imgCarroBateria from '../../assets/mantenimiento/car-battery.webp'
+import imgCarroSuspension from '../../assets/mantenimiento/car-suspension.webp'
+import imgCarroRefrigerante from '../../assets/mantenimiento/car-coolant.webp'
+import imgCarroBujias from '../../assets/mantenimiento/car-spark-plugs.webp'
+import imgCarroLimpiaparabrisas from '../../assets/mantenimiento/car-wipers.webp'
 
 /**
  * 2026-09-15, pedido explícito del usuario: "Paquete de tarjetas ejecutivas
@@ -33,6 +43,16 @@ export const IMAGENES_MANTENIMIENTO: Record<ImagenMantenimiento, string> = {
   reglaje_de_valvulas: imgReglajeDeValvulas,
   rodamientos_de_direccion: imgRodamientosDeDireccion,
   rodamientos_de_rueda: imgRodamientosDeRueda,
+  carro_cambio_de_aceite: imgCarroCambioDeAceite,
+  carro_filtro_de_aire: imgCarroFiltroDeAire,
+  carro_cambio_de_llantas: imgCarroCambioDeLlantas,
+  carro_frenos: imgCarroFrenos,
+  carro_mantenimiento_general: imgCarroMantenimientoGeneral,
+  carro_bateria: imgCarroBateria,
+  carro_suspension: imgCarroSuspension,
+  carro_refrigerante: imgCarroRefrigerante,
+  carro_bujias: imgCarroBujias,
+  carro_limpiaparabrisas: imgCarroLimpiaparabrisas,
 }
 
 /**

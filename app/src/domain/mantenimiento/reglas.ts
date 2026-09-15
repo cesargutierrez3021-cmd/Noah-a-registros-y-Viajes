@@ -20,23 +20,41 @@ import type { EstadoAlerta, ItemMantenimiento, PlantillaItemMantenimiento } from
  * paquete. Batería/SOAT/Revisión técnico-mecánica no venían en el paquete
  * (sin imagen propia) — se mantienen igual, se muestran sin la tarjeta
  * ejecutiva.
+ *
+ * 2026-09-15 (misma sesión), el usuario mandó un catálogo de carro aparte
+ * ("Los de carro") — varios nombres chocan literalmente con los de moto
+ * (Cambio de aceite, Cambio de llantas, Mantenimiento general, Batería,
+ * con km distintos en cada vehículo). `vehiculo` en cada plantilla es lo
+ * que evita el choque: SeccionMantenimiento.tsx solo muestra las del tipo
+ * de vehículo elegido (domain/vehiculo, por defecto 'moto', cambiable en
+ * Ajustes) — nunca las 25 mezcladas.
  */
 export const CATALOGO_MANTENIMIENTO: PlantillaItemMantenimiento[] = [
-  { nombre: 'Cambio de aceite', criterio: 'km_o_dias', intervaloKm: 3000, intervaloDias: 90, imagen: 'cambio_de_aceite' },
-  { nombre: 'Cambio de aceite y filtro', criterio: 'km_o_dias', intervaloKm: 5000, intervaloDias: 180, imagen: 'aceite_y_filtro' },
-  { nombre: 'Cambio de llantas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'cambio_de_llantas' },
-  { nombre: 'Mantenimiento general', criterio: 'km_o_dias', intervaloKm: 5000, intervaloDias: 180, imagen: 'mantenimiento_general' },
-  { nombre: 'Balanceo', criterio: 'km', intervaloKm: 5000, intervaloDias: null, imagen: 'balanceo' },
-  { nombre: 'Cambio de filtro de aire', criterio: 'km', intervaloKm: 15000, intervaloDias: null, imagen: 'filtro_de_aire' },
-  { nombre: 'Cambio de pastillas de freno', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'pastillas_de_freno' },
-  { nombre: 'Batería', criterio: 'dias', intervaloKm: null, intervaloDias: 730, imagen: null },
-  { nombre: 'SOAT', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null },
-  { nombre: 'Revisión técnico-mecánica', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null },
-  { nombre: 'Líquido de frenos', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: 'liquido_de_frenos' },
-  { nombre: 'Aceite y retenes de horquilla', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'aceite_y_retenes_horquilla' },
-  { nombre: 'Reglaje de válvulas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'reglaje_de_valvulas' },
-  { nombre: 'Rodamientos de dirección', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_direccion' },
-  { nombre: 'Rodamientos de rueda', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_rueda' },
+  { nombre: 'Cambio de aceite', criterio: 'km_o_dias', intervaloKm: 3000, intervaloDias: 90, imagen: 'cambio_de_aceite', vehiculo: 'moto' },
+  { nombre: 'Cambio de aceite y filtro', criterio: 'km_o_dias', intervaloKm: 5000, intervaloDias: 180, imagen: 'aceite_y_filtro', vehiculo: 'moto' },
+  { nombre: 'Cambio de llantas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'cambio_de_llantas', vehiculo: 'moto' },
+  { nombre: 'Mantenimiento general', criterio: 'km_o_dias', intervaloKm: 5000, intervaloDias: 180, imagen: 'mantenimiento_general', vehiculo: 'moto' },
+  { nombre: 'Balanceo', criterio: 'km', intervaloKm: 5000, intervaloDias: null, imagen: 'balanceo', vehiculo: 'moto' },
+  { nombre: 'Cambio de filtro de aire', criterio: 'km', intervaloKm: 15000, intervaloDias: null, imagen: 'filtro_de_aire', vehiculo: 'moto' },
+  { nombre: 'Cambio de pastillas de freno', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'pastillas_de_freno', vehiculo: 'moto' },
+  { nombre: 'Batería', criterio: 'dias', intervaloKm: null, intervaloDias: 730, imagen: null, vehiculo: 'moto' },
+  { nombre: 'SOAT', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null, vehiculo: 'moto' },
+  { nombre: 'Revisión técnico-mecánica', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null, vehiculo: 'moto' },
+  { nombre: 'Líquido de frenos', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: 'liquido_de_frenos', vehiculo: 'moto' },
+  { nombre: 'Aceite y retenes de horquilla', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'aceite_y_retenes_horquilla', vehiculo: 'moto' },
+  { nombre: 'Reglaje de válvulas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'reglaje_de_valvulas', vehiculo: 'moto' },
+  { nombre: 'Rodamientos de dirección', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_direccion', vehiculo: 'moto' },
+  { nombre: 'Rodamientos de rueda', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_rueda', vehiculo: 'moto' },
+  { nombre: 'Cambio de aceite', criterio: 'km', intervaloKm: 5000, intervaloDias: null, imagen: 'carro_cambio_de_aceite', vehiculo: 'carro' },
+  { nombre: 'Filtro de aire', criterio: 'km', intervaloKm: 10000, intervaloDias: null, imagen: 'carro_filtro_de_aire', vehiculo: 'carro' },
+  { nombre: 'Cambio de llantas', criterio: 'km', intervaloKm: 40000, intervaloDias: null, imagen: 'carro_cambio_de_llantas', vehiculo: 'carro' },
+  { nombre: 'Frenos', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'carro_frenos', vehiculo: 'carro' },
+  { nombre: 'Mantenimiento general', criterio: 'km', intervaloKm: 10000, intervaloDias: null, imagen: 'carro_mantenimiento_general', vehiculo: 'carro' },
+  { nombre: 'Batería', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'carro_bateria', vehiculo: 'carro' },
+  { nombre: 'Suspensión', criterio: 'km', intervaloKm: 50000, intervaloDias: null, imagen: 'carro_suspension', vehiculo: 'carro' },
+  { nombre: 'Refrigerante', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'carro_refrigerante', vehiculo: 'carro' },
+  { nombre: 'Bujías', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'carro_bujias', vehiculo: 'carro' },
+  { nombre: 'Limpiaparabrisas', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: 'carro_limpiaparabrisas', vehiculo: 'carro' },
 ]
 
 /** Margen de aviso antes de vencer: dentro de esto se marca "próximo a vencer". */

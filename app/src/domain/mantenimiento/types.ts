@@ -8,6 +8,8 @@
  * planes/permisos (Fase 11/12), fuera de alcance aquí.
  */
 
+import type { TipoVehiculo } from '../vehiculo/types'
+
 export type OrigenItemMantenimiento = 'predefinido' | 'personalizado'
 
 /**
@@ -40,6 +42,16 @@ export type ImagenMantenimiento =
   | 'reglaje_de_valvulas'
   | 'rodamientos_de_direccion'
   | 'rodamientos_de_rueda'
+  | 'carro_cambio_de_aceite'
+  | 'carro_filtro_de_aire'
+  | 'carro_cambio_de_llantas'
+  | 'carro_frenos'
+  | 'carro_mantenimiento_general'
+  | 'carro_bateria'
+  | 'carro_suspension'
+  | 'carro_refrigerante'
+  | 'carro_bujias'
+  | 'carro_limpiaparabrisas'
 
 export interface ItemMantenimiento {
   id: string
@@ -64,6 +76,12 @@ export interface ItemMantenimiento {
  * final — 2026-09-15, pedido explícito del usuario: "no todo el mundo tiene
  * la misma moto ni hace los mismos cambios al mismo tiempo" — el conductor
  * los edita antes de confirmar (ver features/trabajo/SeccionMantenimiento.tsx).
+ *
+ * `vehiculo`: 2026-09-15, el usuario mandó también un catálogo de carro
+ * ("Los de carro") con nombres que chocan con los de moto (Cambio de
+ * aceite, Cambio de llantas, Mantenimiento general, Batería existen en
+ * los dos, con km distintos) — este campo es lo que permite filtrar el
+ * catálogo mostrado según domain/vehiculo (ver SeccionMantenimiento.tsx).
  */
 export interface PlantillaItemMantenimiento {
   nombre: string
@@ -71,6 +89,7 @@ export interface PlantillaItemMantenimiento {
   intervaloKm: number | null
   intervaloDias: number | null
   imagen?: ImagenMantenimiento | null
+  vehiculo: TipoVehiculo
 }
 
 /** Registro histórico de una vez que se realizó un mantenimiento. */

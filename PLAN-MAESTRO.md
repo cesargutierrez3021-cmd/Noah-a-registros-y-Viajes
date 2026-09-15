@@ -1044,3 +1044,29 @@ El usuario mandó un segundo paquete (`moto-new-maintenance-package.zip`) con 5 
 **Verificado:** `npm run build` limpio en `app/` y `server/`.
 
 **Pendiente explícito del usuario — todavía NO se generó ni se mandó el APK:** sigue en pie la instrucción de la ronda anterior ("no me mandes el link todavía... ya te aviso"); este mensaje solo agregó datos a esa misma corrección pendiente.
+
+## 2026-09-15 (misma sesión, sexta ronda) — Catálogo de mantenimiento de carro + selector de vehículo (nuevo dominio)
+
+El usuario mandó "Los de carro": dos paquetes (`car-maintenance-part1.zip` + `car-maintenance-part2.zip`, mismo `maintenance_cards.json` completo repetido en ambos, 5 imágenes cada uno) con 10 categorías de mantenimiento de carro: Cambio de aceite (5.000 km), Filtro de aire (10.000 km), Cambio de llantas (40.000 km), Frenos (20.000 km), Mantenimiento general (10.000 km), Batería (30.000 km), Suspensión (50.000 km), Refrigerante (20.000 km), Bujías (30.000 km), Limpiaparabrisas (12 meses).
+
+**Problema real, no solo de datos:** 4 de esos nombres chocan literalmente con el catálogo de moto que ya existía — "Cambio de aceite", "Cambio de llantas", "Mantenimiento general" y "Batería" aparecen en los dos catálogos, con km/días distintos en cada uno. La app hasta ahora asumía un solo catálogo para todo el mundo (todo pensado para moto) — meterle los 10 de carro encima sin resolver esto habría duplicado nombres y roto el "ya agregado" (`nombresYaAgregados`, que compara por nombre). Se le preguntó al usuario cómo resolverlo (3 opciones: selector de tipo de vehículo / catálogo único combinado con sufijos / selector aparte sin tocar perfil) — eligió **selector de tipo de vehículo**.
+
+**Dominio nuevo `domain/vehiculo/` (types.ts + store.ts)**, mismo patrón exacto que `domain/tema`: una preferencia local (`localStorage`, clave `mia:tipoVehiculo`), sin sync a backend, sin repository — `TipoVehiculo = 'moto' | 'carro'`. Por defecto `'moto'`: todo conductor que ya venía usando la app agregó ítems del único catálogo que existía hasta ahora (moto), así que no se le cambia nada debajo del pie sin que lo pida. Seleccionable en **Ajustes** (nueva sección "Vehículo", arriba de "Tema", mismo estilo de tarjeta con borde resaltado que ya usan Tema y Diseño de estadísticas) — cambiable cuando sea, no solo una vez.
+
+**Cambios en `domain/mantenimiento/`:**
+- `types.ts`: `PlantillaItemMantenimiento` ahora tiene `vehiculo: TipoVehiculo` (obligatorio, cada plantilla declara para qué vehículo es). `ImagenMantenimiento` extendido con 10 claves nuevas prefijadas `carro_*` (para no chocar con las claves de moto que ya existían, ej. `carro_cambio_de_aceite` vs `cambio_de_aceite`).
+- `reglas.ts`: las 15 plantillas de moto que ya existían ahora llevan `vehiculo: 'moto'` (retrocompatible, mismos valores de siempre) + 10 plantillas nuevas con `vehiculo: 'carro'`. El catálogo total queda en 25 ítems (15 moto + 10 carro), pero cada conductor solo ve los de su tipo.
+- `SeccionMantenimiento.tsx`: lee `tipoVehiculo` de `useVehiculo()`, filtra `CATALOGO_MANTENIMIENTO` por eso ANTES de aplicar el filtro de "ya agregado" — así "Cambio de aceite" de moto y de carro nunca compiten por el mismo hueco en `nombresYaAgregados`. Se agregó una línea visible arriba del catálogo ("Catálogo de Moto/Carro. ¿Manejas otro vehículo? Cambialo en Ajustes.") para que no sea un filtro silencioso — el conductor entiende por qué ve lo que ve.
+- `TarjetaMantenimiento.tsx`: sin cambios — ya era genérico/data-driven.
+
+**Imágenes:** 10 PNG 1920×1920 (RGBA, ~2-5 MB cada una, ~38 MB en total entre los 2 paquetes) → WebP 480×480 calidad 82 método 6 (~276 KB en total), transparencia verificada por código (canal alfa 0-255 antes y después). Copiadas a `app/src/assets/mantenimiento/` junto a las de moto, mapeadas en `tarjetasMantenimiento.ts` (10 imports + 10 entradas nuevas en `IMAGENES_MANTENIMIENTO`). Paleta ejecutiva sin cambios — el JSON de carro usa el mismo `style` ("realista-minimalista, serio y ejecutivo") que el de moto, se reutiliza `PALETA_TARJETA_MANTENIMIENTO` tal cual.
+
+**Sin cambios de backend:** mismo razonamiento de siempre — `ItemMantenimiento`/`PlantillaItemMantenimiento` no sincronizan, y `tipoVehiculo` es una preferencia 100% local (no hay concepto de "vehículo del conductor" en el modelo de usuario del servidor, y no hace falta uno para esto).
+
+**Límite conocido, no resuelto a propósito (no lo pidió el usuario):** si un conductor cambia de tipo de vehículo en Ajustes DESPUÉS de ya haber agregado ítems del catálogo anterior, esos ítems viejos no se borran ni se re-etiquetan (siguen ahí, con sus valores de siempre) — y si el nombre coincide con uno del catálogo nuevo (ej. tenía "Batería" de moto, cambia a carro), el catálogo de carro lo va a dar por "ya agregado" aunque sea un ítem distinto. Caso raro (un conductor no suele cambiar de vehículo seguido) y no es lo que se pidió resolver ahora.
+
+**Verificado:** `npm run build` limpio en `app/` y `server/`. **No verificado:** cómo se ve el selector de Ajustes ni el catálogo filtrado en un teléfono de verdad — mismo límite de siempre de este entorno.
+
+**Pendiente explícito del usuario — todavía NO se generó ni se mandó el APK:** sigue sin pedirse.
+
+**Además pendiente en esta misma sesión, todavía sin procesar:** el usuario mandó un paquete nuevo (`prism-crystal-orbit-package.zip`) con "dos gráficas diferentes" para agregar al selector de estilo de Balance (`domain/estiloGrafico`, junto a Anillos/Cristal3D/Prisma que ya existen) — extraído a scratchpad, todavía sin integrar.
