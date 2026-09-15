@@ -8,7 +8,19 @@ interface EstadoMantenimiento {
   registros: RegistroMantenimiento[]
   cargando: boolean
   cargar: () => Promise<void>
-  agregarDesdeCatalogo: (plantilla: PlantillaItemMantenimiento, kmActual: number) => Promise<void>
+  /**
+   * 2026-09-15, pedido explícito del usuario: antes esto agregaba la
+   * plantilla del catálogo TAL CUAL (km/días fijos, sin poder ajustarlos)
+   * — "no todo el mundo tiene la misma moto ni hace los mismos cambios al
+   * mismo tiempo". Ahora recibe también `valores`, lo que el conductor
+   * eligió en la pantalla de editar antes de confirmar (criterio + su(s)
+   * intervalo(s)) — la plantilla solo aporta nombre/imagen/origen.
+   */
+  agregarDesdeCatalogo: (
+    plantilla: PlantillaItemMantenimiento,
+    valores: Pick<ItemMantenimiento, 'criterio' | 'intervaloKm' | 'intervaloDias'>,
+    kmActual: number,
+  ) => Promise<void>
   agregarPersonalizado: (
     datos: Pick<ItemMantenimiento, 'nombre' | 'criterio' | 'intervaloKm' | 'intervaloDias'>,
     kmActual: number,
@@ -36,16 +48,17 @@ export const useMantenimiento = create<EstadoMantenimiento>((set, get) => ({
     set({ items, registros, cargando: false })
   },
 
-  agregarDesdeCatalogo: async (plantilla, kmActual) => {
+  agregarDesdeCatalogo: async (plantilla, valores, kmActual) => {
     const item: ItemMantenimiento = {
       id: generarId(),
       nombre: plantilla.nombre,
       origen: 'predefinido',
-      criterio: plantilla.criterio,
-      intervaloKm: plantilla.intervaloKm,
-      intervaloDias: plantilla.intervaloDias,
+      criterio: valores.criterio,
+      intervaloKm: valores.intervaloKm,
+      intervaloDias: valores.intervaloDias,
       ultimoKm: kmActual,
       ultimaFechaISO: new Date().toISOString(),
+      imagen: plantilla.imagen ?? null,
     }
     await repositorioMantenimiento.guardarItem(item)
     set({ items: [...get().items, item] })

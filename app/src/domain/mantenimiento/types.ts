@@ -18,6 +18,24 @@ export type OrigenItemMantenimiento = 'predefinido' | 'personalizado'
  */
 export type CriterioIntervalo = 'km' | 'dias' | 'km_o_dias'
 
+/**
+ * 2026-09-15, pedido explícito del usuario: las tarjetas ejecutivas de
+ * mantenimiento (paquete "maintenance-executive-first-cards" que compartió)
+ * — cada clave corresponde a una imagen en app/src/assets/mantenimiento/,
+ * mapeada en features/trabajo/tarjetasMantenimiento.ts. `null` = ítem sin
+ * imagen propia (ej. Batería/SOAT/Revisión técnico-mecánica, que no venían
+ * en el paquete) — se muestra sin la tarjeta ejecutiva, con el estilo
+ * genérico de siempre.
+ */
+export type ImagenMantenimiento =
+  | 'cambio_de_aceite'
+  | 'aceite_y_filtro'
+  | 'cambio_de_llantas'
+  | 'mantenimiento_general'
+  | 'balanceo'
+  | 'filtro_de_aire'
+  | 'pastillas_de_freno'
+
 export interface ItemMantenimiento {
   id: string
   nombre: string
@@ -31,14 +49,23 @@ export interface ItemMantenimiento {
   ultimoKm: number
   /** Fecha del último mantenimiento realizado, o de creación del ítem si nunca se ha hecho. */
   ultimaFechaISO: string
+  /** Ver el comentario de `ImagenMantenimiento` arriba. Opcional para no romper ítems ya guardados antes de este campo (quedan `undefined`, se tratan igual que `null`). */
+  imagen?: ImagenMantenimiento | null
 }
 
-/** Plantilla de catálogo — no tiene id ni "último" todavía, eso se genera al agregarla. */
+/**
+ * Plantilla de catálogo — no tiene id ni "último" todavía, eso se genera al
+ * agregarla. `intervaloKm`/`intervaloDias` acá son el valor SUGERIDO, no el
+ * final — 2026-09-15, pedido explícito del usuario: "no todo el mundo tiene
+ * la misma moto ni hace los mismos cambios al mismo tiempo" — el conductor
+ * los edita antes de confirmar (ver features/trabajo/SeccionMantenimiento.tsx).
+ */
 export interface PlantillaItemMantenimiento {
   nombre: string
   criterio: CriterioIntervalo
   intervaloKm: number | null
   intervaloDias: number | null
+  imagen?: ImagenMantenimiento | null
 }
 
 /** Registro histórico de una vez que se realizó un mantenimiento. */
@@ -62,11 +89,18 @@ export interface RegistroMantenimiento {
 
 export interface EstadoAlerta {
   item: ItemMantenimiento
-  /** null si el ítem no usa km. Negativo o cero = vencido por km. */
+  /** null si el ítem no usa km. Negativo o cero = vencido por km. YA incluye el margen de seguridad (ver `MARGEN_SEGURIDAD_KM` en reglas.ts). */
   kmFaltantes: number | null
   /** null si el ítem no usa días. Negativo o cero = vencido por tiempo. */
   diasFaltantes: number | null
   vencido: boolean
   /** Vencido pronto (dentro del margen de aviso) pero todavía no vencido. */
   proximoAVencer: boolean
+  /**
+   * 0-100, pedido explícito del usuario ("la barra o el porcentaje que esté
+   * según cómo esté la etiqueta"): cuánto se lleva consumido del intervalo,
+   * usando el criterio más avanzado si el ítem es `km_o_dias` (mismo
+   * criterio de "lo que pase primero" que ya usa `vencido`).
+   */
+  progresoPorcentaje: number
 }
