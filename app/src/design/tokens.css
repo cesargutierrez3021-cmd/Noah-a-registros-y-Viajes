@@ -844,112 +844,116 @@ textarea:focus {
   color: var(--color-texto-mute);
 }
 
-/* Estilo "Cristal 3D" (2026-09-15) — ver components/graficos/Cristal3D.tsx */
-.cristal3d__panel {
-  width: 148px;
-  padding: 14px 16px;
-  border-radius: 14px;
+/* Estilo "Cristal 3D" (2026-09-15, reescrito 2026-09-16 para calcar la referencia exacta) — ver components/graficos/Cristal3D.tsx */
+.cristal3d__piso {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 14px;
+  height: 14px;
   border: 1px solid;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  transform: skewX(-35deg);
+}
+.cristal3d__panel {
+  position: absolute;
+  width: 76px;
+  height: 100px;
+  padding: 10px 8px;
+  border: 1px solid;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  box-shadow: 0 14px 22px rgba(0, 0, 0, 0.3);
 }
 .cristal3d__etiqueta {
-  font-size: 0.66rem;
+  font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 .cristal3d__valor {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   color: var(--color-texto);
 }
-.cristal3d__monto {
-  font-size: 0.75rem;
-  color: var(--color-texto-mute);
-}
 .cristal3d__panel--animado {
-  animation: cristal3d-flotar 5.5s ease-in-out infinite;
+  animation: cristal3d-flotar 4s ease-in-out infinite;
 }
 @keyframes cristal3d-flotar {
-  0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
-  50% { transform: translateY(-7px) rotate(var(--rot, 0deg)); }
+  0%, 100% { transform: translateY(0) skewY(var(--skew, 0deg)) rotate(var(--rot, 0deg)); }
+  50% { transform: translateY(-7px) skewY(var(--skew, 0deg)) rotate(var(--rot, 0deg)); filter: brightness(1.2); }
 }
 
-/* Estilo "Prisma" (2026-09-15) — ver components/graficos/Prisma.tsx */
-.prisma {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.prisma__total {
-  flex: none;
-  width: 92px;
-  height: 92px;
-  border-radius: 50%;
+/* Estilo "Prisma" (2026-09-15, reescrito 2026-09-16 para calcar la referencia exacta) — ver components/graficos/Prisma.tsx */
+.prisma__fuente {
+  position: absolute;
+  left: 2%;
+  top: 44%;
+  transform: translateY(-50%);
+  width: 74px;
+  height: 50px;
+  border: 1px solid;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  background: color-mix(in srgb, var(--color-acento) 16%, var(--color-superficie));
 }
-.prisma__total-icono {
-  font-size: 1.1rem;
+.prisma__fuente-icono {
+  font-size: 0.85rem;
 }
-.prisma__total-valor {
-  font-size: 0.95rem;
-  font-weight: 700;
-}
-.prisma__barras {
-  flex: 1;
-  min-width: 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.prisma__fila {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.prisma__barra {
-  position: relative;
-  flex: 1;
-  height: 22px;
-  border-radius: 0 999px 999px 0;
-  overflow: visible;
-}
-.prisma__punto {
-  position: absolute;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-texto);
-  transform: translate(-50%, -50%);
-}
-.prisma__punto--animado {
-  animation: prisma-recorrer 3.2s ease-in-out infinite;
-}
-@keyframes prisma-recorrer {
-  0%, 100% { left: 6%; }
-  50% { left: 94%; }
-}
-.prisma__etiqueta {
-  flex: none;
-  width: 84px;
-  font-size: 0.76rem;
-  color: var(--color-texto-mute);
-}
-.prisma__porcentaje {
-  flex: none;
-  width: 40px;
-  text-align: right;
+.prisma__fuente b {
   font-size: 0.8rem;
-  font-weight: 700;
+}
+.prisma__lineas {
+  position: absolute;
+  left: 24%;
+  right: 34%;
+  top: 30%;
+  height: 90px;
+}
+.prisma__linea {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--linea);
+  box-shadow: 0 0 10px var(--linea);
+  transform-origin: left center;
+  transform: rotate(var(--angulo, 0deg));
+}
+.prisma__linea--animada {
+  animation: prisma-fluir 2.8s ease-in-out infinite;
+}
+@keyframes prisma-fluir {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.8); }
+}
+.prisma__destinos {
+  position: absolute;
+  right: 1%;
+  top: 8%;
+  display: grid;
+  gap: 8px;
+}
+.prisma__destino {
+  min-width: 96px;
+  padding: 7px 9px;
+  border: 1px solid;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-superficie) 85%, transparent);
+  color: var(--color-texto);
+  font-size: 0.66rem;
+  font-family: monospace;
+}
+.prisma__destino--animado {
+  animation: prisma-destino 2.8s ease-in-out infinite alternate;
+}
+@keyframes prisma-destino {
+  to { transform: translateX(-4px); }
 }
 
 /* Tarjetas ejecutivas de mantenimiento (2026-09-15) — ver features/trabajo/TarjetaMantenimiento.tsx */

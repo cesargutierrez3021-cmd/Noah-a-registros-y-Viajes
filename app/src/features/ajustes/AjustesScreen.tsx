@@ -12,11 +12,12 @@ import { Cristal3D } from '../../components/graficos/Cristal3D'
 import { Prisma } from '../../components/graficos/Prisma'
 
 /** Muestra de ejemplo para los 3 estilos — mismas proporciones que las capturas de referencia del usuario (Hogar 28% / Deudas 19% / Ahorro 18% / Libre 35%). */
+// Mismos 4 colores que BalanceScreen.tsx (D-18: una sola fuente del "set validado de Balance" — ver el comentario ahí).
 const ITEMS_MUESTRA: ItemDistribucion[] = [
-  { clave: 'hogar', etiqueta: 'Hogar', monto: 1_260_000, porcentaje: 28, color: '#c98500' },
-  { clave: 'deudas', etiqueta: 'Deudas', monto: 855_000, porcentaje: 19, color: '#d95926' },
-  { clave: 'ahorro', etiqueta: 'Ahorro', monto: 810_000, porcentaje: 18, color: '#199e70' },
-  { clave: 'libre', etiqueta: 'Libre', monto: 1_575_000, porcentaje: 35, color: '#3987e5' },
+  { clave: 'hogar', etiqueta: 'Hogar', monto: 1_260_000, porcentaje: 28, color: '#55e3a0' },
+  { clave: 'deudas', etiqueta: 'Deudas', monto: 855_000, porcentaje: 19, color: '#ff9d83' },
+  { clave: 'ahorro', etiqueta: 'Ahorro', monto: 810_000, porcentaje: 18, color: '#b7a4ff' },
+  { clave: 'libre', etiqueta: 'Libre', monto: 1_575_000, porcentaje: 35, color: '#78c8ff' },
 ]
 const TOTAL_MUESTRA = 4_500_000
 

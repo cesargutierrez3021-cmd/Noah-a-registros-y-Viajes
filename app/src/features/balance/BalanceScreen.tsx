@@ -62,11 +62,17 @@ export function BalanceScreen() {
   // en la lista de abajo.
   const librePositivo = Math.max(balance.balanceNeto, 0)
   const sumaCuatro = balance.gastosDeHogar + balance.deudaPendienteTotal + balance.ahorroTotal + librePositivo
+  // 2026-09-15 (corrección posterior, misma sesión): el usuario mandó la
+  // referencia exacta de color para Hogar/Deudas/Ahorro/Libre (paquete
+  // "prism-crystal-orbit-package", ORIGINAL_COMPONENTS.tsx: C.green/coral/
+  // lilac/sky) y mostró capturas — el set anterior (ámbar/rojo-naranja/
+  // verde/azul) no calzaba con lo que había pedido. Se reemplaza por el
+  // set exacto del paquete, mismo orden Hogar→Deudas→Ahorro→Libre.
   const itemsDistribucion: ItemDistribucion[] = [
-    { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#c98500', porcentaje: sumaCuatro > 0 ? (balance.gastosDeHogar / sumaCuatro) * 100 : 0 },
-    { clave: 'deudas', etiqueta: 'Deudas', monto: balance.deudaPendienteTotal, color: '#d95926', porcentaje: sumaCuatro > 0 ? (balance.deudaPendienteTotal / sumaCuatro) * 100 : 0 },
-    { clave: 'ahorro', etiqueta: 'Ahorro', monto: balance.ahorroTotal, color: '#199e70', porcentaje: sumaCuatro > 0 ? (balance.ahorroTotal / sumaCuatro) * 100 : 0 },
-    { clave: 'libre', etiqueta: 'Libre', monto: librePositivo, color: '#3987e5', porcentaje: sumaCuatro > 0 ? (librePositivo / sumaCuatro) * 100 : 0 },
+    { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#55e3a0', porcentaje: sumaCuatro > 0 ? (balance.gastosDeHogar / sumaCuatro) * 100 : 0 },
+    { clave: 'deudas', etiqueta: 'Deudas', monto: balance.deudaPendienteTotal, color: '#ff9d83', porcentaje: sumaCuatro > 0 ? (balance.deudaPendienteTotal / sumaCuatro) * 100 : 0 },
+    { clave: 'ahorro', etiqueta: 'Ahorro', monto: balance.ahorroTotal, color: '#b7a4ff', porcentaje: sumaCuatro > 0 ? (balance.ahorroTotal / sumaCuatro) * 100 : 0 },
+    { clave: 'libre', etiqueta: 'Libre', monto: librePositivo, color: '#78c8ff', porcentaje: sumaCuatro > 0 ? (librePositivo / sumaCuatro) * 100 : 0 },
   ]
 
   return (
@@ -86,7 +92,7 @@ export function BalanceScreen() {
           <span className="texto-mute">Ahorro frente a la meta</span>
           <AnilloMeta
             porcentaje={porcentajeAhorro}
-            color="#199e70"
+            color="#b7a4ff"
             valorCentral={`${Math.round(porcentajeAhorro)}%`}
             etiqueta={`${formatoPesos(balance.ahorroTotal)} de ${formatoPesos(objetivoAhorroTotal)}`}
             animado={animado}
