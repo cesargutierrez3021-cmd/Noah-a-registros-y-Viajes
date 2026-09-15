@@ -8,6 +8,7 @@ import { useAhorro } from '../../domain/ahorro/store'
 import { useAuth } from '../../domain/auth/store'
 import { calcularBalanceGeneral } from '../../domain/balance/calculos'
 import { GraficoOrbital } from './GraficoOrbital'
+import { AnilloMeta } from '../../components/graficos/AnilloMeta'
 
 function formatoPesos(monto: number): string {
   return `$${Math.round(monto).toLocaleString('es-CO')}`
@@ -40,6 +41,14 @@ export function BalanceScreen() {
 
   const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar, metasAhorro)
 
+  // 2026-09-15, pedido explícito del usuario: "la otra órbita que ves en el
+  // ahorro, también quiero que esté en balance... que vea cuánto voy en
+  // porcentaje de la meta". Si hay varias metas, se suman objetivo y saldo
+  // de todas — un solo % que representa el ahorro total contra lo que se
+  // propuso en total (mismo criterio que ahorroTotal en calculos.ts).
+  const objetivoAhorroTotal = metasAhorro.reduce((acc, m) => acc + m.montoObjetivo, 0)
+  const porcentajeAhorro = objetivoAhorroTotal > 0 ? (balance.ahorroTotal / objetivoAhorroTotal) * 100 : 0
+
   return (
     <section className="pantalla"><div className="app-panel">
       <div className="app-hero"><div className="app-eyebrow">MIA · RESUMEN</div><h1 className="app-title">Balance general</h1></div>
@@ -55,6 +64,18 @@ export function BalanceScreen() {
         ahorro={balance.ahorroTotal}
         balanceNeto={balance.balanceNeto}
       />
+
+      {metasAhorro.length > 0 && (
+        <div className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'center', gap: 4, marginBottom: 16, paddingTop: 20, paddingBottom: 16 }}>
+          <span className="texto-mute">Ahorro frente a la meta</span>
+          <AnilloMeta
+            porcentaje={porcentajeAhorro}
+            color="#199e70"
+            valorCentral={`${Math.round(porcentajeAhorro)}%`}
+            etiqueta={`${formatoPesos(balance.ahorroTotal)} de ${formatoPesos(objetivoAhorroTotal)}`}
+          />
+        </div>
+      )}
 
       {!autenticado() && (
         <div className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, marginBottom: 16 }}>

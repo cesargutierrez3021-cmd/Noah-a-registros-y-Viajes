@@ -11,9 +11,6 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.RadialGradient
-import android.graphics.Shader
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
@@ -43,9 +40,6 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         const val EXTRA_KM = "km"
         const val EXTRA_TIEMPO = "tiempo"
         const val EXTRA_EN_VIAJE = "enViaje"
-        const val EXTRA_RESUMEN_HOY = "resumenHoy"
-        const val EXTRA_RESUMEN_SEMANA = "resumenSemana"
-        const val EXTRA_RESUMEN_MES = "resumenMes"
         const val EXTRA_COLOR_ACENTO = "colorAcento"
         const val EXTRA_COLOR_FG = "colorFg"
         const val EXTRA_COLOR_SURFACE = "colorSurface"
@@ -67,20 +61,10 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     private lateinit var windowManager: WindowManager
     private var vistaBurbuja: View? = null
-    private var vistaResumen: View? = null
     private var vistaManija: View? = null
-    private var resumenAnimator: ValueAnimator? = null
-    private var decoracionResumen: ResumenDecoracionView? = null
-    private var resumenParams: WindowManager.LayoutParams? = null
     private lateinit var etiquetaTiempo: TextView
     private lateinit var etiquetaKm: TextView
     private lateinit var etiquetaViajes: TextView
-    private lateinit var etiquetaResumen: TextView
-    private var etiquetasPeriodo = emptyList<TextView>()
-    private var periodoResumen = "hoy"
-    private var resumenHoy = ""
-    private var resumenSemana = ""
-    private var resumenMes = ""
     private var colorAcento = "#D4AF37"
     private var colorFg = "#F3EDDD"
     private var colorSurface = "#14100A"
@@ -118,9 +102,6 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         crearCanalSiHaceFalta()
         startForeground(NOTIF_ID, construirNotificacion())
-        intent?.getStringExtra(EXTRA_RESUMEN_HOY)?.takeIf { it.isNotBlank() }?.let { resumenHoy = it }
-        intent?.getStringExtra(EXTRA_RESUMEN_SEMANA)?.takeIf { it.isNotBlank() }?.let { resumenSemana = it }
-        intent?.getStringExtra(EXTRA_RESUMEN_MES)?.takeIf { it.isNotBlank() }?.let { resumenMes = it }
         colorAcento = intent?.getStringExtra(EXTRA_COLOR_ACENTO) ?: colorAcento
         colorFg = intent?.getStringExtra(EXTRA_COLOR_FG) ?: colorFg
         colorSurface = intent?.getStringExtra(EXTRA_COLOR_SURFACE) ?: colorSurface
@@ -145,7 +126,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         if (estadoSolicitado && !enViaje) iniciarViaje(false)
         if (!estadoSolicitado && enViaje) finalizarViaje(false)
         if (vistaBurbuja == null) crearBurbuja()
-        if (tarjetaActiva && vistaManija == null) crearManijaResumen()
+        if (tarjetaActiva && vistaManija == null) crearManijaVoz()
         if (!tarjetaActiva && vistaManija != null) { vistaManija?.let { runCatching { windowManager.removeView(it) } }; vistaManija = null }
         aplicarColores()
         if (intent?.getBooleanExtra(EXTRA_SOLO_ESTILO, false) == true) return START_STICKY
@@ -157,10 +138,9 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         activo = false
         handler.removeCallbacksAndMessages(null); tts?.stop(); tts?.shutdown()
         getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", false).apply()
-        vistaResumen?.let { runCatching { windowManager.removeView(it) } }
         vistaManija?.let { runCatching { windowManager.removeView(it) } }
         vistaBurbuja?.let { runCatching { windowManager.removeView(it) } }
-        vistaResumen = null; vistaManija = null; vistaBurbuja = null
+        vistaManija = null; vistaBurbuja = null
         super.onDestroy()
     }
 
@@ -210,10 +190,8 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
                 MotionEvent.ACTION_DOWN -> { xInicial = params.x; yInicial = params.y; toqueXInicial = evento.rawX; toqueYInicial = evento.rawY; tiempoInicioToque = System.currentTimeMillis(); fueArrastre = false; true }
                 MotionEvent.ACTION_MOVE -> { val dx = (evento.rawX - toqueXInicial).toInt(); val dy = (evento.rawY - toqueYInicial).toInt(); if (abs(dx) > UMBRAL_ARRASTRE_PX || abs(dy) > UMBRAL_ARRASTRE_PX) fueArrastre = true; params.x = xInicial + dx; params.y = yInicial + dy; runCatching { windowManager.updateViewLayout(contenedor, params) }; true }
                 MotionEvent.ACTION_UP -> {
-                    val dx = evento.rawX - toqueXInicial; val duracion = System.currentTimeMillis() - tiempoInicioToque; val cercaDelFondo = params.y > resources.displayMetrics.heightPixels - dp(220)
+                    val duracion = System.currentTimeMillis() - tiempoInicioToque; val cercaDelFondo = params.y > resources.displayMetrics.heightPixels - dp(220)
                     when {
-                        fueArrastre && dx < -UMBRAL_DESLIZAMIENTO_PX && tarjetaActiva -> mostrarResumen(params)
-                        fueArrastre && dx > UMBRAL_DESLIZAMIENTO_PX -> ocultarResumen()
                         fueArrastre && cercaDelFondo -> { BurbujaPlugin.instanciaActiva?.notificarAccion("cerrar"); stopSelf() }
                         !fueArrastre && duracion >= UMBRAL_TOQUE_MS -> startActivity(Intent(this, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) })
                         !fueArrastre -> if (enViaje) finalizarViaje(true) else { iniciarViaje(true); BurbujaPlugin.instanciaActiva?.notificarAccion("iniciar") }
@@ -226,7 +204,17 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         ValueAnimator.ofFloat(0f, 360f).apply { duration = 9000; repeatCount = ValueAnimator.INFINITE; addUpdateListener { (contenedor.getChildAt(0) as? OrbitaView)?.angulo = it.animatedValue as Float; contenedor.getChildAt(0).invalidate() }; start() }
     }
 
-    private fun crearManijaResumen() {
+    /**
+     * 2026-09-15, pedido explícito del usuario: esta manija abría un panel
+     * "resumen" (Hoy/Semana/Mes) — se quitó, reemplazada por un solo toque
+     * que activa el asistente de voz de MIA. No hay forma de correr
+     * reconocimiento de voz de verdad sin la app en primer plano (mismo
+     * límite ya documentado en domain/conversacion/voz.ts), así que esto
+     * deja un aviso en SharedPreferences y trae la app al frente — el lado
+     * TS (BurbujaPlugin.handleOnResume) lo recoge y abre la conversación con
+     * MIA lista para escuchar, sin que el conductor tenga que navegar nada.
+     */
+    private fun crearManijaVoz() {
         val manija = TextView(this).apply {
             text = "◁"
             textSize = 14f
@@ -240,8 +228,8 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         manija.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> { downX = event.rawX; downY = event.rawY; originX = params.x; originY = params.y; moved = false; true }
-                MotionEvent.ACTION_MOVE -> { val dx = (event.rawX - downX).toInt(); val dy = (event.rawY - downY).toInt(); moved = moved || abs(dx) > dp(4) || abs(dy) > dp(4); params.x = (originX - dx).coerceAtLeast(0); params.y = (originY + dy).coerceIn(dp(80), resources.displayMetrics.heightPixels - dp(100)); runCatching { windowManager.updateViewLayout(manija, params) }; resumenParams?.let { panel -> panel.y = posicionResumenY(params.y, panel.height); vistaResumen?.let { panelView -> runCatching { windowManager.updateViewLayout(panelView, panel) } } }; true }
-                MotionEvent.ACTION_UP -> { if (!moved) { if (vistaResumen == null) abrirResumenDesdeManija() else ocultarResumen() }; true }
+                MotionEvent.ACTION_MOVE -> { val dx = (event.rawX - downX).toInt(); val dy = (event.rawY - downY).toInt(); moved = moved || abs(dx) > dp(4) || abs(dy) > dp(4); params.x = (originX - dx).coerceAtLeast(0); params.y = (originY + dy).coerceIn(dp(80), resources.displayMetrics.heightPixels - dp(100)); runCatching { windowManager.updateViewLayout(manija, params) }; true }
+                MotionEvent.ACTION_UP -> { if (!moved) activarAsistenteDeVoz(); true }
                 else -> false
             }
         }
@@ -249,59 +237,17 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         vistaManija = manija
     }
 
-    private fun abrirResumenDesdeManija() {
-        val params = WindowManager.LayoutParams(dp(184), dp(174), tipoVentana(), WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.END; x = dp(14); y = dp(220) }
-        mostrarResumen(params)
+    /** Ver el comentario de `crearManijaVoz()` — deja el aviso para BurbujaPlugin.handleOnResume() y trae la app al frente. */
+    private fun activarAsistenteDeVoz() {
+        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("voz_pendiente", true).apply()
+        startActivity(Intent(this, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) })
     }
 
-    private fun mostrarResumen(burbujaParams: WindowManager.LayoutParams) {
-        if (vistaResumen != null) return
-        val contenedor = FrameLayout(this)
-        val decoracion = ResumenDecoracionView(this)
-        decoracionResumen = decoracion
-        contenedor.addView(decoracion, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        val contenido = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(9), dp(10), dp(9)); background = ColorDrawable(Color.TRANSPARENT) }
-        val pestañas = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        val nombres = listOf("Hoy" to "hoy", "Semana" to "semana", "Mes" to "mes")
-        etiquetasPeriodo = nombres.map { (nombre, clave) ->
-            TextView(this).apply {
-                text = nombre; textSize = 10f; gravity = Gravity.CENTER; setPadding(dp(7), dp(5), dp(7), dp(5))
-                setOnClickListener { periodoResumen = clave; actualizarResumenSeleccionado() }
-                pestañas.addView(this, LinearLayout.LayoutParams(0, dp(27), 1f))
-            }
-        }
-        etiquetaResumen = TextView(this).apply { textSize = 12f; setPadding(dp(4), dp(8), dp(4), dp(2)); text = textoResumenSeleccionado() }
-        contenido.addView(pestañas); contenido.addView(etiquetaResumen, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        contenedor.addView(contenido, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        val fondo = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; cornerRadii = floatArrayOf(dp(18).toFloat(), dp(18).toFloat(), dp(4).toFloat(), dp(4).toFloat(), dp(18).toFloat(), dp(18).toFloat(), dp(4).toFloat(), dp(4).toFloat()); setColor(colorSeguro(colorSurface, "#14100A")); setStroke(dp(1), colorSeguro(colorAcento, "#D4AF37")) }; contenedor.background = fondo
-        val params = WindowManager.LayoutParams(dp(128), dp(154), tipoVentana(), WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.END; x = dp(14); y = posicionResumenY(burbujaParams.y, dp(154)) }
-        windowManager.addView(contenedor, params); vistaResumen = contenedor; resumenParams = params; actualizarResumenSeleccionado()
-        resumenAnimator = ValueAnimator.ofFloat(0f, 360f).apply { duration = 9000; repeatCount = ValueAnimator.INFINITE; addUpdateListener { decoracion.fase = it.animatedValue as Float; decoracion.invalidate() }; start() }
-    }
-    private fun posicionResumenY(manijaY: Int, panelAlto: Int): Int {
-        val altoPantalla = resources.displayMetrics.heightPixels
-        val margen = dp(8)
-        val debajo = manijaY + dp(64) + margen
-        val encima = manijaY - panelAlto - margen
-        return if (debajo + panelAlto <= altoPantalla - dp(70)) debajo else encima.coerceAtLeast(dp(70))
-    }
-    private fun ocultarResumen() { resumenAnimator?.cancel(); resumenAnimator = null; decoracionResumen = null; resumenParams = null; vistaResumen?.let { runCatching { windowManager.removeView(it) } }; vistaResumen = null }
-    private fun textoResumenSeleccionado(): String {
-        val datos = when (periodoResumen) { "semana" -> resumenSemana; "mes" -> resumenMes; else -> resumenHoy }
-        val partes = datos.split(" · ")
-        val viajes = partes.getOrNull(0)?.replace(" viajes", "")?.replace(" viaje", "")?.ifBlank { "0" } ?: "0"
-        val dinero = partes.getOrNull(1)?.ifBlank { "$0" } ?: "$0"
-        val km = partes.getOrNull(2)?.replace(" km", "")?.ifBlank { "0.0" } ?: "0.0"
-        val kmLimpio = km.toDoubleOrNull()?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: km
-        return "Viajes  $viajes   Km  $kmLimpio\nTotal   $dinero"
-    }
-    private fun actualizarResumenSeleccionado() { if (::etiquetaResumen.isInitialized) etiquetaResumen.text = textoResumenSeleccionado(); etiquetasPeriodo.forEachIndexed { i, vista -> vista.setTypeface(null, if (listOf("hoy", "semana", "mes")[i] == periodoResumen) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL) } }
     private fun aplicarColores() {
         if (::etiquetaTiempo.isInitialized) {
             etiquetaTiempo.setTextColor(colorVisible(colorFg, colorSurface)); etiquetaKm.setTextColor(colorSeguro(colorAcento, "#D4AF37")); etiquetaViajes.setTextColor(colorVisible(colorFg, colorSurface))
             (etiquetaTiempo.parent?.parent as? View)?.background = GradientDrawable().apply { shape = if (estilo == "pulso" || estilo == "marea") GradientDrawable.OVAL else GradientDrawable.RECTANGLE; cornerRadius = when (estilo) { "taller" -> dp(5).toFloat(); "editorial" -> dp(2).toFloat(); else -> dp(28).toFloat() }; setColor(colorSeguro(colorSurface, "#14100A")); setStroke(dp(if (estilo == "pulso") 3 else 2), colorSeguro(colorAcento, "#D4AF37")) }
         }
-        if (::etiquetaResumen.isInitialized) { etiquetaResumen.setTextColor(colorVisible(colorFg, colorSurface)); etiquetasPeriodo.forEach { it.setTextColor(colorVisible(colorFg, colorSurface)) }; (vistaResumen?.background as? GradientDrawable)?.setColor(colorSeguro(colorSurface, "#14100A")); (vistaResumen?.background as? GradientDrawable)?.setStroke(dp(1), colorSeguro(colorAcento, "#D4AF37")) }
         if (vistaManija is TextView) { val manija = vistaManija as TextView; manija.setTextColor(colorVisible(colorFg, colorSurface)); (manija.background as? GradientDrawable)?.setColor(colorSeguro(colorSurface, "#14100A")); (manija.background as? GradientDrawable)?.setStroke(dp(1), colorSeguro(colorAcento, "#D4AF37")) }
     }
     private fun colorSeguro(valor: String, respaldo: String): Int = runCatching { Color.parseColor(valor.trim()) }.getOrElse { Color.parseColor(respaldo) }
@@ -313,7 +259,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         return if (kotlin.math.abs(tl - fl) < 0.28) { if (fl > 0.55) Color.BLACK else Color.WHITE } else t
     }
     private fun tipoVentana() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
-    private fun actualizarTextos(km: String, tiempo: String) { if (::etiquetaTiempo.isInitialized) { etiquetaTiempo.text = tiempo.ifBlank { "0m" }.replace(Regex("\\s+\\d{2}s"), ""); etiquetaKm.text = "Km ${km.ifBlank { "0" }}"; etiquetaViajes.text = "$viajesContados viaje${if (viajesContados == 1) "" else "s"}"; if (vistaResumen != null) actualizarResumenSeleccionado() } }
+    private fun actualizarTextos(km: String, tiempo: String) { if (::etiquetaTiempo.isInitialized) { etiquetaTiempo.text = tiempo.ifBlank { "0m" }.replace(Regex("\\s+\\d{2}s"), ""); etiquetaKm.text = "Km ${km.ifBlank { "0" }}"; etiquetaViajes.text = "$viajesContados viaje${if (viajesContados == 1) "" else "s"}" } }
     private fun formatearTiempo(ms: Long): String { val totalMinutos = (ms / 60000).coerceAtLeast(0); val horas = totalMinutos / 60; val minutos = totalMinutos % 60; return if (horas > 0) "%dh %02dm".format(horas, minutos) else "${minutos}m" }
     private fun formatearKm(km: Double): String = kotlin.math.round(km).toInt().toString()
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
@@ -334,49 +280,4 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
-    /** Escena orbital animada: volumen, brillo, profundidad y partículas sin tapar los datos. */
-    private inner class ResumenDecoracionView(context: android.content.Context) : View(context) {
-        var fase = 0f
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val particulas = listOf(.12f to .22f, .24f to .68f, .42f to .17f, .73f to .78f, .9f to .36f, .84f to .9f)
-
-        init { setLayerType(View.LAYER_TYPE_SOFTWARE, null) }
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val acento = colorSeguro(colorAcento, "#D4AF37")
-            val azul = Color.rgb(60, 150, 255)
-            val fg = colorSeguro(colorFg, "#FFFFFF")
-            val w = width.toFloat(); val h = height.toFloat(); val cx = w * .52f; val cy = h * .65f
-            val radio = (w.coerceAtMost(h) * .25f)
-            val giro = Math.toRadians(fase.toDouble())
-
-            // Aura y esfera central con degradado radial para dar sensación de volumen.
-            paint.style = Paint.Style.FILL
-            paint.shader = RadialGradient(cx - radio * .28f, cy - radio * .35f, radio * 1.65f, intArrayOf(Color.argb(48, 80, 180, 255), Color.argb(24, Color.red(acento), Color.green(acento), Color.blue(acento)), Color.TRANSPARENT), floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
-            canvas.drawCircle(cx, cy, radio * 1.65f, paint)
-            paint.shader = RadialGradient(cx - radio * .35f, cy - radio * .38f, radio * 1.25f, intArrayOf(Color.argb(58, 255, 255, 255), Color.argb(44, 60, 150, 255), Color.argb(30, 8, 25, 70)), floatArrayOf(0f, .25f, 1f), Shader.TileMode.CLAMP)
-            canvas.drawCircle(cx, cy, radio, paint)
-            paint.shader = null
-
-            // Tres anillos elípticos en distintos ángulos: sustituyen las líneas planas por órbitas.
-            paint.style = Paint.Style.STROKE; paint.strokeWidth = dp(1).toFloat(); paint.setShadowLayer(dp(5).toFloat(), 0f, 0f, acento)
-            paint.color = acento; paint.alpha = 72
-            canvas.save(); canvas.rotate(18f + fase * .65f, cx, cy); canvas.drawOval(cx - radio * 2.25f, cy - radio * .52f, cx + radio * 2.25f, cy + radio * .52f, paint); canvas.restore()
-            paint.color = azul; paint.alpha = 62
-            canvas.save(); canvas.rotate(-28f - fase * .42f, cx, cy); canvas.drawOval(cx - radio * 1.9f, cy - radio * .42f, cx + radio * 1.9f, cy + radio * .42f, paint); canvas.restore()
-            paint.color = fg; paint.alpha = 38; paint.clearShadowLayer()
-            canvas.save(); canvas.rotate(72f + fase * .3f, cx, cy); canvas.drawOval(cx - radio * 1.65f, cy - radio * .26f, cx + radio * 1.65f, cy + radio * .26f, paint); canvas.restore()
-
-            // Puntos que orbitan y cambian de profundidad con la fase.
-            paint.style = Paint.Style.FILL; paint.setShadowLayer(dp(4).toFloat(), 0f, 0f, acento)
-            particulas.forEachIndexed { i, (px, py) ->
-                val angulo = giro + i * 1.15
-                val profundidad = .72f + .28f * kotlin.math.sin(angulo).toFloat()
-                paint.color = if (i % 2 == 0) acento else azul; paint.alpha = (45 + profundidad * 55).toInt()
-                canvas.drawCircle(w * px + kotlin.math.cos(angulo).toFloat() * dp(5), h * py + kotlin.math.sin(angulo).toFloat() * dp(4), dp(1.5f + profundidad * 1.7f).toFloat(), paint)
-            }
-            paint.clearShadowLayer()
-        }
-    }
 }

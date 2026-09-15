@@ -28,7 +28,16 @@ function claveDiaDeHoy(): string {
 }
 
 export function MiaBurbuja() {
-  const { estado, turnos, ultimoError, escucharYResponder, cancelar, reiniciarConversacion } = useConversacion()
+  const {
+    estado,
+    turnos,
+    ultimoError,
+    escucharYResponder,
+    cancelar,
+    reiniciarConversacion,
+    aperturaConVozSolicitada,
+    limpiarSolicitudApertura,
+  } = useConversacion()
   const { viajes, cargar: cargarViajes } = useViajes()
   const { items: itemsMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
   const { autenticado } = useAuth()
@@ -37,6 +46,18 @@ export function MiaBurbuja() {
   const [modoContinuo, setModoContinuo] = useState(false)
   const [permisoListo, setPermisoListo] = useState(false)
   const finDelHistorial = useRef<HTMLDivElement>(null)
+  /** true mientras falta arrancar a escuchar tras una apertura pedida desde la burbuja (ver efecto de abajo). */
+  const autoEscucharPendiente = useRef(false)
+
+  // 2026-09-15, pedido explícito del usuario: tocar la manija de la burbuja
+  // flotante trae la app al frente y pide abrir MIA lista para escuchar —
+  // ver domain/viajes/burbujaOrquestacion.ts. Acá se recoge ese pedido.
+  useEffect(() => {
+    if (!aperturaConVozSolicitada) return
+    limpiarSolicitudApertura()
+    autoEscucharPendiente.current = true
+    setAbierta(true)
+  }, [aperturaConVozSolicitada, limpiarSolicitudApertura])
 
   useEffect(() => {
     if (!abierta) return
@@ -50,6 +71,18 @@ export function MiaBurbuja() {
       .then(setPermisoListo)
       .catch(() => setPermisoListo(false))
   }, [abierta])
+
+  // Termina el flujo que empezó el primer efecto de arriba: una vez el
+  // panel está abierto, el permiso de micrófono está listo y hay sesión
+  // (sin cuenta no hay a quién preguntarle, ver el bloque `!autenticado()`
+  // más abajo), arranca a escuchar solo — sin que el conductor toque nada.
+  useEffect(() => {
+    if (!abierta || !permisoListo || !autoEscucharPendiente.current) return
+    if (!autenticado()) return
+    autoEscucharPendiente.current = false
+    void escucharYResponder(armarContexto())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abierta, permisoListo])
 
   useEffect(() => {
     finDelHistorial.current?.scrollIntoView({ behavior: 'smooth' })

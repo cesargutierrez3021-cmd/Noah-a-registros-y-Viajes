@@ -19,7 +19,7 @@ import { SeccionMantenimiento } from './SeccionMantenimiento'
 import { SeccionGastos } from './SeccionGastos'
 import { SeccionEstadisticas } from './SeccionEstadisticas'
 
-type VistaLectura = 'redondas' | 'recortadas' | 'resumen' | 'mantenimiento' | 'estadisticas'
+type VistaLectura = 'recortadas' | 'resumen' | 'mantenimiento' | 'estadisticas'
 type PeriodoResumen = 'hoy' | 'semana' | 'mes'
 
 function formatoPesos(monto: number): string {
@@ -77,7 +77,7 @@ export function SeccionPulso() {
   const { jornadaAbierta, iniciarJornada, terminarJornada } = useJornada()
   const { gastos } = useGastos()
 
-  const [vista, setVista] = useState<VistaLectura>('redondas')
+  const [vista, setVista] = useState<VistaLectura>('recortadas')
   const [periodo, setPeriodo] = useState<PeriodoResumen>('hoy')
   const [historialAbierto, setHistorialAbierto] = useState(false)
 
@@ -165,12 +165,8 @@ export function SeccionPulso() {
       </button>
 
       <div className="tt-pildoras">
-        <span className="tt-pildoras__etiqueta">Lectura del día</span>
-        <button type="button" className={`tt-pildora ${vista === 'redondas' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('redondas')}>
-          Redondas
-        </button>
         <button type="button" className={`tt-pildora ${vista === 'recortadas' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('recortadas')}>
-          Recortadas
+          Lectura del día
         </button>
         <button type="button" className={`tt-pildora ${vista === 'resumen' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('resumen')}>
           Resumen
@@ -192,50 +188,50 @@ export function SeccionPulso() {
 
       {vista === 'estadisticas' && <SeccionEstadisticas />}
 
-      {(vista === 'redondas' || vista === 'recortadas') && (
+      {vista === 'recortadas' && (
         <div className="tt-grilla-metricas">
-          <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
+          <div className="tt-metrica tt-metrica--recortada">
             <span className="tt-metrica__icono">⏱️</span>
             <span className="tt-metrica__etiqueta">Tiempo de jornada</span>
             <span className="tt-metrica__valor">{formatoDuracion(tiempo?.tiempoTotalMs ?? 0)}</span>
           </div>
-          <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
+          <div className="tt-metrica tt-metrica--recortada">
             <span className="tt-metrica__icono">🏍️</span>
             <span className="tt-metrica__etiqueta">Tiempo real trabajado</span>
             <span className="tt-metrica__valor">{formatoDuracion(tiempo?.tiempoTrabajadoMs ?? 0)}</span>
           </div>
-          <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
+          <div className="tt-metrica tt-metrica--recortada">
             <span className="tt-metrica__icono">🌙</span>
             <span className="tt-metrica__etiqueta">Tiempo muerto</span>
             <span className="tt-metrica__valor tt-metrica__valor--oro">{formatoDuracion(tiempo?.tiempoMuertoMs ?? 0)}</span>
           </div>
-          <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
+          <div className="tt-metrica tt-metrica--recortada">
             <span className="tt-metrica__icono">💰</span>
             <span className="tt-metrica__etiqueta">Dinero / hora real</span>
             <span className="tt-metrica__valor tt-metrica__valor--lila">
               {rentabilidad && rentabilidad.ingresoPorHoraTrabajada > 0 ? formatoPesos(rentabilidad.ingresoPorHoraTrabajada) : '—'}
             </span>
           </div>
-          <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
+          <div className="tt-metrica tt-metrica--recortada">
             <span className="tt-metrica__icono">⛽</span>
             <span className="tt-metrica__etiqueta">Gasolina / km</span>
             <span className="tt-metrica__valor">
               {gasolinaPorKmHoy.costoPorKm === null ? '—' : formatoPesos(gasolinaPorKmHoy.costoPorKm)}
             </span>
           </div>
-          <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
+          <div className="tt-metrica tt-metrica--recortada">
             <span className="tt-metrica__icono">🔧</span>
             <span className="tt-metrica__etiqueta">Dinero que se va en espera</span>
             <span className="tt-metrica__valor tt-metrica__valor--coral">
               {dineroEnEspera === null ? '—' : formatoPesos(dineroEnEspera)}
             </span>
           </div>
-          <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
+          <div className="tt-metrica tt-metrica--recortada">
             <span className="tt-metrica__icono">📍</span>
             <span className="tt-metrica__etiqueta">Kilómetros del día</span>
             <span className="tt-metrica__valor">{resumenHoy.kmTotales.toFixed(0)} km</span>
           </div>
-          <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
+          <div className="tt-metrica tt-metrica--recortada">
             <span className="tt-metrica__icono">🛠️</span>
             <span className="tt-metrica__etiqueta">Mantenimiento del día</span>
             <span className="tt-metrica__valor tt-metrica__valor--oro">{formatoPesos(mantenimientoHoy)}</span>

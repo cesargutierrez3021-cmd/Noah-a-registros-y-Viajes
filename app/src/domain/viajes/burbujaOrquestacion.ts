@@ -1,5 +1,6 @@
 import { useViajes } from './store'
 import { suscribirseAccionesBurbuja } from './burbuja'
+import { useConversacion } from '../conversacion/store'
 
 /**
  * 2026-09-15, pedido explícito del usuario: "yo espicho el botón flotante...
@@ -20,6 +21,13 @@ import { suscribirseAccionesBurbuja } from './burbuja'
  *   el viaje "esperando ingreso" — `pausarParaIngreso()` — porque el monto
  *   no se puede escribir desde la burbuja. La pantalla de Jornada y viajes
  *   se encarga de pedirlo la próxima vez que se abre la app.
+ * - accion "abrirVoz" (2026-09-15, pedido explícito del usuario): se tocó
+ *   la manija de la burbuja — antes abría un panel "resumen" (Hoy/Semana/
+ *   Mes), ahora activa a MIA. No hay forma real de escuchar/hablar sin la
+ *   app en primer plano (mismo límite ya documentado en
+ *   domain/conversacion/voz.ts), así que el nativo ya trajo la app al
+ *   frente antes de mandar esto — acá solo se le avisa a MiaBurbuja.tsx que
+ *   se abra y empiece a escuchar sola.
  */
 const PLATAFORMA_POR_DEFECTO_BURBUJA = 'Particular'
 
@@ -30,6 +38,8 @@ export function registrarEscuchaBurbuja(): void {
       if (!estado.viajeEnCurso) void estado.iniciarViaje(PLATAFORMA_POR_DEFECTO_BURBUJA)
     } else if (datos.accion === 'terminar') {
       if (estado.viajeEnCurso && !estado.viajeEnCurso.finISOPendiente) estado.pausarParaIngreso()
+    } else if (datos.accion === 'abrirVoz') {
+      useConversacion.getState().solicitarAperturaConVoz()
     }
   })
 }

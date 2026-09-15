@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useTema } from '../../domain/tema/store'
 import { TEMAS_DISPONIBLES } from '../../domain/tema/types'
+import { sincronizarAparienciaBurbuja } from '../../domain/viajes/burbuja'
 
 /**
  * Ajustes (2026-09-15, pedido explícito del usuario): "en ajustes... de
@@ -11,6 +12,12 @@ import { TEMAS_DISPONIBLES } from '../../domain/tema/types'
  */
 export function AjustesScreen() {
   const { tema, elegirTema } = useTema()
+
+  function manejarElegirTema(nuevo: typeof tema) {
+    elegirTema(nuevo)
+    // Si la burbuja está visible en este momento (jornada abierta), se repinta con el tema nuevo sin esperar el próximo mostrar()/actualizar().
+    void sincronizarAparienciaBurbuja()
+  }
 
   return (
     <div className="pantalla">
@@ -26,7 +33,7 @@ export function AjustesScreen() {
             <button
               key={t.valor}
               type="button"
-              onClick={() => elegirTema(t.valor)}
+              onClick={() => manejarElegirTema(t.valor)}
               style={{
                 textAlign: 'left',
                 padding: 16,

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { solicitarNotificaciones, solicitarUbicacion, solicitarBurbuja, solicitarMicrofono } from '../../domain/onboarding/permisos'
-import { useTema } from '../../domain/tema/store'
+import { useTema, previsualizarTema } from '../../domain/tema/store'
 import { TEMAS_DISPONIBLES } from '../../domain/tema/types'
 import type { Tema } from '../../domain/tema/types'
 
@@ -22,6 +22,8 @@ export function OnboardingScreen() {
   const { elegirTema } = useTema()
   const [paso, setPaso] = useState<Paso>('bienvenida')
   const [pidiendo, setPidiendo] = useState(false)
+  /** Tema que se está VIENDO ahora mismo (repintado real, ver previsualizarTema) — todavía no confirmado. */
+  const [temaPrevia, setTemaPrevia] = useState<Tema>('verde')
 
   function siguiente() {
     const i = ORDEN.indexOf(paso)
@@ -38,8 +40,13 @@ export function OnboardingScreen() {
     }
   }
 
-  function manejarElegirTema(tema: Tema) {
-    elegirTema(tema)
+  function manejarPrevisualizar(tema: Tema) {
+    setTemaPrevia(tema)
+    previsualizarTema(tema)
+  }
+
+  function manejarConfirmarTema() {
+    elegirTema(temaPrevia)
     // No hace falta navegar a ningún lado — App.tsx re-renderiza a los
     // paneles normales apenas `yaElegido` pasa a true.
   }
@@ -100,21 +107,38 @@ export function OnboardingScreen() {
         <>
           <h1 className="titulo-pantalla">Elige tu tema</h1>
           <p className="texto-mute" style={{ marginBottom: 20 }}>
-            Puedes cambiarlo cuando quieras desde Ajustes.
+            Tocá uno para verlo de verdad en esta pantalla — recién cuando confirmes queda guardado. Podés cambiarlo cuando quieras desde Ajustes.
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
             {TEMAS_DISPONIBLES.map((t) => (
               <button
                 key={t.valor}
                 type="button"
-                onClick={() => manejarElegirTema(t.valor)}
-                style={{ textAlign: 'left', padding: 16 }}
+                onClick={() => manejarPrevisualizar(t.valor)}
+                style={{
+                  textAlign: 'left',
+                  padding: 16,
+                  border: t.valor === temaPrevia ? '2px solid var(--color-acento)' : '1px solid var(--color-borde)',
+                }}
               >
-                <strong style={{ display: 'block', marginBottom: 4 }}>{t.nombre}</strong>
+                <strong style={{ display: 'block', marginBottom: 4 }}>
+                  {t.nombre} {t.valor === temaPrevia ? '· Viendo' : ''}
+                </strong>
                 <span className="texto-mute">{t.descripcion}</span>
               </button>
             ))}
           </div>
+
+          {/* Muestra real del tema en vivo — no una foto, la tarjeta usa las mismas clases que ya usa el resto de la app. */}
+          <div className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, marginBottom: 20 }}>
+            <span className="texto-mute">Vista previa</span>
+            <strong style={{ fontSize: '1.4rem' }}>$48.200</strong>
+            <span className="texto-mute">3 viajes · 22.4 km</span>
+            <button type="button" style={{ marginTop: 8 }}>Botón de ejemplo</button>
+          </div>
+
+          <button type="button" onClick={manejarConfirmarTema}>Confirmar {TEMAS_DISPONIBLES.find((t) => t.valor === temaPrevia)?.nombre}</button>
         </>
       )}
     </div>

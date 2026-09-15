@@ -375,7 +375,7 @@
   border: 1px solid var(--tt-borde);
 }
 
-/* --- Grupo de píldoras (Redondas / Recortadas / Resumen, Hoy / Semana / Mes) --- */
+/* --- Grupo de píldoras (Lectura del día / Resumen / Mantenimiento y gastos / Estadísticas, Hoy / Semana / Mes) --- */
 .tt-pildoras {
   display: flex;
   flex-wrap: wrap;
@@ -384,27 +384,17 @@
   padding: 0 18px 16px;
 }
 
-.tt-pildoras__etiqueta {
-  font-family: var(--tt-fuente-etiqueta);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--tt-texto-mute);
-  line-height: 1.2;
-  flex-shrink: 0;
-  width: 58px;
-}
-
 .tt-pildora {
   flex-shrink: 0;
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid var(--tt-borde);
   background: var(--tt-fondo-alto);
   color: var(--tt-texto-mute);
   font-family: var(--tt-fuente-cuerpo);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  line-height: 1.2;
   cursor: pointer;
 }
 
@@ -419,7 +409,7 @@
   color: var(--color-texto-sobre-acento);
 }
 
-/* --- Grilla de métricas (vista "Redondas" / "Recortadas") --- */
+/* --- Grilla de métricas (vista "Lectura del día") --- */
 .tt-grilla-metricas {
   display: grid;
   grid-template-columns: 1fr 1fr;
