@@ -5,6 +5,15 @@ name: build-apk
 # como MIAPROYECTO.zip subido a mano; ese archivo ya no existe en el repo
 # (se borró hace varias sesiones), así que ese `unzip` fallaba siempre. El
 # código fuente ya está commiteado directo, no hace falta desempaquetar nada.
+#
+# También se quitó `android-actions/setup-android@v3`: ese paso intenta
+# instalar el paquete legado "tools" del SDK de Android (`sdkmanager tools`),
+# que Google eliminó del repositorio hace años — la acción fallaba siempre
+# con "Failed to find package 'tools'", exit code 1, antes de tocar nuestro
+# código. No hacía falta: los runners `ubuntu-latest` de GitHub ya traen el
+# Android SDK preinstalado (`ANDROID_HOME=/usr/local/lib/android/sdk`, con
+# platform 35 / build-tools y licencias ya aceptadas), que es justo lo que
+# pide `variables.gradle` (compileSdk/targetSdk 35) — Gradle lo usa solo.
 on:
   push:
     branches: [main]
@@ -25,7 +34,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
       - name: Instalar dependencias del cliente
         working-directory: app
