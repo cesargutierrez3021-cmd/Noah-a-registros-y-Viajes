@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import type { Viaje, Plataforma, PuntoGPS, ViajeManualInput } from './types'
+import { PLATAFORMAS_DISPONIBLES } from './types'
 import { repositorioViajes, crearViajeDesdeCiere, crearViajeManual } from './repository'
 import { calcularDistanciaReal } from './distancia'
-import { iniciarSeguimientoGPS, type SeguidorGPS } from './gps'
+import { iniciarSeguimientoGPS, obtenerUbicacionActual, type SeguidorGPS } from './gps'
+import { obtenerLocalidad, obtenerZonaCustom } from './geofencing'
 import { Capacitor } from '@capacitor/core'
 import { obtenerTrazaPersistida, limpiarTrazaPersistida } from './gpsBackground'
 import { mostrarBurbuja, actualizarBurbuja, ocultarBurbuja } from './burbuja'
@@ -29,12 +31,25 @@ interface EstadoViajes {
   viajes: Viaje[]
   viajeEnCurso: ViajeEnCurso | null
   cargando: boolean
+  /**
+   * 2026-09-15, pedido explícito del usuario: "yo escucho la burbuja... queda
+   * registrado como particular... hay que poner botón de preferencia... para
+   * que si yo siempre hago viajes en Uber, siempre aparezca con Uber". `null`
+   * = sin preferencia elegida todavía (se sigue usando 'Particular' como
+   * hasta ahora). Se elige en Ajustes (ver AjustesScreen.tsx) y la usa
+   * `burbujaOrquestacion.ts` al iniciar un viaje desde la burbuja — sigue
+   * siendo editable a mano en cada viaje (acá y en el picker normal), esto
+   * solo cambia el valor de ARRANQUE cuando no hay forma de elegir con un
+   * solo toque.
+   */
+  plataformaPreferida: Plataforma | null
+  elegirPlataformaPreferida: (plataforma: Plataforma) => void
+  cargar: () => Promise<void>
   /** Bloque 1, ítem 1: antes un error de GPS al iniciar viaje quedaba en
    *  silencio (la promesa rechazada de iniciarSeguimientoGPS no se atrapaba
    *  en ningún lado). Ahora queda acá, visible, para que la pantalla lo
    *  muestre — se limpia solo al iniciar un viaje nuevo con éxito. */
   errorGPS: string | null
-  cargar: () => Promise<void>
   iniciarViaje: (plataforma: Plataforma) => Promise<void>
   marcarRecogida: () => void
   /**
@@ -58,7 +73,7 @@ interface EstadoViajes {
    * resuelve por separado, en cualquier orden — no hay un solo "el viaje
    * pendiente", son todos los que tengan `ingresoPendiente: true`.
    */
-  completarIngreso: (viajeId: string, ingreso: number) => Promise<void>
+  completarIngreso: (viajeId: string, ingreso: number, plataforma: Plataforma) => Promise<void>
   /** Bloque 2, ítem 4 — "agregar viaje manual". No toca `viajeEnCurso` ni el
    *  GPS para nada: es un camino totalmente aparte para cargar un viaje que
    *  ya pasó y no se registró en su momento. */
@@ -75,11 +90,22 @@ const CLAVE_ACTIVO = 'mia:viaje-en-curso'
 function calcularKmLocal(puntos: PuntoGPS[]): number { return calcularDistanciaReal({ plataforma:'Particular', inicioISO:'', finISO:'', recorrido:puntos, puntoDeRecogidaISO:null, distanciaReportadaPlataforma:null, ingreso:0, ingresoPendiente:false }).kmTotalesReales }
 function guardarActivo(v: ViajeEnCurso | null){ if(v) localStorage.setItem(CLAVE_ACTIVO, JSON.stringify(v)); else localStorage.removeItem(CLAVE_ACTIVO) }
 
+const CLAVE_PLATAFORMA_PREFERIDA = 'mia:plataformaPreferida'
+function leerPlataformaPreferida(): Plataforma | null {
+  const crudo = localStorage.getItem(CLAVE_PLATAFORMA_PREFERIDA)
+  return (PLATAFORMAS_DISPONIBLES as string[]).includes(crudo ?? '') ? (crudo as Plataforma) : null
+}
+
 export const useViajes = create<EstadoViajes>((set, get) => ({
   viajes: [],
   viajeEnCurso: null,
   cargando: false,
   errorGPS: null,
+  plataformaPreferida: leerPlataformaPreferida(),
+  elegirPlataformaPreferida: (plataforma) => {
+    localStorage.setItem(CLAVE_PLATAFORMA_PREFERIDA, plataforma)
+    set({ plataformaPreferida: plataforma })
+  },
 
   cargar: async () => {
     set({ cargando: true })
@@ -177,6 +203,11 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     void actualizarBurbuja('0.0', '0m', false, get().viajes.length)
     guardarActivo(null)
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') void limpiarTrazaPersistida()
+    // No se espera (`void`, no `await`) — el próximo viaje por la burbuja
+    // no puede quedar bloqueado por esto (ver comentario en
+    // `resolverZonaSiHizoFalta` más abajo, y el bug de viajes perdidos de
+    // una ronda anterior que este mismo criterio evita repetir).
+    void resolverZonaSiHizoFalta(viaje.id, enCurso.recorrido)
   },
 
   finalizarViaje: async ({ ingreso, distanciaReportadaPlataforma }) => {
@@ -203,13 +234,19 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     void ocultarBurbuja()
     guardarActivo(null)
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') void limpiarTrazaPersistida()
+    void resolverZonaSiHizoFalta(viaje.id, enCurso.recorrido)
     return viaje
   },
 
-  completarIngreso: async (viajeId, ingreso) => {
+  completarIngreso: async (viajeId, ingreso, plataforma) => {
     const viaje = get().viajes.find((v) => v.id === viajeId)
     if (!viaje) return
-    const actualizado: Viaje = { ...viaje, ingreso, ingresoPendiente: false, pendienteDeSync: true }
+    // 2026-09-15, pedido explícito del usuario: la burbuja arranca el viaje
+    // con la plataforma preferida (o 'Particular' si no hay ninguna elegida)
+    // porque no hay forma de preguntarla con un solo toque — acá, al
+    // completar el ingreso con la app abierta, sí se puede corregir si ese
+    // viaje puntual fue de otra plataforma.
+    const actualizado: Viaje = { ...viaje, ingreso, plataforma, ingresoPendiente: false, pendienteDeSync: true }
     await repositorioViajes.guardar(actualizado)
     set({ viajes: get().viajes.map((v) => (v.id === viajeId ? actualizado : v)) })
   },
@@ -221,3 +258,46 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     return viaje
   },
 }))
+
+/**
+ * 2026-09-15, pedido explícito del usuario (bug real reportado): un viaje muy
+ * corto (ej. 50 metros por la burbuja) puede cerrarse antes de que llegue el
+ * primer punto del `watch` de GPS en curso, dejando `recorrido` vacío — sin
+ * ningún punto, `crearViajeDesdeCiere` (repository.ts) no tiene contra qué
+ * resolver la zona, ni de inicio ni de fin, aunque el viaje sí haya pasado en
+ * un lugar real (el mismo de un viaje anterior que sí la resolvió bien).
+ *
+ * A propósito NO se espera (`await`) antes de guardar/liberar `viajeEnCurso`
+ * en `pausarParaIngreso`/`finalizarViaje` — `obtenerUbicacionActual` puede
+ * tardar hasta 8s, y bloquear ahí reabriría el mismo bug de "viajes perdidos"
+ * que se corrigió en una ronda anterior de esta sesión (la burbuja tiene que
+ * poder arrancar el siguiente viaje de inmediato). En cambio, esto corre en
+ * segundo plano y, si consigue una posición, PARCHA el viaje ya guardado con
+ * la zona resuelta — el conductor puede alcanzar a ver "Zona no detectada"
+ * por un instante y que se corrija sola un momento después.
+ */
+async function resolverZonaSiHizoFalta(viajeId: string, recorridoOriginal: PuntoGPS[]): Promise<void> {
+  if (recorridoOriginal.length > 0) return
+  const punto = await obtenerUbicacionActual()
+  if (!punto) return
+
+  const localidad = obtenerLocalidad(punto)
+  const zona = obtenerZonaCustom(punto)
+  if (!localidad && !zona) return
+
+  const viaje = useViajes.getState().viajes.find((v) => v.id === viajeId)
+  if (!viaje) return
+
+  const actualizado: Viaje = {
+    ...viaje,
+    localidad: localidad ?? viaje.localidad,
+    zona: zona ?? viaje.zona,
+    localidadInicio: localidad ?? viaje.localidadInicio,
+    zonaInicio: zona ?? viaje.zonaInicio,
+    localidadFin: localidad ?? viaje.localidadFin,
+    zonaFin: zona ?? viaje.zonaFin,
+    pendienteDeSync: true,
+  }
+  await repositorioViajes.guardar(actualizado)
+  useViajes.setState({ viajes: useViajes.getState().viajes.map((v) => (v.id === viajeId ? actualizado : v)) })
+}

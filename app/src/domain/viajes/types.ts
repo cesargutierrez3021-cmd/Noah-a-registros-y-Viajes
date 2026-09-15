@@ -8,6 +8,15 @@
 
 export type Plataforma = 'Uber' | 'DiDi' | 'inDrive' | 'Cabify' | 'Picap' | 'Rappi' | 'Particular'
 
+/**
+ * 2026-09-15, pedido explícito del usuario: hoisteada acá (antes vivía
+ * duplicada como una constante local en SeccionViajesYJornada.tsx, D-18) para
+ * que Ajustes (elegir la plataforma preferida) y la tarjeta de "viaje
+ * pendiente de ingreso" (poder cambiarla antes de guardar) usen la misma
+ * lista, sin repetirla.
+ */
+export const PLATAFORMAS_DISPONIBLES: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap', 'Rappi', 'Particular']
+
 export type EstadoViaje = 'en_curso' | 'finalizado'
 
 /** Un punto de recorrido capturado por el plugin nativo de GPS. */

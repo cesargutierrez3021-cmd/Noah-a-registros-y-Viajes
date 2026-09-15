@@ -1153,6 +1153,34 @@ textarea:focus {
   transition: width 0.4s ease;
 }
 
+/* Secciones desplegables de Ajustes (2026-09-15) — ver components/SeccionDesplegable.tsx.
+   La mecánica de abrir/cerrar (grid-template-rows, chevron) reusa las clases
+   acordeon-resumen__panel y acordeon-resumen__chevron de arriba (D-18);
+   acá solo la cabecera propia. */
+.seccion-desplegable {
+  margin-top: 16px;
+  border-radius: var(--radio-tarjeta-grande, 20px);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-suave);
+  overflow: hidden;
+}
+.seccion-desplegable__cabecera {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-texto);
+}
+.seccion-desplegable__contenido {
+  padding: 0 20px 20px;
+}
+
 /* Tarjetas ejecutivas de mantenimiento (2026-09-15) — ver features/trabajo/TarjetaMantenimiento.tsx */
 .tarjeta-mantenimiento__imagen--animada {
   animation: tarjeta-mantenimiento-respirar 6s ease-in-out infinite;

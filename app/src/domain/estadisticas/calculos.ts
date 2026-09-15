@@ -163,7 +163,17 @@ const UNA_HORA_MS = 3_600_000
 export function calcularTiempoJornada(jornada: Jornada, viajes: Viaje[]): TiempoJornada {
   const inicioMs = new Date(jornada.inicioISO).getTime()
   const finMs = jornada.finISO ? new Date(jornada.finISO).getTime() : Date.now()
-  const tiempoTotalMs = Math.max(0, finMs - inicioMs)
+
+  // 2026-09-15, pedido explícito del usuario: "pausar jornada y reanudar
+  // jornada" — mientras está pausada, ese tiempo no cuenta como parte de la
+  // jornada (ni trabajado ni muerto: el conductor avisó que no está de
+  // turno). `?? null`/`?? 0` por si la jornada es de antes de que existieran
+  // estos dos campos (D-16, jornadas viejas ya guardadas sin ellos).
+  const msPausaEnCurso =
+    jornada.pausadaDesdeISO && !jornada.finISO ? Math.max(0, Date.now() - new Date(jornada.pausadaDesdeISO).getTime()) : 0
+  const msPausadoTotal = (jornada.msPausadosAcumulados ?? 0) + msPausaEnCurso
+
+  const tiempoTotalMs = Math.max(0, finMs - inicioMs - msPausadoTotal)
 
   const viajesDeLaJornada = viajes.filter(
     (v) => jornada.viajesIds.includes(v.id) && v.estado === 'finalizado' && v.finISO,
@@ -186,14 +196,26 @@ export function calcularTiempoJornada(jornada: Jornada, viajes: Viaje[]): Tiempo
  * Bloque 2, ítem 3. Reutiliza `calcularTiempoJornada` (D-18: no duplicar un
  * cálculo que ya existe) para las horas, y suma el ingreso de los mismos
  * viajes finalizados de la jornada.
+ *
+ * 2026-09-15, pedido explícito del usuario: con UN SOLO viaje no hay
+ * suficiente historial para proyectar una tarifa por hora real — dividir
+ * "$26.000 en 10 minutos" da $156.000/hora, un número inflado que solo
+ * extrapola un único dato, no algo que el conductor de verdad se está
+ * haciendo. El propio usuario confirmó el punto de corte con su ejemplo: con
+ * 2-3 viajes ("dos horas... me dice 60 mil, dice 30 mil por hora") la
+ * división SÍ es la cuenta correcta — eso no se toca. Con 0 o 1 viaje
+ * finalizado, se muestra el ingreso real tal cual, sin dividir — "porque no
+ * hay registros" (sus palabras) para proyectar nada todavía.
  */
 export function calcularRentabilidadPorHora(jornada: Jornada, viajes: Viaje[]): RentabilidadPorHora {
+  const viajesFinalizadosDeLaJornada = viajes.filter((v) => jornada.viajesIds.includes(v.id) && v.estado === 'finalizado')
+  const ingresos = viajesFinalizadosDeLaJornada.reduce((acc, v) => acc + v.ingreso, 0)
+
+  if (viajesFinalizadosDeLaJornada.length < 2) {
+    return { ingresoPorHoraTrabajada: ingresos, ingresoPorHoraConEspera: ingresos }
+  }
+
   const tiempo = calcularTiempoJornada(jornada, viajes)
-
-  const ingresos = viajes
-    .filter((v) => jornada.viajesIds.includes(v.id) && v.estado === 'finalizado')
-    .reduce((acc, v) => acc + v.ingreso, 0)
-
   const horasTrabajadas = tiempo.tiempoTrabajadoMs / UNA_HORA_MS
   const horasTotales = tiempo.tiempoTotalMs / UNA_HORA_MS
 

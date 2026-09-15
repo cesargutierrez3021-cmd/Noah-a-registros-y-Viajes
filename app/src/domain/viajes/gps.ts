@@ -112,3 +112,31 @@ export async function iniciarSeguimientoGPS(onPunto: (p: PuntoGPS) => void): Pro
   const esAndroidNativo = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
   return esAndroidNativo ? iniciarSeguimientoNativo(onPunto) : iniciarSeguimientoWeb(onPunto)
 }
+
+/**
+ * 2026-09-15, pedido explícito del usuario: reportó un viaje de 50 metros,
+ * iniciado y terminado casi de inmediato (por la burbuja), que quedó "zona no
+ * detectada" tanto al inicio como al final — aunque el viaje ANTERIOR, en el
+ * mismo lugar físico, sí había resuelto bien la zona. Causa real: el primer
+ * fix de GPS en frío (`iniciarSeguimientoGPS`, `watchPosition`/el servicio
+ * nativo) puede tardar varios segundos en llegar — un viaje tan corto puede
+ * terminar ANTES de que llegue el primer punto válido, dejando `recorrido`
+ * vacío (`puntoInicio`/`puntoFin` en null, ver repository.ts). Esto es un
+ * pedido puntual de UNA posición (no un `watch` en curso, no pasa por el
+ * filtro de `puntoValido` de arriba — no hay "anterior" con el que comparar
+ * velocidad/distancia en un solo punto) para usar como último recurso cuando
+ * el recorrido real quedó vacío — mejor una zona aproximada por la posición
+ * actual del teléfono que "no detectada" para un viaje que sí ocurrió acá.
+ */
+export async function obtenerUbicacionActual(): Promise<PuntoGPS | null> {
+  try {
+    const posicion = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 8000 })
+    return {
+      lat: posicion.coords.latitude,
+      lng: posicion.coords.longitude,
+      timestampISO: new Date(posicion.timestamp).toISOString(),
+    }
+  } catch {
+    return null
+  }
+}

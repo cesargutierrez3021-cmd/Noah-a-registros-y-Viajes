@@ -49,9 +49,14 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         const val EXTRA_SOLO_ESTILO = "soloEstilo"
         private const val CANAL_ID = "mia_burbuja"
         private const val NOTIF_ID = 4201
-        private const val UMBRAL_TOQUE_MS = 650L
         private const val UMBRAL_ARRASTRE_PX = 12
         private const val UMBRAL_DESLIZAMIENTO_PX = 100
+        // 2026-09-15, pedido explícito del usuario: mantener presionada la burbuja 2s termina
+        // la jornada (y la cierra); doble-tap la pausa/reanuda. El tap simple (iniciar/terminar
+        // un VIAJE) se retrasa este mismo tiempo de doble-tap para poder distinguir si viene un
+        // segundo toque — mismo umbral que usa Android para su propio gesture detector.
+        private const val UMBRAL_JORNADA_MS = 2000L
+        private const val UMBRAL_DOBLE_TAP_MS = 300L
         private const val INTERVALO_RELOJ_MS = 1000L
         private const val PRECISION_MAXIMA_M = 35f
         private const val VELOCIDAD_MINIMA_MS = 0.42
@@ -185,17 +190,62 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         val tipoVentana = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
         val params = WindowManager.LayoutParams(ancho, alto, tipoVentana, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.START; x = dp(12); y = dp(160) }
         var xInicial = 0; var yInicial = 0; var toqueXInicial = 0f; var toqueYInicial = 0f; var tiempoInicioToque = 0L; var fueArrastre = false
+        var tiempoUltimoTap = 0L
+        // 2026-09-15, pedido explícito del usuario: "manteniendo el presionado dos segundos se
+        // termina la jornada... haciéndole doble tap a la burbuja, se pausa la jornada". Antes,
+        // mantener presionado ~650ms abría la app — se reemplaza por este gesto nuevo; para
+        // abrir la app sigue estando la notificación persistente (construirNotificacion(),
+        // siempre visible mientras la jornada está abierta).
+        val accionJornadaLarga = Runnable {
+            hablar("Jornada terminada")
+            BurbujaPlugin.instanciaActiva?.notificarAccion("terminarJornada")
+            stopSelf()
+        }
+        // El tap simple (iniciar/terminar un VIAJE) se retrasa UMBRAL_DOBLE_TAP_MS para poder
+        // saber si viene un segundo toque atrás (doble-tap = pausar/reanudar la JORNADA, algo
+        // completamente distinto) — sin este retraso no hay forma de distinguir los dos gestos.
+        val accionTapPendiente = Runnable {
+            if (enViaje) finalizarViaje(true) else { iniciarViaje(true); BurbujaPlugin.instanciaActiva?.notificarAccion("iniciar") }
+        }
         contenedor.setOnTouchListener { _, evento ->
             when (evento.action) {
-                MotionEvent.ACTION_DOWN -> { xInicial = params.x; yInicial = params.y; toqueXInicial = evento.rawX; toqueYInicial = evento.rawY; tiempoInicioToque = System.currentTimeMillis(); fueArrastre = false; true }
-                MotionEvent.ACTION_MOVE -> { val dx = (evento.rawX - toqueXInicial).toInt(); val dy = (evento.rawY - toqueYInicial).toInt(); if (abs(dx) > UMBRAL_ARRASTRE_PX || abs(dy) > UMBRAL_ARRASTRE_PX) fueArrastre = true; params.x = xInicial + dx; params.y = yInicial + dy; runCatching { windowManager.updateViewLayout(contenedor, params) }; true }
+                MotionEvent.ACTION_DOWN -> {
+                    xInicial = params.x; yInicial = params.y; toqueXInicial = evento.rawX; toqueYInicial = evento.rawY
+                    tiempoInicioToque = System.currentTimeMillis(); fueArrastre = false
+                    handler.postDelayed(accionJornadaLarga, UMBRAL_JORNADA_MS)
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = (evento.rawX - toqueXInicial).toInt(); val dy = (evento.rawY - toqueYInicial).toInt()
+                    if (abs(dx) > UMBRAL_ARRASTRE_PX || abs(dy) > UMBRAL_ARRASTRE_PX) {
+                        if (!fueArrastre) handler.removeCallbacks(accionJornadaLarga)
+                        fueArrastre = true
+                    }
+                    params.x = xInicial + dx; params.y = yInicial + dy
+                    runCatching { windowManager.updateViewLayout(contenedor, params) }
+                    true
+                }
                 MotionEvent.ACTION_UP -> {
-                    val duracion = System.currentTimeMillis() - tiempoInicioToque; val cercaDelFondo = params.y > resources.displayMetrics.heightPixels - dp(220)
+                    handler.removeCallbacks(accionJornadaLarga)
+                    val duracion = System.currentTimeMillis() - tiempoInicioToque
+                    val cercaDelFondo = params.y > resources.displayMetrics.heightPixels - dp(220)
                     when {
                         fueArrastre && cercaDelFondo -> { BurbujaPlugin.instanciaActiva?.notificarAccion("cerrar"); stopSelf() }
-                        !fueArrastre && duracion >= UMBRAL_TOQUE_MS -> startActivity(Intent(this, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) })
-                        !fueArrastre -> if (enViaje) finalizarViaje(true) else { iniciarViaje(true); BurbujaPlugin.instanciaActiva?.notificarAccion("iniciar") }
-                    }; true
+                        fueArrastre -> Unit
+                        duracion >= UMBRAL_JORNADA_MS -> Unit // ya se disparó solo vía accionJornadaLarga arriba
+                        else -> {
+                            val ahora = System.currentTimeMillis()
+                            if (ahora - tiempoUltimoTap < UMBRAL_DOBLE_TAP_MS) {
+                                handler.removeCallbacks(accionTapPendiente)
+                                tiempoUltimoTap = 0L
+                                BurbujaPlugin.instanciaActiva?.notificarAccion("alternarPausaJornada")
+                            } else {
+                                tiempoUltimoTap = ahora
+                                handler.postDelayed(accionTapPendiente, UMBRAL_DOBLE_TAP_MS)
+                            }
+                        }
+                    }
+                    true
                 }
                 else -> false
             }

@@ -4,8 +4,14 @@ import type { Tema } from '../tema/types'
 
 /** Lo que manda BurbujaPlugin.notificarAccion() del lado nativo al tocar la burbuja. */
 export interface AccionBurbuja {
-  /** 'abrirVoz' (2026-09-15): se tocó la manija — antes abría un panel resumen, ahora activa a MIA. */
-  accion: 'iniciar' | 'terminar' | 'cerrar' | 'abrirVoz'
+  /**
+   * 'abrirVoz' (2026-09-15): se tocó la manija — antes abría un panel resumen,
+   * ahora activa a MIA. 'terminarJornada'/'alternarPausaJornada' (2026-09-15,
+   * misma sesión, ronda posterior): mantener la burbuja presionada 2s termina
+   * la jornada (y la burbuja se cierra sola, del lado nativo); doble-tap
+   * pausa/reanuda — ver BurbujaService.kt y burbujaOrquestacion.ts.
+   */
+  accion: 'iniciar' | 'terminar' | 'cerrar' | 'abrirVoz' | 'terminarJornada' | 'alternarPausaJornada'
   km?: number
   inicioMs?: number
   finMs?: number

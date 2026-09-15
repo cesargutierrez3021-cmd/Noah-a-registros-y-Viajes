@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTema } from '../../domain/tema/store'
 import { TEMAS_DISPONIBLES } from '../../domain/tema/types'
@@ -7,9 +8,12 @@ import { ESTILOS_DISPONIBLES } from '../../domain/estiloGrafico/types'
 import type { ItemDistribucion } from '../../domain/estiloGrafico/types'
 import { useVehiculo } from '../../domain/vehiculo/store'
 import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
+import { useViajes } from '../../domain/viajes/store'
+import { PLATAFORMAS_DISPONIBLES } from '../../domain/viajes/types'
 import { AnillosOrbitales } from '../../components/graficos/AnillosOrbitales'
 import { Cristal3D } from '../../components/graficos/Cristal3D'
 import { Prisma } from '../../components/graficos/Prisma'
+import { SeccionDesplegable } from '../../components/SeccionDesplegable'
 
 /** Muestra de ejemplo para los 3 estilos — mismas proporciones que las capturas de referencia del usuario (Hogar 28% / Deudas 19% / Ahorro 18% / Libre 35%). */
 // Mismos 4 colores que BalanceScreen.tsx (D-18: una sola fuente del "set validado de Balance" — ver el comentario ahí).
@@ -28,11 +32,27 @@ const TOTAL_MUESTRA = 4_500_000
  * cuando sea. Reusa el mismo store/lista que OnboardingScreen (D-18): no
  * hay una segunda fuente de temas disponibles.
  */
+type SeccionAjustes = 'vehiculo' | 'plataforma' | 'tema' | 'estadisticas'
+
 export function AjustesScreen() {
   const { tema, elegirTema } = useTema()
   const { estilo, elegirEstilo } = useEstiloGrafico()
   const { tipoVehiculo, elegirVehiculo } = useVehiculo()
+  const { plataformaPreferida, elegirPlataformaPreferida } = useViajes()
   const animado = tema !== 'papel'
+
+  /**
+   * 2026-09-15, pedido explícito del usuario: "todo lo que esté en ajustes
+   * tiene que ser menú desplegable... si estamos en la sección de temas, se
+   * espicha y me abre. Si vuelvo a las [otras], se cierra" — UNA sola
+   * sección abierta a la vez (a diferencia de los acordeones de Balance,
+   * que sí permiten varios abiertos). Un solo `useState` con la clave de
+   * cuál está abierta (o `null`, todas cerradas) alcanza para eso.
+   */
+  const [seccionAbierta, setSeccionAbierta] = useState<SeccionAjustes | null>(null)
+  function alternar(seccion: SeccionAjustes) {
+    setSeccionAbierta((actual) => (actual === seccion ? null : seccion))
+  }
 
   function manejarElegirTema(nuevo: typeof tema) {
     elegirTema(nuevo)
@@ -44,8 +64,7 @@ export function AjustesScreen() {
     <div className="pantalla">
       <h1 className="titulo-pantalla">Ajustes</h1>
 
-      <section style={{ marginTop: 16 }}>
-        <h2 style={{ marginBottom: 4 }}>Vehículo</h2>
+      <SeccionDesplegable titulo="Vehículo" abierta={seccionAbierta === 'vehiculo'} onToggle={() => alternar('vehiculo')}>
         <p className="texto-mute" style={{ marginBottom: 16 }}>
           Qué manejas — decide qué catálogo de mantenimiento te aparece en Trabajo.
         </p>
@@ -68,10 +87,32 @@ export function AjustesScreen() {
             </button>
           ))}
         </div>
-      </section>
+      </SeccionDesplegable>
 
-      <section style={{ marginTop: 32 }}>
-        <h2 style={{ marginBottom: 4 }}>Tema</h2>
+      <SeccionDesplegable titulo="Plataforma preferida" abierta={seccionAbierta === 'plataforma'} onToggle={() => alternar('plataforma')}>
+        <p className="texto-mute" style={{ marginBottom: 16 }}>
+          Con qué plataforma trabajas más seguido — cuando inicias un viaje desde la burbuja flotante (sin abrir la app), se usa esta en vez de
+          "Particular". Siempre la puedes cambiar a mano en cada viaje.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          {PLATAFORMAS_DISPONIBLES.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => elegirPlataformaPreferida(p)}
+              style={{
+                textAlign: 'left',
+                padding: 16,
+                border: p === plataformaPreferida ? '2px solid var(--color-acento)' : '1px solid var(--color-borde)',
+              }}
+            >
+              <strong>{p} {p === plataformaPreferida ? '· Preferida' : ''}</strong>
+            </button>
+          ))}
+        </div>
+      </SeccionDesplegable>
+
+      <SeccionDesplegable titulo="Tema" abierta={seccionAbierta === 'tema'} onToggle={() => alternar('tema')}>
         <p className="texto-mute" style={{ marginBottom: 16 }}>
           Cambia el estilo visual de toda la app cuando quieras.
         </p>
@@ -94,10 +135,9 @@ export function AjustesScreen() {
             </button>
           ))}
         </div>
-      </section>
+      </SeccionDesplegable>
 
-      <section style={{ marginTop: 32 }}>
-        <h2 style={{ marginBottom: 4 }}>Diseño de estadísticas</h2>
+      <SeccionDesplegable titulo="Diseño de estadísticas" abierta={seccionAbierta === 'estadisticas'} onToggle={() => alternar('estadisticas')}>
         <p className="texto-mute" style={{ marginBottom: 16 }}>
           Así se ve la distribución de dinero en Balance con cada estilo — elegí el que más te guste, con datos de ejemplo reales (no son los tuyos).
         </p>
@@ -133,7 +173,7 @@ export function AjustesScreen() {
             </div>
           ))}
         </div>
-      </section>
+      </SeccionDesplegable>
 
       <Link to="/" style={{ display: 'inline-block', marginTop: 24 }}>
         ← Volver

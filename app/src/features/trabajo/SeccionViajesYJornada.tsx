@@ -5,9 +5,7 @@ import { useJornada } from '../../domain/jornada/store'
 import { sincronizarViajesPendientes } from '../../domain/viajes/sync'
 import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
 import { fechaNegocioISO, limitesDiaBogotaISODesdeClave } from '../../lib/fechas'
-import type { Plataforma } from '../../domain/viajes/types'
-
-const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap', 'Rappi', 'Particular']
+import { PLATAFORMAS_DISPONIBLES as PLATAFORMAS } from '../../domain/viajes/types'
 
 /**
  * Misma lógica de orquestación que tenía ViajesScreen.tsx — solo se movió
@@ -18,40 +16,29 @@ const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap',
  * arriba (SeccionPulso, mismo store `useJornada`), y tener los dos confundía
  * ("aparece arriba y también acá abajo"). El único botón de jornada que
  * queda en todo el Panel Trabajo es el de arriba.
+ *
+ * 2026-09-15 (misma sesión, ronda posterior): la tarjeta de "viajes
+ * pendientes de ingreso" que vivía acá se sacó a `TarjetaViajesPendientes.tsx`
+ * — el usuario pidió que apareciera justo debajo de "Estado del sistema"
+ * (SeccionPulso.tsx), no acá abajo, donde había que hacer scroll para
+ * encontrarla.
  */
 export function SeccionViajesYJornada() {
-  const { viajes, viajeEnCurso, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje, completarIngreso } = useViajes()
+  const { viajeEnCurso, viajes, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje } = useViajes()
   const { agregarViajeAJornadaAbierta, cargar: cargarJornadas } = useJornada()
 
   const [ingreso, setIngreso] = useState('')
   const [diaHistorial, setDiaHistorial] = useState(() => fechaNegocioISO())
-  /** 2026-09-16: uno por cada viaje pendiente de ingreso (puede haber varios, ver store.ts). */
-  const [ingresosPendientes, setIngresosPendientes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void cargar()
     void cargarJornadas()
   }, [cargar, cargarJornadas])
 
-  const viajesPendientesIngreso = viajes.filter((v) => v.ingresoPendiente)
-
   async function manejarFinalizar() {
     const viaje = await finalizarViaje({ ingreso: Number(ingreso) || 0, distanciaReportadaPlataforma: null })
     if (viaje) await agregarViajeAJornadaAbierta(viaje.id)
     setIngreso('')
-    void sincronizarViajesPendientes()
-    void sincronizarJornadasPendientes()
-  }
-
-  async function manejarCompletarIngreso(viajeId: string) {
-    const monto = Number(ingresosPendientes[viajeId]) || 0
-    await completarIngreso(viajeId, monto)
-    await agregarViajeAJornadaAbierta(viajeId)
-    setIngresosPendientes((prev) => {
-      const siguiente = { ...prev }
-      delete siguiente[viajeId]
-      return siguiente
-    })
     void sincronizarViajesPendientes()
     void sincronizarJornadasPendientes()
   }
@@ -76,31 +63,6 @@ export function SeccionViajesYJornada() {
           <Link to="/viajes/manual">
             <button type="button">Agregar viaje manual (ya pasó, sin GPS)</button>
           </Link>
-        </div>
-      )}
-
-      {viajesPendientesIngreso.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-          {viajesPendientesIngreso.length > 1 && (
-            <p className="texto-mute">
-              Tienes {viajesPendientesIngreso.length} viajes terminados desde la burbuja esperando el ingreso — complétalos uno por uno.
-            </p>
-          )}
-          {viajesPendientesIngreso.map((v) => (
-            <div key={v.id} className="tarjeta-viaje" style={{ flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
-              <p className="texto-mute">
-                Terminaste este viaje desde la burbuja flotante — {v.plataforma}, {v.distancia.kmTotalesReales.toFixed(1)} km.
-                Solo falta el ingreso para guardarlo.
-              </p>
-              <input
-                type="number"
-                placeholder="Ingreso del viaje"
-                value={ingresosPendientes[v.id] ?? ''}
-                onChange={(e) => setIngresosPendientes((prev) => ({ ...prev, [v.id]: e.target.value }))}
-              />
-              <button type="button" onClick={() => void manejarCompletarIngreso(v.id)}>Guardar viaje</button>
-            </div>
-          ))}
         </div>
       )}
 

@@ -18,6 +18,7 @@ import type { Viaje } from '../../domain/viajes/types'
 import { SeccionMantenimiento } from './SeccionMantenimiento'
 import { SeccionGastos } from './SeccionGastos'
 import { SeccionEstadisticas } from './SeccionEstadisticas'
+import { TarjetaViajesPendientes } from './TarjetaViajesPendientes'
 
 type VistaLectura = 'recortadas' | 'resumen' | 'mantenimiento' | 'estadisticas'
 type PeriodoResumen = 'hoy' | 'semana' | 'mes'
@@ -74,7 +75,7 @@ function claveDiaDeHoy(): string {
  */
 export function SeccionPulso() {
   const { viajes, viajeEnCurso } = useViajes()
-  const { jornadaAbierta, iniciarJornada, terminarJornada } = useJornada()
+  const { jornadaAbierta, iniciarJornada, terminarJornada, pausarJornada, reanudarJornada } = useJornada()
   const { gastos } = useGastos()
 
   const [vista, setVista] = useState<VistaLectura>('recortadas')
@@ -148,13 +149,16 @@ export function SeccionPulso() {
 
       <div className="tt-estado tt-tarjeta">
         <span className="tt-estado__etiqueta">Estado del sistema</span>
-        <div className={`tt-estado__valor ${jornada ? 'tt-estado__valor--activo' : 'tt-estado__valor--pausa'}`}>
-          {jornada ? 'En curso' : 'Pausa'}
+        <div className={`tt-estado__valor ${jornada && !jornada.pausadaDesdeISO ? 'tt-estado__valor--activo' : 'tt-estado__valor--pausa'}`}>
+          {jornada ? (jornada.pausadaDesdeISO ? 'Pausada' : 'En curso') : 'Sin abrir'}
         </div>
         <span className="tt-estado__detalle">
           {resumenHoy.kmTotales.toFixed(1)} km · {resumenHoy.cantidadViajes} viaje{resumenHoy.cantidadViajes === 1 ? '' : 's'}
         </span>
       </div>
+
+      {/* 2026-09-15, pedido explícito del usuario: "cuando los viajes están pendientes... tiene que aparecer ahí abajito de estado del sistema... no debería tener que hacer scroll" */}
+      <TarjetaViajesPendientes />
 
       <button
         type="button"
@@ -163,6 +167,18 @@ export function SeccionPulso() {
       >
         {jornada ? 'Terminar jornada' : 'Iniciar jornada'}
       </button>
+
+      {/* 2026-09-15, pedido explícito del usuario: "toca pausar jornada y reanudar jornada, no está ese botoncito" — mismo store (useJornada), solo pausa el reloj de la jornada (ver calcularTiempoJornada), nunca un viaje en curso. */}
+      {jornada && (
+        <button
+          type="button"
+          className="tt-boton-cta tt-boton-cta--pausar"
+          style={{ marginTop: 8 }}
+          onClick={() => void (jornada.pausadaDesdeISO ? reanudarJornada() : pausarJornada())}
+        >
+          {jornada.pausadaDesdeISO ? 'Reanudar jornada' : 'Pausar jornada'}
+        </button>
+      )}
 
       <div className="tt-pildoras">
         <button type="button" className={`tt-pildora ${vista === 'recortadas' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('recortadas')}>
