@@ -2,6 +2,7 @@ import type { Viaje } from '../viajes/types'
 import type { Gasto } from '../gastos/types'
 import type { Deuda } from '../deudas/types'
 import type { GastoHogar } from '../hogar/types'
+import type { MetaAhorro } from '../ahorro/types'
 import { calcularResumen } from '../estadisticas/calculos'
 
 /**
@@ -34,6 +35,13 @@ export interface BalanceGeneral {
    * hecho — se muestran por separado para no mezclar los dos conceptos.
    */
   balanceNeto: number
+  /**
+   * 2026-09-15, pedido explícito del usuario: suma de `saldoActual` de todas
+   * las metas de domain/ahorro. Mismo criterio que deudaPendienteTotal — se
+   * muestra aparte, NO se resta de balanceNeto (es plata que sigue siendo
+   * del conductor, solo que ya la apartó, no es un gasto).
+   */
+  ahorroTotal: number
 }
 
 export function calcularBalanceGeneral(
@@ -41,11 +49,13 @@ export function calcularBalanceGeneral(
   gastos: Gasto[],
   deudas: Deuda[],
   gastosDeHogar: GastoHogar[],
+  metasAhorro: MetaAhorro[] = [],
 ): BalanceGeneral {
   const ingresosTotales = calcularResumen(viajes).ingresos
   const gastosOperativos = gastos.reduce((acc, g) => acc + g.monto, 0)
   const totalGastosHogar = gastosDeHogar.reduce((acc, g) => acc + g.monto, 0)
   const deudaPendienteTotal = deudas.reduce((acc, d) => acc + Math.max(d.saldoActual, 0), 0)
+  const ahorroTotal = metasAhorro.reduce((acc, m) => acc + Math.max(m.saldoActual, 0), 0)
 
   return {
     ingresosTotales,
@@ -53,5 +63,6 @@ export function calcularBalanceGeneral(
     gastosDeHogar: totalGastosHogar,
     deudaPendienteTotal,
     balanceNeto: ingresosTotales - gastosOperativos - totalGastosHogar,
+    ahorroTotal,
   }
 }

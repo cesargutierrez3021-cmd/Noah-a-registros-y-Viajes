@@ -4,8 +4,10 @@ import { useViajes } from '../../domain/viajes/store'
 import { useGastos } from '../../domain/gastos/store'
 import { useDeudas } from '../../domain/deudas/store'
 import { useHogar } from '../../domain/hogar/store'
+import { useAhorro } from '../../domain/ahorro/store'
 import { useAuth } from '../../domain/auth/store'
 import { calcularBalanceGeneral } from '../../domain/balance/calculos'
+import { GraficoOrbital } from './GraficoOrbital'
 
 function formatoPesos(monto: number): string {
   return `$${Math.round(monto).toLocaleString('es-CO')}`
@@ -25,6 +27,7 @@ export function BalanceScreen() {
   const { gastos, cargar: cargarGastos } = useGastos()
   const { deudas, cargar: cargarDeudas } = useDeudas()
   const { gastos: gastosHogar, cargar: cargarHogar } = useHogar()
+  const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
   const { autenticado } = useAuth()
 
   useEffect(() => {
@@ -32,17 +35,26 @@ export function BalanceScreen() {
     void cargarGastos()
     void cargarDeudas()
     void cargarHogar()
-  }, [cargarViajes, cargarGastos, cargarDeudas, cargarHogar])
+    void cargarAhorro()
+  }, [cargarViajes, cargarGastos, cargarDeudas, cargarHogar, cargarAhorro])
 
-  const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar)
+  const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar, metasAhorro)
 
   return (
     <section className="pantalla"><div className="app-panel">
       <div className="app-hero"><div className="app-eyebrow">MIA · RESUMEN</div><h1 className="app-title">Balance general</h1></div>
-      <p className="texto-mute" style={{ marginBottom: 16 }}>
+      <p className="texto-mute" style={{ marginBottom: 8 }}>
         Cruce de todo lo que entró (viajes) contra todo lo que salió (gastos operativos + gastos de hogar). La deuda
-        pendiente se muestra aparte — es una obligación futura, no un gasto ya hecho.
+        pendiente y el ahorro se muestran aparte — son plata que no se gastó, no un flujo de este período.
       </p>
+
+      <GraficoOrbital
+        ingresos={balance.ingresosTotales}
+        gastosOperativos={balance.gastosOperativos}
+        gastosDeHogar={balance.gastosDeHogar}
+        ahorro={balance.ahorroTotal}
+        balanceNeto={balance.balanceNeto}
+      />
 
       {!autenticado() && (
         <div className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, marginBottom: 16 }}>
@@ -73,6 +85,10 @@ export function BalanceScreen() {
         <li className="tarjeta-viaje" style={{ marginTop: 16 }}>
           <span>Deuda pendiente total</span>
           <strong>{formatoPesos(balance.deudaPendienteTotal)}</strong>
+        </li>
+        <li className="tarjeta-viaje">
+          <span>Ahorro total</span>
+          <strong>{formatoPesos(balance.ahorroTotal)}</strong>
         </li>
       </ul>
     </div></section>

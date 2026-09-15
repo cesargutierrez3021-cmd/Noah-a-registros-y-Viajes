@@ -23,6 +23,16 @@ interface ViajeEnCurso {
   inicioISO: string
   recorrido: PuntoGPS[]
   puntoDeRecogidaISO: string | null
+  /**
+   * 2026-09-15, pedido explícito del usuario: cuando el viaje se termina
+   * desde la burbuja flotante (un solo toque, sin abrir la app), no hay
+   * forma de escribir el ingreso ahí — el GPS SÍ se detiene en el momento
+   * exacto (por eso queda guardado acá, no se recalcula después), pero el
+   * viaje se queda "pausado" esperando que el conductor abra la app y
+   * escriba el monto. Mientras esto es `null`, el viaje sigue en curso
+   * normal (igual que antes). Ver `pausarParaIngreso` más abajo.
+   */
+  finISOPendiente: string | null
 }
 
 interface EstadoViajes {
@@ -37,6 +47,12 @@ interface EstadoViajes {
   cargar: () => Promise<void>
   iniciarViaje: (plataforma: Plataforma) => Promise<void>
   marcarRecogida: () => void
+  /**
+   * 2026-09-15 — detiene el GPS y marca `finISOPendiente` sin crear todavía
+   * el `Viaje` final (falta el ingreso). Lo dispara la burbuja flotante al
+   * tocarla para terminar un viaje. Ver `finISOPendiente` arriba.
+   */
+  pausarParaIngreso: () => void
   finalizarViaje: (params: {
     ingreso: number
     distanciaReportadaPlataforma: number | null
@@ -87,6 +103,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
       inicioISO: new Date().toISOString(),
       recorrido: [],
       puntoDeRecogidaISO: null,
+      finISOPendiente: null,
     }
     set({ viajeEnCurso: enCurso, errorGPS: null })
     guardarActivo(enCurso)
@@ -127,6 +144,17 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     })
   },
 
+  /** Ver `finISOPendiente` en la interfaz — usado por la burbuja al terminar un viaje sin abrir la app. */
+  pausarParaIngreso: () => {
+    const enCurso = get().viajeEnCurso
+    if (!enCurso || enCurso.finISOPendiente) return
+    seguidorActivo?.detener()
+    seguidorActivo = null
+    const actualizado = { ...enCurso, finISOPendiente: new Date().toISOString() }
+    guardarActivo(actualizado)
+    set({ viajeEnCurso: actualizado })
+  },
+
   finalizarViaje: async ({ ingreso, distanciaReportadaPlataforma }) => {
     const enCurso = get().viajeEnCurso
     if (!enCurso) return null
@@ -137,7 +165,10 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     const viaje = crearViajeDesdeCiere(enCurso.id, {
       plataforma: enCurso.plataforma,
       inicioISO: enCurso.inicioISO,
-      finISO: new Date().toISOString(),
+      // Si la burbuja ya paró el GPS esperando el ingreso, ese es el
+      // momento real en que terminó el viaje — no "ahora", que podría ser
+      // minutos/horas después (cuando el conductor por fin abre la app).
+      finISO: enCurso.finISOPendiente ?? new Date().toISOString(),
       recorrido: enCurso.recorrido,
       puntoDeRecogidaISO: enCurso.puntoDeRecogidaISO,
       distanciaReportadaPlataforma,

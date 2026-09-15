@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
 import { useJornada } from '../../domain/jornada/store'
 import { useGastos } from '../../domain/gastos/store'
+import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
+import { mostrarBurbuja, ocultarBurbuja } from '../../domain/viajes/burbuja'
 import {
   agruparPorPeriodo,
   calcularCostoPorKm,
@@ -13,8 +15,11 @@ import {
 } from '../../domain/estadisticas/calculos'
 import type { Gasto } from '../../domain/gastos/types'
 import type { Viaje } from '../../domain/viajes/types'
+import { SeccionMantenimiento } from './SeccionMantenimiento'
+import { SeccionGastos } from './SeccionGastos'
+import { SeccionEstadisticas } from './SeccionEstadisticas'
 
-type VistaLectura = 'redondas' | 'recortadas' | 'resumen'
+type VistaLectura = 'redondas' | 'recortadas' | 'resumen' | 'mantenimiento' | 'estadisticas'
 type PeriodoResumen = 'hoy' | 'semana' | 'mes'
 
 function formatoPesos(monto: number): string {
@@ -68,7 +73,7 @@ function claveDiaDeHoy(): string {
  * "Agregar viaje" y "Agregar gasto", que sí llevan a algo real.
  */
 export function SeccionPulso() {
-  const { viajes } = useViajes()
+  const { viajes, viajeEnCurso } = useViajes()
   const { jornadaAbierta, iniciarJornada, terminarJornada } = useJornada()
   const { gastos } = useGastos()
 
@@ -109,8 +114,22 @@ export function SeccionPulso() {
   const historial = useMemo(() => agruparPorPeriodo(viajes, 'dia').slice(0, 5), [viajes])
 
   async function manejarJornada() {
-    if (jornada) await terminarJornada()
-    else await iniciarJornada()
+    if (jornada) {
+      await terminarJornada()
+      // 2026-09-15, pedido explícito del usuario: la burbuja aparece al
+      // iniciar jornada y desaparece al terminarla — si en ese momento
+      // había un viaje en curso, se deja (mismo criterio que ya tenía
+      // domain/viajes/store.ts: ocultarBurbuja() solo cuando el viaje
+      // termina de verdad, nunca a mitad de uno).
+      if (!viajeEnCurso) void ocultarBurbuja()
+    } else {
+      await iniciarJornada()
+      // "que cuando le dé iniciar jornada, me abra el botón flotante" — antes
+      // la burbuja solo aparecía al elegir una plataforma para un viaje
+      // (domain/viajes/store.ts, iniciarViaje). Ahora aparece de una vez.
+      void mostrarBurbuja('0.0', '0m', !!viajeEnCurso, viajes.length)
+    }
+    void sincronizarJornadasPendientes()
   }
 
   function irA(idSeccion: string) {
@@ -156,9 +175,24 @@ export function SeccionPulso() {
         <button type="button" className={`tt-pildora ${vista === 'resumen' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('resumen')}>
           Resumen
         </button>
+        <button type="button" className={`tt-pildora ${vista === 'mantenimiento' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('mantenimiento')}>
+          Mantenimiento y gastos
+        </button>
+        <button type="button" className={`tt-pildora ${vista === 'estadisticas' ? 'tt-pildora--activa' : ''}`} onClick={() => setVista('estadisticas')}>
+          Estadísticas
+        </button>
       </div>
 
-      {vista !== 'resumen' && (
+      {vista === 'mantenimiento' && (
+        <>
+          <SeccionMantenimiento />
+          <SeccionGastos />
+        </>
+      )}
+
+      {vista === 'estadisticas' && <SeccionEstadisticas />}
+
+      {(vista === 'redondas' || vista === 'recortadas') && (
         <div className="tt-grilla-metricas">
           <div className={`tt-metrica ${vista === 'redondas' ? 'tt-metrica--redonda' : 'tt-metrica--recortada'}`}>
             <span className="tt-metrica__icono">⏱️</span>
@@ -269,10 +303,10 @@ export function SeccionPulso() {
             <button type="button" className="tt-accion-boton" onClick={() => irA('seccion-viajes-jornada')}>
               Agregar viaje
             </button>
-            <button type="button" className="tt-accion-boton" onClick={() => irA('seccion-gastos')}>
+            <button type="button" className="tt-accion-boton" onClick={() => setVista('mantenimiento')}>
               Agregar gasto
             </button>
-            <button type="button" className="tt-accion-boton" onClick={() => irA('seccion-mantenimiento')}>
+            <button type="button" className="tt-accion-boton" onClick={() => setVista('mantenimiento')}>
               Mantenimiento
             </button>
           </div>

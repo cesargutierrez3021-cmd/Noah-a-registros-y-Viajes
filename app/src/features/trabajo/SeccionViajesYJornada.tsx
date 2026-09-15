@@ -9,11 +9,19 @@ import type { Plataforma } from '../../domain/viajes/types'
 
 const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap', 'Rappi', 'Particular']
 
-/** Misma lógica de orquestación que tenía ViajesScreen.tsx — solo se movió acá adentro del panel único. */
+/**
+ * Misma lógica de orquestación que tenía ViajesScreen.tsx — solo se movió
+ * acá adentro del panel único.
+ *
+ * 2026-09-15, pedido explícito del usuario: el botón "Iniciar/Terminar
+ * jornada" que vivía acá se quitó — estaba duplicado con el botón CTA de
+ * arriba (SeccionPulso, mismo store `useJornada`), y tener los dos confundía
+ * ("aparece arriba y también acá abajo"). El único botón de jornada que
+ * queda en todo el Panel Trabajo es el de arriba.
+ */
 export function SeccionViajesYJornada() {
   const { viajes, viajeEnCurso, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje } = useViajes()
-  const { jornadaAbierta, iniciarJornada, terminarJornada, agregarViajeAJornadaAbierta, cargar: cargarJornadas } =
-    useJornada()
+  const { agregarViajeAJornadaAbierta, cargar: cargarJornadas } = useJornada()
 
   const [ingreso, setIngreso] = useState('')
   const [diaHistorial, setDiaHistorial] = useState(() => fechaNegocioISO())
@@ -23,8 +31,6 @@ export function SeccionViajesYJornada() {
     void cargarJornadas()
   }, [cargar, cargarJornadas])
 
-  const jornada = jornadaAbierta()
-
   async function manejarFinalizar() {
     const viaje = await finalizarViaje({ ingreso: Number(ingreso) || 0, distanciaReportadaPlataforma: null })
     if (viaje) await agregarViajeAJornadaAbierta(viaje.id)
@@ -33,22 +39,9 @@ export function SeccionViajesYJornada() {
     void sincronizarJornadasPendientes()
   }
 
-  async function manejarTerminarJornada() {
-    await terminarJornada()
-    void sincronizarJornadasPendientes()
-  }
-
   return (
     <div id="seccion-viajes-jornada">
       <h2 className="tt-titulo-seccion">Jornada y viajes</h2>
-
-      <div className="tarjeta-viaje" style={{ marginBottom: 16 }}>
-        {jornada ? (
-          <button type="button" onClick={() => void manejarTerminarJornada()}>Terminar jornada</button>
-        ) : (
-          <button type="button" onClick={() => void iniciarJornada()}>Iniciar jornada</button>
-        )}
-      </div>
 
       {!viajeEnCurso && (
         <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 8 }}>
@@ -69,7 +62,24 @@ export function SeccionViajesYJornada() {
         </div>
       )}
 
-      {viajeEnCurso && (
+      {viajeEnCurso && viajeEnCurso.finISOPendiente && (
+        <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
+          <p className="texto-mute">
+            Terminaste este viaje desde la burbuja flotante — {viajeEnCurso.plataforma}, quedan{' '}
+            {viajeEnCurso.recorrido.length} puntos GPS capturados. Solo falta el ingreso para guardarlo.
+          </p>
+          <input
+            type="number"
+            placeholder="Ingreso del viaje"
+            value={ingreso}
+            onChange={(e) => setIngreso(e.target.value)}
+            autoFocus
+          />
+          <button type="button" onClick={() => void manejarFinalizar()}>Guardar viaje</button>
+        </div>
+      )}
+
+      {viajeEnCurso && !viajeEnCurso.finISOPendiente && (
         <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
           <p className="texto-mute">
             Viaje en curso — {viajeEnCurso.plataforma} — {viajeEnCurso.recorrido.length} puntos GPS capturados

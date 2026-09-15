@@ -128,7 +128,16 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         tarjetaActiva = intent?.getBooleanExtra(EXTRA_TARJETA_ACTIVA, tarjetaActiva) ?: tarjetaActiva
         estilo = intent?.getStringExtra(EXTRA_ESTILO) ?: estilo
         getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putString(EXTRA_ESTILO, estilo).apply()
-        val km = intent?.getStringExtra(EXTRA_KM) ?: formatearKm(kmAcumulados)
+        // 2026-09-15: antes esto solo mostraba el km recibido UNA vez — el
+        // reloj de abajo (`reloj`, cada 1s mientras enViaje) lo pisaba con
+        // kmAcumulados, que nunca se actualizaba acá, así que un segundo
+        // después de cada punto GPS real la burbuja volvía a mostrar "0".
+        // Ahora, si el intent trae un km real (viene de actualizarBurbuja()
+        // en domain/viajes/store.ts, con el km real medido por GPS), también
+        // se guarda en kmAcumulados para que el reloj lo siga mostrando.
+        val kmExtra = intent?.getStringExtra(EXTRA_KM)
+        if (kmExtra != null) kmExtra.toDoubleOrNull()?.let { kmAcumulados = it }
+        val km = kmExtra ?: formatearKm(kmAcumulados)
         val tiempo = intent?.getStringExtra(EXTRA_TIEMPO) ?: formatearTiempo(if (enViaje) System.currentTimeMillis() - inicioViajeMs else 0)
         val estadoSolicitado = intent?.getBooleanExtra(EXTRA_EN_VIAJE, enViaje) ?: enViaje
         val viajesExternos = intent?.getIntExtra(EXTRA_TOTAL_VIAJES, -1) ?: -1
