@@ -47,7 +47,8 @@ export function TarjetaMantenimiento({
   animado: boolean
   /** Cuántas veces se marcó "realizado" este ítem — 2026-09-16, pedido explícito del usuario, contado desde RegistroMantenimiento (D-18, no se duplica un campo nuevo). */
   vecesRealizado: number
-  onMarcarRealizado: () => void
+  /** 2026-09-16, pedido explícito del usuario ("que la gráfica de gastos de la moto incluya... todo lo de los mantenimientos"): el costo real queda en RegistroMantenimiento.costo, para sumarlo en Balance — antes esto siempre mandaba `null` (D-16, no había UI para cargarlo). */
+  onMarcarRealizado: (costo: number | null) => void
   onEliminar?: () => void
   /** 2026-09-16, pedido explícito del usuario: editar el costo aproximado y la bandera "fijo" de un ítem ya agregado, sin tener que borrarlo y volver a crearlo. */
   onActualizarCostoYFijo: (costoAproximado: number | null, fijo: boolean) => void
@@ -57,6 +58,7 @@ export function TarjetaMantenimiento({
 
   const [editandoCosto, setEditandoCosto] = useState(false)
   const [costoTexto, setCostoTexto] = useState(item.costoAproximado ? String(item.costoAproximado) : '')
+  const [costoRealHoy, setCostoRealHoy] = useState('')
 
   function guardarCosto() {
     onActualizarCostoYFijo(Number(costoTexto) || null, item.fijo ?? false)
@@ -143,8 +145,9 @@ export function TarjetaMantenimiento({
         </button>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-        <button type="button" onClick={onMarcarRealizado}>Marcar realizado hoy</button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 2, alignItems: 'center' }}>
+        <CampoMonto valor={costoRealHoy} onValorCambia={setCostoRealHoy} placeholder="Costo real (opcional)" style={{ flex: 1 }} />
+        <button type="button" onClick={() => { onMarcarRealizado(Number(costoRealHoy) || null); setCostoRealHoy('') }}>Marcar realizado hoy</button>
         {onEliminar && (
           <button type="button" onClick={onEliminar} style={{ background: 'transparent', color: PALETA.textoTenue }}>
             Eliminar

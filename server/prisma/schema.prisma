@@ -268,13 +268,15 @@ model MetaAhorro {
   nombre             String
   montoObjetivo      Float     @map("monto_objetivo")
   saldoActual        Float     @map("saldo_actual")
-  /// 2026-09-16, pedido explícito del usuario ("meta diaria" automática):
-  /// cuánto quiere aportar el conductor a esta meta cada mes — un objetivo
-  /// de planeación, no un abono real (esos siguen siendo AbonoAhorro). Solo
-  /// se usa para prorratear domain/metaDiaria en el cliente; null = esta
-  /// meta no cuenta en la meta diaria (mismo criterio opcional que
-  /// Deuda.cuotaProgramada).
-  aporteMensualObjetivo Float?  @map("aporte_mensual_objetivo")
+  /// 2026-09-16 (corrección posterior, misma sesión): reemplaza el
+  /// `aporteMensualObjetivo Float?` de la ronda anterior — un solo número
+  /// no dejaba decir "ahorro X por SEMANA" (bug real reportado: "la meta
+  /// diaria no subía"). Ahora es un objeto `{monto, frecuencia}` como
+  /// `Deuda.cuotaProgramada`, sin tipar columna por columna (mismo
+  /// criterio que esa) — el cliente decide la forma exacta
+  /// (domain/ahorro/types.ts, `AportePlaneado`). Solo se usa para
+  /// prorratear domain/metaDiaria; null = esta meta no cuenta ahí.
+  aportePlaneado     Json?     @map("aporte_planeado")
   creadaEnISO        DateTime  @map("creada_en")
   sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
   abonos             AbonoAhorro[]

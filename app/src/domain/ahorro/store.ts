@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AbonoAhorro, MetaAhorro } from './types'
+import type { AbonoAhorro, AportePlaneado, MetaAhorro } from './types'
 import { repositorioAhorro } from './repository'
 
 interface EstadoAhorro {
@@ -7,11 +7,11 @@ interface EstadoAhorro {
   abonos: AbonoAhorro[]
   cargando: boolean
   cargar: () => Promise<void>
-  agregarMeta: (nombre: string, montoObjetivo: number, aporteMensualObjetivo: number | null) => Promise<MetaAhorro>
+  agregarMeta: (nombre: string, montoObjetivo: number, aportePlaneado: AportePlaneado | null) => Promise<MetaAhorro>
   /** Crea el abono Y actualiza saldoActual de la meta — misma transacción lógica que Deudas.abonar. */
   abonar: (metaId: string, monto: number) => Promise<void>
-  /** Cambia SOLO el aporte mensual planeado — mismo patrón que Deudas.actualizarFechaLimite. */
-  actualizarAporteMensual: (metaId: string, aporteMensualObjetivo: number | null) => Promise<void>
+  /** Cambia SOLO el aporte planeado — mismo patrón que Deudas.actualizarFechaLimite. */
+  actualizarAportePlaneado: (metaId: string, aportePlaneado: AportePlaneado | null) => Promise<void>
   /** Metas con saldoActual < montoObjetivo. Mismo criterio que Deudas.deudasActivas, invertido. */
   metasEnProgreso: () => MetaAhorro[]
 }
@@ -31,13 +31,13 @@ export const useAhorro = create<EstadoAhorro>((set, get) => ({
     set({ metas, abonos, cargando: false })
   },
 
-  agregarMeta: async (nombre, montoObjetivo, aporteMensualObjetivo) => {
+  agregarMeta: async (nombre, montoObjetivo, aportePlaneado) => {
     const meta: MetaAhorro = {
       id: generarId(),
       nombre,
       montoObjetivo,
       saldoActual: 0,
-      aporteMensualObjetivo,
+      aportePlaneado,
       creadaEnISO: new Date().toISOString(),
       pendienteDeSync: true,
     }
@@ -46,10 +46,10 @@ export const useAhorro = create<EstadoAhorro>((set, get) => ({
     return meta
   },
 
-  actualizarAporteMensual: async (metaId, aporteMensualObjetivo) => {
+  actualizarAportePlaneado: async (metaId, aportePlaneado) => {
     const meta = get().metas.find((m) => m.id === metaId)
     if (!meta) return
-    const metaActualizada: MetaAhorro = { ...meta, aporteMensualObjetivo, pendienteDeSync: true }
+    const metaActualizada: MetaAhorro = { ...meta, aportePlaneado, pendienteDeSync: true }
     await repositorioAhorro.guardarMeta(metaActualizada)
     set({ metas: get().metas.map((m) => (m.id === metaId ? metaActualizada : m)) })
   },

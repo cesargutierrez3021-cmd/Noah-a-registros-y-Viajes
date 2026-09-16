@@ -13,7 +13,12 @@
 export const SUPERFICIE_EJECUTIVA = '#1b1d1b'
 export const BORDE_EJECUTIVO = '#373934'
 
-/** 4 tonos de dorado apagado, uno por categoría — reemplazan `item.color` en la variante ejecutiva (sobria, monocromática, no arcoíris). */
-export const TONOS_EJECUTIVOS = ['#b9aa80', '#c9b98b', '#e0d0a1', '#8b8066']
+/**
+ * Tonos de dorado apagado, uno por categoría — reemplazan `item.color` en la
+ * variante ejecutiva (sobria, monocromática, no arcoíris). 2026-09-16: se
+ * agregó un 5to tono al sumar la categoría "Vehículo" a Prisma (ver
+ * BalanceScreen.tsx) — antes de esto, con 4 categorías, alcanzaban los 4.
+ */
+export const TONOS_EJECUTIVOS = ['#b9aa80', '#c9b98b', '#e0d0a1', '#8b8066', '#a89468']
 
 export type VarianteGrafico = 'clasico' | 'ejecutivo'

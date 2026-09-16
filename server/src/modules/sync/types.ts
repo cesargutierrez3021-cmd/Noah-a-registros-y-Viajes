@@ -127,7 +127,7 @@ export interface MetaAhorroSyncEntrada {
   montoObjetivo: number
   saldoActual: number
   creadaEnISO: string
-  aporteMensualObjetivo: number | null
+  aportePlaneado: { monto: number; frecuencia: string } | null
 }
 
 /** Lo que el cliente manda por abono a una meta de ahorro. Mismo patrón que AbonoDeudaSyncEntrada. */

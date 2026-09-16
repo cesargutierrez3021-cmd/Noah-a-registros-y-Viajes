@@ -96,13 +96,19 @@ export const esquemaAbonoDeudaSync = z.object({
   fechaISO: z.string(),
 })
 
+const esquemaAportePlaneado = z.object({
+  monto: z.number().positive(),
+  frecuencia: z.enum(['semanal', 'quincenal', 'mensual']),
+})
+
 export const esquemaMetaAhorroSync = z.object({
   id: z.string().uuid('El id de la meta debe ser el UUID generado en el cliente'),
   nombre: z.string().min(1),
   montoObjetivo: z.number().positive(),
   saldoActual: z.number().nonnegative(),
   creadaEnISO: z.string(),
-  aporteMensualObjetivo: z.number().nonnegative().nullable().optional().default(null),
+  // 2026-09-16 (corrección posterior, misma sesión): reemplaza aporteMensualObjetivo (número fijo) por {monto,frecuencia}.
+  aportePlaneado: esquemaAportePlaneado.nullable().optional().default(null),
 })
 
 export const esquemaAbonoAhorroSync = z.object({

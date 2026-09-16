@@ -146,8 +146,8 @@ export function SeccionMantenimiento() {
               estado={estado}
               animado={animado}
               vecesRealizado={registros.filter((r) => r.itemId === estado.item.id).length}
-              onMarcarRealizado={() => {
-                void marcarRealizado(estado.item.id, kmActual, null, null)
+              onMarcarRealizado={(costo) => {
+                void marcarRealizado(estado.item.id, kmActual, costo, null)
                 void sincronizarRegistrosMantenimientoPendientes()
               }}
               onEliminar={estado.item.origen === 'personalizado' ? () => void eliminarItem(estado.item.id) : undefined}

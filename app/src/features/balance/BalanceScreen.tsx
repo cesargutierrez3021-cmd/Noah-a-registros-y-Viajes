@@ -5,6 +5,7 @@ import { useGastos } from '../../domain/gastos/store'
 import { useDeudas } from '../../domain/deudas/store'
 import { useHogar } from '../../domain/hogar/store'
 import { useAhorro } from '../../domain/ahorro/store'
+import { useMantenimiento } from '../../domain/mantenimiento/store'
 import { useAuth } from '../../domain/auth/store'
 import { useTema } from '../../domain/tema/store'
 import { useVehiculo } from '../../domain/vehiculo/store'
@@ -59,6 +60,7 @@ export function BalanceScreen() {
   const { deudas, cargar: cargarDeudas } = useDeudas()
   const { gastos: gastosHogar, cargar: cargarHogar } = useHogar()
   const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
+  const { registros: registrosMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
   const { autenticado } = useAuth()
   const { tema } = useTema()
   const { tipoVehiculo } = useVehiculo()
@@ -82,30 +84,57 @@ export function BalanceScreen() {
     void cargarDeudas()
     void cargarHogar()
     void cargarAhorro()
-  }, [cargarViajes, cargarGastos, cargarDeudas, cargarHogar, cargarAhorro])
+    void cargarMantenimiento()
+  }, [cargarViajes, cargarGastos, cargarDeudas, cargarHogar, cargarAhorro, cargarMantenimiento])
 
   const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar, metasAhorro)
 
+  /**
+   * 2026-09-16, pedido explícito del usuario: "falta la gráfica de los
+   * gastos de la moto... todo lo que reporto como gastos dentro del panel
+   * de trabajo y todo lo de los mantenimientos" — dos fuentes reales
+   * distintas, nunca se pisan: `balance.gastosOperativos` (domain/gastos,
+   * lo cargado a mano en "Gastos de jornada") y el costo real de cada
+   * mantenimiento marcado "realizado" (`RegistroMantenimiento.costo`, ver
+   * TarjetaMantenimiento.tsx — antes siempre se guardaba `null`, sin UI
+   * para cargarlo; ahora hay un campo "Costo real" junto al botón).
+   */
+  const costoMantenimientoRealizado = registrosMantenimiento.reduce((acc, r) => acc + (r.costo ?? 0), 0)
+  const gastosVehiculoTotal = balance.gastosOperativos + costoMantenimientoRealizado
+
   // 2026-09-15, pedido explícito del usuario, con referencia visual propia:
-  // Hogar/Deudas/Ahorro/Libre, las 4 sumando 100% entre sí — NO % del
+  // Hogar/Deudas/Ahorro/Vehículo/Libre, sumando 100% entre sí — NO % del
   // ingreso total (una deuda acumulada puede superar el ingreso de un solo
-  // período, eso rompería el sentido de "4 porciones de una torta"). Libre
+  // período, eso rompería el sentido de "porciones de una torta"). Libre
   // (balance neto) se recorta a 0 para este reparto si diera negativo — un
   // "libre" negativo no es una porción positiva de nada, ya se ve en rojo
   // en la lista de abajo.
   const librePositivo = Math.max(balance.balanceNeto, 0)
-  const sumaCuatro = balance.gastosDeHogar + balance.deudaPendienteTotal + balance.ahorroTotal + librePositivo
-  // 2026-09-15 (corrección posterior, misma sesión): el usuario mandó la
-  // referencia exacta de color para Hogar/Deudas/Ahorro/Libre (paquete
-  // "prism-crystal-orbit-package", ORIGINAL_COMPONENTS.tsx: C.green/coral/
-  // lilac/sky) y mostró capturas — el set anterior (ámbar/rojo-naranja/
-  // verde/azul) no calzaba con lo que había pedido. Se reemplaza por el
-  // set exacto del paquete, mismo orden Hogar→Deudas→Ahorro→Libre.
+  const sumaCategorias = balance.gastosDeHogar + balance.deudaPendienteTotal + balance.ahorroTotal + gastosVehiculoTotal + librePositivo
+  // 2026-09-15, el usuario mandó la referencia exacta de color para
+  // Hogar/Deudas/Ahorro/Libre (paquete "prism-crystal-orbit-package",
+  // ORIGINAL_COMPONENTS.tsx: C.green/coral/lilac/sky). "Vehículo" (2026-09-16,
+  // categoría nueva) reusa el ámbar `#f0c987` que ya usa el acordeón de
+  // gastos de vehículo más abajo (D-18, un solo color por concepto en toda
+  // la pantalla).
+  //
+  // "Vehículo" queda AL FINAL a propósito: el estilo "Cristal 3D"
+  // (Cristal3D.tsx) tiene 5 placas de VIDRIO FOTOGRAFIADO fijas —
+  // HOGAR/DEUDAS/AHORRO/LIBRE/INGRESO — no hay una sexta placa "VEHÍCULO"
+  // (no existe esa foto, y no hay forma de generar una que calce con el
+  // mismo material/iluminación de las otras). Ese componente corta con
+  // `items.slice(0,4)`; si "vehiculo" fuera antes que "libre" en este
+  // array, Cristal3D perdería a "Libre" en su lugar — mucho peor, esa
+  // categoría siempre estuvo ahí. Así, Cristal3D sigue mostrando
+  // exactamente lo mismo de siempre (Hogar/Deudas/Ahorro/Libre) y "Vehículo"
+  // se ve en los otros dos estilos (Prisma, Anillos orbitales), que sí
+  // dibujan sus 5 categorías con CSS/SVG, sin depender de una foto fija.
   const itemsDistribucion: ItemDistribucion[] = [
-    { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#55e3a0', porcentaje: sumaCuatro > 0 ? (balance.gastosDeHogar / sumaCuatro) * 100 : 0 },
-    { clave: 'deudas', etiqueta: 'Deudas', monto: balance.deudaPendienteTotal, color: '#ff9d83', porcentaje: sumaCuatro > 0 ? (balance.deudaPendienteTotal / sumaCuatro) * 100 : 0 },
-    { clave: 'ahorro', etiqueta: 'Ahorro', monto: balance.ahorroTotal, color: '#b7a4ff', porcentaje: sumaCuatro > 0 ? (balance.ahorroTotal / sumaCuatro) * 100 : 0 },
-    { clave: 'libre', etiqueta: 'Libre', monto: librePositivo, color: '#78c8ff', porcentaje: sumaCuatro > 0 ? (librePositivo / sumaCuatro) * 100 : 0 },
+    { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#55e3a0', porcentaje: sumaCategorias > 0 ? (balance.gastosDeHogar / sumaCategorias) * 100 : 0 },
+    { clave: 'deudas', etiqueta: 'Deudas', monto: balance.deudaPendienteTotal, color: '#ff9d83', porcentaje: sumaCategorias > 0 ? (balance.deudaPendienteTotal / sumaCategorias) * 100 : 0 },
+    { clave: 'ahorro', etiqueta: 'Ahorro', monto: balance.ahorroTotal, color: '#b7a4ff', porcentaje: sumaCategorias > 0 ? (balance.ahorroTotal / sumaCategorias) * 100 : 0 },
+    { clave: 'libre', etiqueta: 'Libre', monto: librePositivo, color: '#78c8ff', porcentaje: sumaCategorias > 0 ? (librePositivo / sumaCategorias) * 100 : 0 },
+    { clave: 'vehiculo', etiqueta: 'Vehículo', monto: gastosVehiculoTotal, color: '#f0c987', porcentaje: sumaCategorias > 0 ? (gastosVehiculoTotal / sumaCategorias) * 100 : 0 },
   ]
 
   // 2026-09-15, pedido explícito del usuario: "después de la gráfica

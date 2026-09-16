@@ -31,7 +31,17 @@ function formatoPesosCorto(monto: number): string {
  * fuente" pero recibía `total` = `sumaCuatro` (Hogar+Deudas+Ahorro+Libre),
  * no el ingreso real — agregar una deuda inflaba este número también.
  * Ahora recibe `ingresoReal` aparte.
+ *
+ * 2026-09-16 (misma sesión, ronda posterior): pasa de 4 a 5 categorías al
+ * agregarse "Vehículo" (BalanceScreen.tsx) — a diferencia de Cristal3D (5
+ * placas de FOTO fija, no puede crecer a una 6ta sin una foto nueva que no
+ * existe), acá las líneas y tarjetas de destino son CSS/SVG puro, así que
+ * suman una más sin problema. El ángulo de cada línea se calcula centrado
+ * sobre la cantidad real de `items` (`PASO_ANGULO` fijo, el punto de
+ * arranque se corre según cuántas haya) en vez de un abanico fijo para
+ * exactamente 4 — así no queda descuadrado si algún día hay más o menos.
  */
+const PASO_ANGULO = 15
 export function Prisma({
   items,
   ingresoReal,
@@ -48,7 +58,7 @@ export function Prisma({
   const colorFuente = ejecutivo ? TONOS_EJECUTIVOS[0] : 'var(--color-acento)'
 
   return (
-    <div style={{ position: 'relative', height: 210, marginBottom: 8 }}>
+    <div style={{ position: 'relative', height: Math.max(210, 40 * items.length + 60), marginBottom: 8 }}>
       <div
         className="prisma__fuente"
         style={{ borderColor: colorFuente, color: colorFuente, background: `color-mix(in srgb, ${colorFuente} 16%, ${superficie})` }}
@@ -58,20 +68,21 @@ export function Prisma({
       </div>
 
       <div className="prisma__lineas">
-        {items.slice(0, 4).map((item, i) => {
+        {items.map((item, i) => {
           const color = ejecutivo ? TONOS_EJECUTIVOS[i % TONOS_EJECUTIVOS.length] : item.color
+          const anguloInicial = -((items.length - 1) * PASO_ANGULO) / 2
           return (
             <span
               key={item.clave}
               className={animado ? 'prisma__linea prisma__linea--animada' : 'prisma__linea'}
-              style={{ ['--linea' as string]: color, ['--angulo' as string]: `${-25 + i * 16}deg`, animationDelay: `${i * 0.55}s` }}
+              style={{ ['--linea' as string]: color, ['--angulo' as string]: `${anguloInicial + i * PASO_ANGULO}deg`, animationDelay: `${i * 0.55}s` }}
             />
           )
         })}
       </div>
 
       <div className="prisma__destinos">
-        {items.slice(0, 4).map((item, i) => {
+        {items.map((item, i) => {
           const color = ejecutivo ? TONOS_EJECUTIVOS[i % TONOS_EJECUTIVOS.length] : item.color
           return (
             <span

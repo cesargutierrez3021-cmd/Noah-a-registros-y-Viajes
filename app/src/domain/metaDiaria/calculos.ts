@@ -1,26 +1,65 @@
 import type { ConceptoFijo } from '../hogar/types'
-import type { Deuda, FrecuenciaCuota } from '../deudas/types'
+import type { CuotaProgramada, Deuda, FrecuenciaCuota } from '../deudas/types'
 import type { MetaAhorro } from '../ahorro/types'
 import type { ItemMantenimiento } from '../mantenimiento/types'
 import { tarifaDiariaItem } from '../mantenimiento/reglas'
 import { fechaNegocioISO } from '../../lib/fechas'
 import type { DesgloseMetaBaseDiaria, ResultadoMetaDiaria } from './types'
 
-const DIAS_MES = 30
+/** Días reales del mes [año, mes 0-indexado] — 28/29/30/31, nunca un promedio fijo. */
+function diasEnMes(año: number, mes: number): number {
+  return new Date(año, mes + 1, 0).getDate()
+}
 
-function diasPorFrecuencia(frecuencia: FrecuenciaCuota): number {
-  if (frecuencia === 'semanal') return 7
-  if (frecuencia === 'quincenal') return 15
-  return DIAS_MES
+/** Cuántas veces cae el día de semana `diaObjetivo` (0=domingo..6=sábado, igual que Date.getDay()) dentro del mes [año, mes]. */
+function ocurrenciasDiaSemanaEnMes(año: number, mes: number, diaObjetivo: number): number {
+  const dias = diasEnMes(año, mes)
+  let cuenta = 0
+  for (let d = 1; d <= dias; d++) {
+    if (new Date(año, mes, d).getDay() === diaObjetivo) cuenta++
+  }
+  return cuenta
+}
+
+/**
+ * 2026-09-16, corrección de un bug real reportado por el usuario ("puse
+ * muchas deudas y muchos gastos y no aumentaba la meta diaria... recuerda
+ * que la meta diaria es en balance AL MES"): la ronda anterior agregó el
+ * ancla real de cada cuota (`diaDelMes`/`diasDelMes`/`diaDeLaSemana`, ver
+ * domain/deudas/types.ts) para las alertas de vencimiento, pero
+ * `calcularMetaBaseDiaria` nunca llegó a USARLA — seguía prorrateando con
+ * un divisor genérico (`monto / 7` para semanal, `/15` quincenal, `/30`
+ * mensual) sin mirar cuántas veces cae de verdad la cuota en el mes actual.
+ * Esta función cuenta las ocurrencias REALES dentro del mes de `ahora`:
+ * - mensual   → siempre 1 vez al mes (con o sin ancla puesta).
+ * - quincenal → siempre 2 veces al mes (las dos fechas elegidas).
+ * - semanal   → 4 o 5 veces, según cuántos [diaDeLaSemana] caen ese mes —
+ *   exactamente el ejemplo del usuario ("cuántas semanas del 1 al 30 o 31").
+ *   Sin ancla puesta (deuda de antes de ese campo), cae a una aproximación
+ *   genérica de 4 veces al mes.
+ */
+function ocurrenciasCuotaEnMes(cuota: CuotaProgramada, año: number, mes: number): number {
+  if (cuota.frecuencia === 'mensual') return 1
+  if (cuota.frecuencia === 'quincenal') return 2
+  // semanal
+  if (cuota.diaDeLaSemana != null) return ocurrenciasDiaSemanaEnMes(año, mes, cuota.diaDeLaSemana)
+  return 4
+}
+
+/** Mismo criterio que `ocurrenciasCuotaEnMes`, pero para el aporte planeado de Ahorro — sin ancla de día (ver domain/ahorro/types.ts, AportePlaneado): "las semanas que alcancen en el mes", sin fijar cuál día de la semana. */
+function ocurrenciasFrecuenciaEnMes(frecuencia: FrecuenciaCuota, año: number, mes: number): number {
+  if (frecuencia === 'mensual') return 1
+  if (frecuencia === 'quincenal') return 2
+  return Math.floor(diasEnMes(año, mes) / 7)
 }
 
 /**
  * Cuánto cuesta "un día normal" — la meta ANTES de sumarle el arrastre de
  * días anteriores sin cubrir (eso lo hace `calcularMetaDiaria`, más abajo).
- * Cada fuente se prorratea a una tarifa diaria con su propio criterio (mes
- * calendario para hogar/gasolina, la frecuencia real de la cuota para
- * deudas, el intervalo del ítem para mantenimiento) — D-10: función pura,
- * recibe todo como parámetro, no importa ningún store.
+ * Cada fuente se calcula como un TOTAL DEL MES CALENDARIO ACTUAL (usando
+ * ocurrencias reales, ver arriba) y se divide entre los días reales de ESE
+ * mes — no un promedio de 30 días fijo, D-10: función pura, recibe todo
+ * como parámetro (incluido `ahora`, para poder probarla con una fecha fija).
  */
 export function calcularMetaBaseDiaria(input: {
   conceptosFijosActivos: ConceptoFijo[]
@@ -29,21 +68,33 @@ export function calcularMetaBaseDiaria(input: {
   itemsMantenimiento: ItemMantenimiento[]
   kmPromedioDiario: number
   presupuestoGasolinaMensual: number | null
+  ahora?: Date
 }): DesgloseMetaBaseDiaria {
-  const hogar = input.conceptosFijosActivos.reduce((acc, c) => acc + c.montoEsperado, 0) / DIAS_MES
+  const ahora = input.ahora ?? new Date()
+  const año = ahora.getFullYear()
+  const mes = ahora.getMonth()
+  const diasDelMesActual = diasEnMes(año, mes)
 
-  const deudas = input.deudasActivas.reduce((acc, d) => {
+  const totalHogarMes = input.conceptosFijosActivos.reduce((acc, c) => acc + c.montoEsperado, 0)
+  const hogar = totalHogarMes / diasDelMesActual
+
+  const totalDeudasMes = input.deudasActivas.reduce((acc, d) => {
     if (!d.cuotaProgramada) return acc
-    return acc + d.cuotaProgramada.monto / diasPorFrecuencia(d.cuotaProgramada.frecuencia)
+    return acc + d.cuotaProgramada.monto * ocurrenciasCuotaEnMes(d.cuotaProgramada, año, mes)
   }, 0)
+  const deudas = totalDeudasMes / diasDelMesActual
 
-  const ahorro = input.metasAhorroEnProgreso.reduce((acc, m) => acc + (m.aporteMensualObjetivo ?? 0), 0) / DIAS_MES
+  const totalAhorroMes = input.metasAhorroEnProgreso.reduce((acc, m) => {
+    if (!m.aportePlaneado) return acc
+    return acc + m.aportePlaneado.monto * ocurrenciasFrecuenciaEnMes(m.aportePlaneado.frecuencia, año, mes)
+  }, 0)
+  const ahorro = totalAhorroMes / diasDelMesActual
 
   const mantenimiento = input.itemsMantenimiento
     .filter((i) => i.fijo && i.costoAproximado)
     .reduce((acc, i) => acc + tarifaDiariaItem(i, input.kmPromedioDiario), 0)
 
-  const gasolina = (input.presupuestoGasolinaMensual ?? 0) / DIAS_MES
+  const gasolina = (input.presupuestoGasolinaMensual ?? 0) / diasDelMesActual
 
   return { hogar, deudas, ahorro, mantenimiento, gasolina, total: hogar + deudas + ahorro + mantenimiento + gasolina }
 }
