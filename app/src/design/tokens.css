@@ -883,7 +883,10 @@ textarea:focus {
 /* Estilo "Cristal 3D" (2026-09-15, reescrito 2026-09-16 con fotos reales de placas de vidrio) — ver components/graficos/Cristal3D.tsx */
 .cristal3d__stage {
   position: relative;
-  height: 380px;
+  /* 2026-09-16: subió de 380 a 420px al pasar de 4 a 5 categorías satélite
+     (layout en pentágono, ver Cristal3D.tsx) — con la cruz de 4 alcanzaba,
+     con 5 el radio del pentágono necesita un poco más de aire vertical. */
+  height: 420px;
   margin-bottom: 8px;
 }
 .cristal3d__placa {

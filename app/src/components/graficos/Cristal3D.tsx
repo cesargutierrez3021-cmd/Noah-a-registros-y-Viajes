@@ -6,11 +6,13 @@ import imgColorHogar from '../../assets/cristal3d/A-color-hogar.webp'
 import imgColorDeudas from '../../assets/cristal3d/A-color-deudas.webp'
 import imgColorAhorro from '../../assets/cristal3d/A-color-ahorro.webp'
 import imgColorLibre from '../../assets/cristal3d/A-color-libre.webp'
+import imgColorVehiculo from '../../assets/cristal3d/A-color-vehiculo.webp'
 import imgMatteIngreso from '../../assets/cristal3d/B-matte-ingreso.webp'
 import imgMatteHogar from '../../assets/cristal3d/B-matte-hogar.webp'
 import imgMatteDeudas from '../../assets/cristal3d/B-matte-deudas.webp'
 import imgMatteAhorro from '../../assets/cristal3d/B-matte-ahorro.webp'
 import imgMatteLibre from '../../assets/cristal3d/B-matte-libre.webp'
+import imgMatteVehiculo from '../../assets/cristal3d/B-matte-vehiculo.webp'
 
 function formatoPesosCorto(monto: number): string {
   if (Math.abs(monto) >= 1_000_000) return `$${(monto / 1_000_000).toFixed(1)}M`
@@ -18,8 +20,8 @@ function formatoPesosCorto(monto: number): string {
   return `$${Math.round(monto)}`
 }
 
-const IMAGENES_COLOR: Record<string, string> = { ingreso: imgColorIngreso, hogar: imgColorHogar, deudas: imgColorDeudas, ahorro: imgColorAhorro, libre: imgColorLibre }
-const IMAGENES_MATTE: Record<string, string> = { ingreso: imgMatteIngreso, hogar: imgMatteHogar, deudas: imgMatteDeudas, ahorro: imgMatteAhorro, libre: imgMatteLibre }
+const IMAGENES_COLOR: Record<string, string> = { ingreso: imgColorIngreso, hogar: imgColorHogar, deudas: imgColorDeudas, ahorro: imgColorAhorro, libre: imgColorLibre, vehiculo: imgColorVehiculo }
+const IMAGENES_MATTE: Record<string, string> = { ingreso: imgMatteIngreso, hogar: imgMatteHogar, deudas: imgMatteDeudas, ahorro: imgMatteAhorro, libre: imgMatteLibre, vehiculo: imgMatteVehiculo }
 /** Tono dorado único de la variante ejecutiva — el mismo del grabado en las fotos B-matte-*. */
 const COLOR_TEXTO_EJECUTIVO = '#e6d9b1'
 
@@ -29,13 +31,27 @@ const COLOR_TEXTO_EJECUTIVO = '#e6d9b1'
  * las 4 categorías alrededor). `left`/`top` son el punto central de cada
  * placa en % del stage; `rot` es su inclinación fija (la misma con la que
  * salió fotografiada, no inventada).
+ *
+ * 2026-09-16, pedido explícito del usuario ("me gustaría la de cristal que
+ * se pueda ver esa quinta gráfica"): se agregó una 6ta placa, "VEHÍCULO"
+ * (BalanceScreen.tsx) — sin una foto nueva del mismo fotógrafo/IA que las
+ * otras 5 (no hay forma de generar una en este entorno), se editó la placa
+ * "LIBRE" existente: se borró el texto grabado con relleno del degradado
+ * del propio cristal (interpolación fila por fila entre los bordes sanos
+ * de la placa, sin tocar los broches de las esquinas) y se dibujó
+ * "VEHÍCULO" encima con el mismo estilo (bisel cromado en la versión color,
+ * brillo ámbar en la ejecutiva) — mismo archivo base, mismo material,
+ * misma luz, así que encaja sin desentonar. El layout pasa de cruz (4
+ * satélites) a pentágono (5 satélites) alrededor de "INGRESO", mismo radio
+ * aproximado que la cruz original.
  */
 const POSICIONES: Record<string, { left: number; top: number; width: number; rot: number; z: number; delay: number }> = {
-  ingreso: { left: 50, top: 50, width: 40, rot: 1, z: 5, delay: 1.6 },
-  hogar:   { left: 21, top: 18, width: 31, rot: -3, z: 2, delay: 0 },
-  deudas:  { left: 79, top: 21, width: 31, rot: 3, z: 3, delay: 0.4 },
-  ahorro:  { left: 21, top: 82, width: 31, rot: -5, z: 2, delay: 0.8 },
-  libre:   { left: 79, top: 82, width: 31, rot: 4, z: 3, delay: 1.2 },
+  ingreso:  { left: 50,   top: 50,   width: 30, rot: 1, z: 6, delay: 1.8 },
+  hogar:    { left: 50,   top: 15,   width: 23, rot: -3, z: 2, delay: 0 },
+  deudas:   { left: 82.3, top: 39.2, width: 23, rot: 3, z: 3, delay: 0.35 },
+  vehiculo: { left: 70,   top: 78.3, width: 23, rot: -4, z: 4, delay: 0.7 },
+  libre:    { left: 30,   top: 78.3, width: 23, rot: 4, z: 3, delay: 1.05 },
+  ahorro:   { left: 17.7, top: 39.2, width: 23, rot: -5, z: 2, delay: 1.4 },
 }
 
 /**
@@ -49,10 +65,11 @@ const POSICIONES: Record<string, { left: number; top: number; width: number; rot
  * envolvente convexa — ver PLAN-MAESTRO para el detalle del proceso).
  *
  * Cada placa trae su nombre grabado en la imagen (HOGAR/DEUDAS/AHORRO/
- * LIBRE/INGRESO) pero el número queda vacío a propósito — el dato real
- * (porcentaje o el monto total en INGRESO) se superpone acá como texto,
- * para que siempre sea el dato del usuario, nunca uno fijo horneado en la
- * imagen (ver el aviso que se le dio al usuario sobre esto).
+ * LIBRE/VEHÍCULO/INGRESO — VEHÍCULO editada de LIBRE, ver el comentario de
+ * `POSICIONES` más abajo) pero el número queda vacío a propósito — el dato
+ * real (porcentaje o el monto total en INGRESO) se superpone acá como
+ * texto, para que siempre sea el dato del usuario, nunca uno fijo horneado
+ * en la imagen (ver el aviso que se le dio al usuario sobre esto).
  *
  * `variante`: 'ejecutivo' usa el segundo lote de fotos (vidrio ahumado
  * negro + bronce/dorado mate, la misma escena pero en ese material) en vez
@@ -85,7 +102,7 @@ export function Cristal3D({
 
   const placas = [
     { clave: 'ingreso', color: COLOR_TEXTO_EJECUTIVO, texto: formatoPesosCorto(ingresoReal) },
-    ...items.slice(0, 4).map((item) => ({ clave: item.clave, color: ejecutivo ? COLOR_TEXTO_EJECUTIVO : item.color, texto: `${Math.round(item.porcentaje)}%` })),
+    ...items.slice(0, 5).map((item) => ({ clave: item.clave, color: ejecutivo ? COLOR_TEXTO_EJECUTIVO : item.color, texto: `${Math.round(item.porcentaje)}%` })),
   ]
 
   return (

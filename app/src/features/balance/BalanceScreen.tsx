@@ -118,17 +118,11 @@ export function BalanceScreen() {
   // gastos de vehículo más abajo (D-18, un solo color por concepto en toda
   // la pantalla).
   //
-  // "Vehículo" queda AL FINAL a propósito: el estilo "Cristal 3D"
-  // (Cristal3D.tsx) tiene 5 placas de VIDRIO FOTOGRAFIADO fijas —
-  // HOGAR/DEUDAS/AHORRO/LIBRE/INGRESO — no hay una sexta placa "VEHÍCULO"
-  // (no existe esa foto, y no hay forma de generar una que calce con el
-  // mismo material/iluminación de las otras). Ese componente corta con
-  // `items.slice(0,4)`; si "vehiculo" fuera antes que "libre" en este
-  // array, Cristal3D perdería a "Libre" en su lugar — mucho peor, esa
-  // categoría siempre estuvo ahí. Así, Cristal3D sigue mostrando
-  // exactamente lo mismo de siempre (Hogar/Deudas/Ahorro/Libre) y "Vehículo"
-  // se ve en los otros dos estilos (Prisma, Anillos orbitales), que sí
-  // dibujan sus 5 categorías con CSS/SVG, sin depender de una foto fija.
+  // 2026-09-16 (corrección posterior, misma sesión): "Cristal 3D" también
+  // muestra "Vehículo" ahora — ver el comentario largo en Cristal3D.tsx
+  // sobre la 6ta placa (editada de la placa "LIBRE" existente, mismo
+  // material/luz, sin foto nueva). El orden acá ya no importa para ese
+  // componente (usa `items.slice(0,5)`, las 5 categorías completas).
   const itemsDistribucion: ItemDistribucion[] = [
     { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#55e3a0', porcentaje: sumaCategorias > 0 ? (balance.gastosDeHogar / sumaCategorias) * 100 : 0 },
     { clave: 'deudas', etiqueta: 'Deudas', monto: balance.deudaPendienteTotal, color: '#ff9d83', porcentaje: sumaCategorias > 0 ? (balance.deudaPendienteTotal / sumaCategorias) * 100 : 0 },
