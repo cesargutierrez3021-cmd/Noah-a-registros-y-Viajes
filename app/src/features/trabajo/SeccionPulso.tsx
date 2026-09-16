@@ -1,8 +1,13 @@
 import { fechaNegocioISO, limitesDiaBogotaISO, limitesSemanaBogotaISO, limitesMesBogotaISO } from '../../lib/fechas'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
 import { useJornada } from '../../domain/jornada/store'
 import { useGastos } from '../../domain/gastos/store'
+import { useHogar } from '../../domain/hogar/store'
+import { useDeudas } from '../../domain/deudas/store'
+import { useAhorro } from '../../domain/ahorro/store'
+import { useMantenimiento } from '../../domain/mantenimiento/store'
+import { useMetaDiaria } from '../../domain/metaDiaria/store'
 import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
 import { mostrarBurbuja, ocultarBurbuja } from '../../domain/viajes/burbuja'
 import {
@@ -13,6 +18,7 @@ import {
   calcularRentabilidadPorHora,
   calcularTiempoJornada,
 } from '../../domain/estadisticas/calculos'
+import { calcularMetaBaseDiaria, calcularMetaDiaria, generarClavesDiasAnteriores } from '../../domain/metaDiaria/calculos'
 import type { Gasto } from '../../domain/gastos/types'
 import type { Viaje } from '../../domain/viajes/types'
 import { SeccionMantenimiento } from './SeccionMantenimiento'
@@ -77,17 +83,58 @@ export function SeccionPulso() {
   const { viajes, viajeEnCurso } = useViajes()
   const { jornadaAbierta, iniciarJornada, terminarJornada, pausarJornada, reanudarJornada } = useJornada()
   const { gastos } = useGastos()
+  const { conceptos: conceptosHogar, cargar: cargarHogar } = useHogar()
+  const { deudas, cargar: cargarDeudas } = useDeudas()
+  const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
+  const { items: itemsMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
+  const { presupuestoGasolinaMensual, cargar: cargarMetaDiaria } = useMetaDiaria()
 
   const [vista, setVista] = useState<VistaLectura>('recortadas')
   const [periodo, setPeriodo] = useState<PeriodoResumen>('hoy')
   const [historialAbierto, setHistorialAbierto] = useState(false)
 
+  // 2026-09-16, pedido explícito del usuario ("meta diaria" automática): la
+  // barra de Estado del sistema necesita datos de 4 dominios más, aparte de
+  // Viajes/Jornada/Gastos que este panel ya cargaba — mismo criterio D-10 que
+  // BalanceScreen.tsx (la única pantalla que ya combinaba varios stores a la vez).
+  useEffect(() => {
+    void cargarHogar()
+    void cargarDeudas()
+    void cargarAhorro()
+    void cargarMantenimiento()
+    cargarMetaDiaria()
+  }, [cargarHogar, cargarDeudas, cargarAhorro, cargarMantenimiento, cargarMetaDiaria])
+
   const jornada = jornadaAbierta()
 
+  const porDia = useMemo(() => agruparPorPeriodo(viajes, 'dia'), [viajes])
   const resumenHoy = useMemo(() => {
-    const porDia = agruparPorPeriodo(viajes, 'dia')
     return porDia.find((p) => p.clave === claveDiaDeHoy())?.resumen ?? calcularResumen([])
-  }, [viajes])
+  }, [porDia])
+
+  const metaDiaria = useMemo(() => {
+    const kmPromedioDiario =
+      porDia.length === 0 ? 0 : porDia.slice(0, 30).reduce((acc, p) => acc + p.resumen.kmTotales, 0) / Math.min(30, porDia.length)
+
+    const metaBase = calcularMetaBaseDiaria({
+      conceptosFijosActivos: conceptosHogar.filter((c) => c.activo),
+      deudasActivas: deudas.filter((d) => d.saldoActual > 0),
+      metasAhorroEnProgreso: metasAhorro.filter((m) => m.saldoActual < m.montoObjetivo),
+      itemsMantenimiento,
+      kmPromedioDiario,
+      presupuestoGasolinaMensual,
+    })
+
+    const finalizados = viajes.filter((v) => v.estado === 'finalizado')
+    const primerViajeISO = finalizados.reduce<string | null>(
+      (acc, v) => (acc === null || v.inicioISO < acc ? v.inicioISO : acc),
+      null,
+    )
+    const ingresosPorDiaClave = new Map(porDia.map((p) => [p.clave, p.resumen.ingresos]))
+    const clavesDiasAnteriores = generarClavesDiasAnteriores(primerViajeISO)
+
+    return calcularMetaDiaria(metaBase.total, ingresosPorDiaClave, clavesDiasAnteriores, resumenHoy.ingresos)
+  }, [porDia, conceptosHogar, deudas, metasAhorro, itemsMantenimiento, presupuestoGasolinaMensual, viajes, resumenHoy.ingresos])
 
   const tiempo = useMemo(() => (jornada ? calcularTiempoJornada(jornada, viajes) : null), [jornada, viajes])
   const rentabilidad = useMemo(() => (jornada ? calcularRentabilidadPorHora(jornada, viajes) : null), [jornada, viajes])
@@ -153,8 +200,35 @@ export function SeccionPulso() {
           {jornada ? (jornada.pausadaDesdeISO ? 'Pausada' : 'En curso') : 'Sin abrir'}
         </div>
         <span className="tt-estado__detalle">
-          {resumenHoy.kmTotales.toFixed(1)} km · {resumenHoy.cantidadViajes} viaje{resumenHoy.cantidadViajes === 1 ? '' : 's'}
+          {resumenHoy.kmTotales.toFixed(1)} km · {resumenHoy.cantidadViajes} viaje{resumenHoy.cantidadViajes === 1 ? '' : 's'} · {formatoPesos(resumenHoy.ingresos)}
         </span>
+
+        {/* 2026-09-16, pedido explícito del usuario: "una barrita que me muestre el porcentaje de lo que llevo de mi meta diaria" — domain/metaDiaria, cruza Hogar+Deudas+Ahorro+Mantenimiento+gasolina aproximada (Ajustes). */}
+        {metaDiaria.metaBase > 0 ? (
+          <div className="tt-meta-diaria">
+            <div className="tt-meta-diaria__fila">
+              <span>Meta de hoy</span>
+              <strong>{formatoPesos(metaDiaria.metaDeHoy)}</strong>
+            </div>
+            <div className="tt-meta-diaria__pista">
+              <div
+                className="tt-meta-diaria__barra"
+                style={{
+                  width: `${Math.round(metaDiaria.progresoPorcentaje)}%`,
+                  background: metaDiaria.cubierta ? 'var(--tt-menta)' : metaDiaria.progresoPorcentaje >= 60 ? 'var(--tt-oro)' : 'var(--tt-coral)',
+                }}
+              />
+            </div>
+            <span className="tt-meta-diaria__detalle">
+              {Math.round(metaDiaria.progresoPorcentaje)}% cubierto
+              {metaDiaria.deficitAcumulado > 0 && ` · incluye ${formatoPesos(metaDiaria.deficitAcumulado)} de días anteriores sin cubrir`}
+            </span>
+          </div>
+        ) : (
+          <span className="tt-estado__detalle" style={{ display: 'block', marginTop: 6, fontSize: '0.72rem' }}>
+            Configura tus gastos fijos (Hogar, Deudas, Ahorro, Mantenimiento) o la gasolina aproximada en Ajustes para ver tu meta diaria.
+          </span>
+        )}
       </div>
 
       {/* 2026-09-15, pedido explícito del usuario: "cuando los viajes están pendientes... tiene que aparecer ahí abajito de estado del sistema... no debería tener que hacer scroll" */}

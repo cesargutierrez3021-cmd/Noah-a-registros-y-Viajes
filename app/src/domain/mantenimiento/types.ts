@@ -68,6 +68,27 @@ export interface ItemMantenimiento {
   ultimaFechaISO: string
   /** Ver el comentario de `ImagenMantenimiento` arriba. Opcional para no romper ítems ya guardados antes de este campo (quedan `undefined`, se tratan igual que `null`). */
   imagen?: ImagenMantenimiento | null
+  /**
+   * 2026-09-16, pedido explícito del usuario ("la meta diaria se tiene que
+   * definir sobre... los gastos de mantenimiento... hay que poner cuánto
+   * vale aproximadamente"): un estimado de plata, NO un gasto real (eso
+   * sigue siendo `RegistroMantenimiento.costo`, cargado al marcar
+   * realizado). Solo se usa para prorratear domain/metaDiaria. `null` =
+   * sin estimado todavía. Opcional para no romper ítems guardados antes de
+   * este campo.
+   */
+  costoAproximado?: number | null
+  /**
+   * 2026-09-16, pedido explícito del usuario ("un botoncito donde diga que
+   * son gastos, mantenimientos fijos"): marca este ítem como un costo
+   * recurrente real que hay que cubrir — solo los ítems con `fijo: true` Y
+   * `costoAproximado` puesto entran a la meta diaria (domain/metaDiaria);
+   * el resto del comportamiento del ítem (se resetea al marcar realizado,
+   * nunca se borra solo) es el mismo de siempre, con o sin esta bandera —
+   * `fijo` solo decide si cuenta en la meta diaria. Opcional por lo mismo
+   * que `costoAproximado`, `undefined` se trata como `false`.
+   */
+  fijo?: boolean
 }
 
 /**
@@ -90,6 +111,8 @@ export interface PlantillaItemMantenimiento {
   intervaloDias: number | null
   imagen?: ImagenMantenimiento | null
   vehiculo: TipoVehiculo
+  /** Costo aproximado SUGERIDO (ver `costoAproximado` en `ItemMantenimiento`) — el conductor lo edita antes de confirmar, igual que el intervalo. */
+  costoAproximado?: number | null
 }
 
 /** Registro histórico de una vez que se realizó un mantenimiento. */

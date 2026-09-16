@@ -98,6 +98,7 @@ export const esquemaMetaAhorroSync = z.object({
   montoObjetivo: z.number().positive(),
   saldoActual: z.number().nonnegative(),
   creadaEnISO: z.string(),
+  aporteMensualObjetivo: z.number().nonnegative().nullable().optional().default(null),
 })
 
 export const esquemaAbonoAhorroSync = z.object({

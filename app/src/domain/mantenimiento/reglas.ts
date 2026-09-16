@@ -29,32 +29,39 @@ import type { EstadoAlerta, ItemMantenimiento, PlantillaItemMantenimiento } from
  * de vehículo elegido (domain/vehiculo, por defecto 'moto', cambiable en
  * Ajustes) — nunca las 25 mezcladas.
  */
+/**
+ * 2026-09-16, pedido explícito del usuario ("hay que poner cuánto vale
+ * aproximadamente los mantenimientos"): costos SUGERIDOS en pesos
+ * colombianos, precios de calle aproximados para 2026 — el conductor los
+ * edita antes de confirmar, igual que ya edita el intervalo (mismo criterio
+ * de "sugerido, no impuesto" que el resto del catálogo).
+ */
 export const CATALOGO_MANTENIMIENTO: PlantillaItemMantenimiento[] = [
-  { nombre: 'Cambio de aceite', criterio: 'km_o_dias', intervaloKm: 3000, intervaloDias: 90, imagen: 'cambio_de_aceite', vehiculo: 'moto' },
-  { nombre: 'Cambio de aceite y filtro', criterio: 'km_o_dias', intervaloKm: 5000, intervaloDias: 180, imagen: 'aceite_y_filtro', vehiculo: 'moto' },
-  { nombre: 'Cambio de llantas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'cambio_de_llantas', vehiculo: 'moto' },
-  { nombre: 'Mantenimiento general', criterio: 'km_o_dias', intervaloKm: 5000, intervaloDias: 180, imagen: 'mantenimiento_general', vehiculo: 'moto' },
-  { nombre: 'Balanceo', criterio: 'km', intervaloKm: 5000, intervaloDias: null, imagen: 'balanceo', vehiculo: 'moto' },
-  { nombre: 'Cambio de filtro de aire', criterio: 'km', intervaloKm: 15000, intervaloDias: null, imagen: 'filtro_de_aire', vehiculo: 'moto' },
-  { nombre: 'Cambio de pastillas de freno', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'pastillas_de_freno', vehiculo: 'moto' },
-  { nombre: 'Batería', criterio: 'dias', intervaloKm: null, intervaloDias: 730, imagen: null, vehiculo: 'moto' },
-  { nombre: 'SOAT', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null, vehiculo: 'moto' },
-  { nombre: 'Revisión técnico-mecánica', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null, vehiculo: 'moto' },
-  { nombre: 'Líquido de frenos', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: 'liquido_de_frenos', vehiculo: 'moto' },
-  { nombre: 'Aceite y retenes de horquilla', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'aceite_y_retenes_horquilla', vehiculo: 'moto' },
-  { nombre: 'Reglaje de válvulas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'reglaje_de_valvulas', vehiculo: 'moto' },
-  { nombre: 'Rodamientos de dirección', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_direccion', vehiculo: 'moto' },
-  { nombre: 'Rodamientos de rueda', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_rueda', vehiculo: 'moto' },
-  { nombre: 'Cambio de aceite', criterio: 'km', intervaloKm: 5000, intervaloDias: null, imagen: 'carro_cambio_de_aceite', vehiculo: 'carro' },
-  { nombre: 'Filtro de aire', criterio: 'km', intervaloKm: 10000, intervaloDias: null, imagen: 'carro_filtro_de_aire', vehiculo: 'carro' },
-  { nombre: 'Cambio de llantas', criterio: 'km', intervaloKm: 40000, intervaloDias: null, imagen: 'carro_cambio_de_llantas', vehiculo: 'carro' },
-  { nombre: 'Frenos', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'carro_frenos', vehiculo: 'carro' },
-  { nombre: 'Mantenimiento general', criterio: 'km', intervaloKm: 10000, intervaloDias: null, imagen: 'carro_mantenimiento_general', vehiculo: 'carro' },
-  { nombre: 'Batería', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'carro_bateria', vehiculo: 'carro' },
-  { nombre: 'Suspensión', criterio: 'km', intervaloKm: 50000, intervaloDias: null, imagen: 'carro_suspension', vehiculo: 'carro' },
-  { nombre: 'Refrigerante', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'carro_refrigerante', vehiculo: 'carro' },
-  { nombre: 'Bujías', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'carro_bujias', vehiculo: 'carro' },
-  { nombre: 'Limpiaparabrisas', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: 'carro_limpiaparabrisas', vehiculo: 'carro' },
+  { nombre: 'Cambio de aceite', criterio: 'km_o_dias', intervaloKm: 3000, intervaloDias: 90, imagen: 'cambio_de_aceite', vehiculo: 'moto', costoAproximado: 45000 },
+  { nombre: 'Cambio de aceite y filtro', criterio: 'km_o_dias', intervaloKm: 5000, intervaloDias: 180, imagen: 'aceite_y_filtro', vehiculo: 'moto', costoAproximado: 65000 },
+  { nombre: 'Cambio de llantas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'cambio_de_llantas', vehiculo: 'moto', costoAproximado: 280000 },
+  { nombre: 'Mantenimiento general', criterio: 'km_o_dias', intervaloKm: 5000, intervaloDias: 180, imagen: 'mantenimiento_general', vehiculo: 'moto', costoAproximado: 120000 },
+  { nombre: 'Balanceo', criterio: 'km', intervaloKm: 5000, intervaloDias: null, imagen: 'balanceo', vehiculo: 'moto', costoAproximado: 25000 },
+  { nombre: 'Cambio de filtro de aire', criterio: 'km', intervaloKm: 15000, intervaloDias: null, imagen: 'filtro_de_aire', vehiculo: 'moto', costoAproximado: 35000 },
+  { nombre: 'Cambio de pastillas de freno', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'pastillas_de_freno', vehiculo: 'moto', costoAproximado: 60000 },
+  { nombre: 'Batería', criterio: 'dias', intervaloKm: null, intervaloDias: 730, imagen: null, vehiculo: 'moto', costoAproximado: 180000 },
+  { nombre: 'SOAT', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null, vehiculo: 'moto', costoAproximado: 450000 },
+  { nombre: 'Revisión técnico-mecánica', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: null, vehiculo: 'moto', costoAproximado: 90000 },
+  { nombre: 'Líquido de frenos', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: 'liquido_de_frenos', vehiculo: 'moto', costoAproximado: 30000 },
+  { nombre: 'Aceite y retenes de horquilla', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'aceite_y_retenes_horquilla', vehiculo: 'moto', costoAproximado: 90000 },
+  { nombre: 'Reglaje de válvulas', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'reglaje_de_valvulas', vehiculo: 'moto', costoAproximado: 70000 },
+  { nombre: 'Rodamientos de dirección', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_direccion', vehiculo: 'moto', costoAproximado: 80000 },
+  { nombre: 'Rodamientos de rueda', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'rodamientos_de_rueda', vehiculo: 'moto', costoAproximado: 70000 },
+  { nombre: 'Cambio de aceite', criterio: 'km', intervaloKm: 5000, intervaloDias: null, imagen: 'carro_cambio_de_aceite', vehiculo: 'carro', costoAproximado: 180000 },
+  { nombre: 'Filtro de aire', criterio: 'km', intervaloKm: 10000, intervaloDias: null, imagen: 'carro_filtro_de_aire', vehiculo: 'carro', costoAproximado: 60000 },
+  { nombre: 'Cambio de llantas', criterio: 'km', intervaloKm: 40000, intervaloDias: null, imagen: 'carro_cambio_de_llantas', vehiculo: 'carro', costoAproximado: 1600000 },
+  { nombre: 'Frenos', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'carro_frenos', vehiculo: 'carro', costoAproximado: 220000 },
+  { nombre: 'Mantenimiento general', criterio: 'km', intervaloKm: 10000, intervaloDias: null, imagen: 'carro_mantenimiento_general', vehiculo: 'carro', costoAproximado: 350000 },
+  { nombre: 'Batería', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'carro_bateria', vehiculo: 'carro', costoAproximado: 380000 },
+  { nombre: 'Suspensión', criterio: 'km', intervaloKm: 50000, intervaloDias: null, imagen: 'carro_suspension', vehiculo: 'carro', costoAproximado: 600000 },
+  { nombre: 'Refrigerante', criterio: 'km', intervaloKm: 20000, intervaloDias: null, imagen: 'carro_refrigerante', vehiculo: 'carro', costoAproximado: 70000 },
+  { nombre: 'Bujías', criterio: 'km', intervaloKm: 30000, intervaloDias: null, imagen: 'carro_bujias', vehiculo: 'carro', costoAproximado: 150000 },
+  { nombre: 'Limpiaparabrisas', criterio: 'dias', intervaloKm: null, intervaloDias: 365, imagen: 'carro_limpiaparabrisas', vehiculo: 'carro', costoAproximado: 50000 },
 ]
 
 /** Margen de aviso antes de vencer: dentro de esto se marca "próximo a vencer". */
@@ -125,4 +132,33 @@ export function calcularEstadoAlerta(item: ItemMantenimiento, kmActual: number, 
     proximoAVencer: !vencido && (proximoPorKm || proximoPorDias),
     progresoPorcentaje,
   }
+}
+
+/**
+ * 2026-09-16, pedido explícito del usuario ("la meta diaria se tiene que
+ * definir sobre... los gastos de mantenimiento"): cuánto de `costoAproximado`
+ * corresponde a UN día, para prorratearlo en domain/metaDiaria. Solo tiene
+ * sentido para ítems `fijo: true` con `costoAproximado` puesto — el llamador
+ * filtra eso antes de invocar esta función (D-10: acá solo se calcula la
+ * tarifa, no se decide qué ítems cuentan).
+ *
+ * `criterio === 'km'` necesita `kmPromedioDiario` (cuántos km hace el
+ * conductor por día en promedio, ver domain/metaDiaria/calculos.ts) para
+ * convertir un intervalo de kilómetros en un intervalo de días — sin eso
+ * (conductor sin viajes todavía) no hay forma de prorratear, se devuelve 0.
+ * `km_o_dias` usa la tarifa MÁS ALTA de las dos (mismo criterio de "lo que
+ * pase primero" que ya usa `calcularEstadoAlerta`) — más conservador: mejor
+ * sobrestimar un poco la meta que dejar un mantenimiento sin cubrir.
+ */
+export function tarifaDiariaItem(item: ItemMantenimiento, kmPromedioDiario: number): number {
+  const costo = item.costoAproximado
+  if (!costo || costo <= 0) return 0
+
+  const tarifaPorDias = item.intervaloDias && item.intervaloDias > 0 ? costo / item.intervaloDias : null
+  const diasParaKm = item.intervaloKm && kmPromedioDiario > 0 ? item.intervaloKm / kmPromedioDiario : null
+  const tarifaPorKm = diasParaKm && diasParaKm > 0 ? costo / diasParaKm : null
+
+  if (item.criterio === 'dias') return tarifaPorDias ?? 0
+  if (item.criterio === 'km') return tarifaPorKm ?? 0
+  return Math.max(tarifaPorDias ?? 0, tarifaPorKm ?? 0)
 }

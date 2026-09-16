@@ -201,6 +201,7 @@ export const repositorioSync = {
       montoObjetivo: meta.montoObjetivo,
       saldoActual: meta.saldoActual,
       creadaEnISO: new Date(meta.creadaEnISO),
+      aporteMensualObjetivo: meta.aporteMensualObjetivo,
     }
 
     await prisma.metaAhorro.upsert({

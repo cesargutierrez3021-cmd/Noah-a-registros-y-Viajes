@@ -5,13 +5,16 @@ import { CampoMonto } from '../../components/CampoMonto'
 
 /** Mismo patrón exacto que SeccionDeudas.tsx, invertido: el saldo SUBE hacia el objetivo en vez de bajar. */
 export function SeccionAhorro() {
-  const { metas, cargando, cargar, agregarMeta, abonar } = useAhorro()
+  const { metas, cargando, cargar, agregarMeta, abonar, actualizarAporteMensual } = useAhorro()
 
   const [nombre, setNombre] = useState('')
   const [montoObjetivo, setMontoObjetivo] = useState('')
+  const [aporteMensual, setAporteMensual] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [montosAbono, setMontosAbono] = useState<Record<string, string>>({})
+  /** Aporte mensual en edición por meta ya creada — solo mientras se está tecleando, se guarda al confirmar (mismo patrón que montosAbono). */
+  const [aportesEdicion, setAportesEdicion] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void cargar()
@@ -30,13 +33,22 @@ export function SeccionAhorro() {
     }
     setGuardando(true)
     try {
-      await agregarMeta(nombre.trim(), objetivoNumero)
+      const aporteNumero = Number(aporteMensual)
+      await agregarMeta(nombre.trim(), objetivoNumero, Number.isFinite(aporteNumero) && aporteNumero > 0 ? aporteNumero : null)
       void sincronizarAhorroPendiente()
       setNombre('')
       setMontoObjetivo('')
+      setAporteMensual('')
     } finally {
       setGuardando(false)
     }
+  }
+
+  async function manejarActualizarAporte(metaId: string) {
+    const texto = aportesEdicion[metaId] ?? ''
+    const monto = Number(texto)
+    await actualizarAporteMensual(metaId, texto && Number.isFinite(monto) && monto > 0 ? monto : null)
+    void sincronizarAhorroPendiente()
   }
 
   async function manejarAbonar(metaId: string) {
@@ -66,6 +78,13 @@ export function SeccionAhorro() {
           Meta (monto a juntar)
           <CampoMonto valor={montoObjetivo} onValorCambia={setMontoObjetivo} placeholder="Ej. 300.000" />
         </label>
+        <label className="texto-mute">
+          Aporte mensual que querés meterle (opcional)
+          <CampoMonto valor={aporteMensual} onValorCambia={setAporteMensual} placeholder="Ej. 50.000" />
+          <span style={{ display: 'block', fontSize: '0.72rem', marginTop: 2 }}>
+            Se usa para calcular tu meta diaria (Trabajo) — no es un abono, es solo cuánto planeás meterle cada mes.
+          </span>
+        </label>
         {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
         <button type="button" onClick={() => void manejarAgregar()} disabled={guardando}>
           {guardando ? 'Guardando…' : 'Crear meta'}
@@ -92,6 +111,17 @@ export function SeccionAhorro() {
                   style={{ flex: 1 }}
                 />
                 <button type="button" onClick={() => void manejarAbonar(m.id)}>Abonar</button>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <CampoMonto
+                  valor={aportesEdicion[m.id] ?? (m.aporteMensualObjetivo ? String(m.aporteMensualObjetivo) : '')}
+                  onValorCambia={(crudo) => setAportesEdicion((actuales) => ({ ...actuales, [m.id]: crudo }))}
+                  placeholder="Aporte mensual planeado"
+                  style={{ flex: 1 }}
+                />
+                <button type="button" onClick={() => void manejarActualizarAporte(m.id)} style={{ background: 'transparent' }}>
+                  Guardar
+                </button>
               </div>
             </li>
           )

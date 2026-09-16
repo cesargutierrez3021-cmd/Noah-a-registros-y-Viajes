@@ -1,6 +1,12 @@
+import { useState } from 'react'
 import type { EstadoAlerta } from '../../domain/mantenimiento/types'
 import { MARGEN_SEGURIDAD_TEXTO } from '../../domain/mantenimiento/reglas'
+import { CampoMonto } from '../../components/CampoMonto'
 import { IMAGENES_MANTENIMIENTO, PALETA_TARJETA_MANTENIMIENTO as PALETA } from './tarjetasMantenimiento'
+
+function formatoPesos(monto: number): string {
+  return `$${Math.round(monto).toLocaleString('es-CO')}`
+}
 
 function textoFaltante(kmFaltantes: number | null, diasFaltantes: number | null): string {
   const partes: string[] = []
@@ -32,16 +38,30 @@ function textoEstado(vencido: boolean, proximo: boolean): string {
 export function TarjetaMantenimiento({
   estado,
   animado,
+  vecesRealizado,
   onMarcarRealizado,
   onEliminar,
+  onActualizarCostoYFijo,
 }: {
   estado: EstadoAlerta
   animado: boolean
+  /** Cuántas veces se marcó "realizado" este ítem — 2026-09-16, pedido explícito del usuario, contado desde RegistroMantenimiento (D-18, no se duplica un campo nuevo). */
+  vecesRealizado: number
   onMarcarRealizado: () => void
   onEliminar?: () => void
+  /** 2026-09-16, pedido explícito del usuario: editar el costo aproximado y la bandera "fijo" de un ítem ya agregado, sin tener que borrarlo y volver a crearlo. */
+  onActualizarCostoYFijo: (costoAproximado: number | null, fijo: boolean) => void
 }) {
   const { item, kmFaltantes, diasFaltantes, vencido, proximoAVencer, progresoPorcentaje } = estado
   const imagen = item.imagen ? IMAGENES_MANTENIMIENTO[item.imagen] : null
+
+  const [editandoCosto, setEditandoCosto] = useState(false)
+  const [costoTexto, setCostoTexto] = useState(item.costoAproximado ? String(item.costoAproximado) : '')
+
+  function guardarCosto() {
+    onActualizarCostoYFijo(Number(costoTexto) || null, item.fijo ?? false)
+    setEditandoCosto(false)
+  }
 
   const colorEstado = vencido ? '#c8756b' : proximoAVencer ? PALETA.acento : PALETA.rellenoProgreso
 
@@ -68,7 +88,12 @@ export function TarjetaMantenimiento({
           />
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <strong style={{ display: 'block', fontSize: '1rem' }}>{item.nombre}</strong>
+          <strong style={{ display: 'block', fontSize: '1rem' }}>
+            {item.nombre}
+            {vecesRealizado > 0 && (
+              <span style={{ color: PALETA.textoTenue, fontWeight: 400, fontSize: '0.78rem' }}> · hecho {vecesRealizado}x</span>
+            )}
+          </strong>
           <span style={{ color: PALETA.textoTenue, fontSize: '0.78rem' }}>{textoFaltante(kmFaltantes, diasFaltantes)}</span>
         </div>
         <span
@@ -96,6 +121,26 @@ export function TarjetaMantenimiento({
 
       {kmFaltantes !== null && (
         <span style={{ color: PALETA.textoTenue, fontSize: '0.68rem' }}>{MARGEN_SEGURIDAD_TEXTO}</span>
+      )}
+
+      {editandoCosto ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <CampoMonto valor={costoTexto} onValorCambia={setCostoTexto} placeholder="Costo aproximado" style={{ flex: 1 }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', color: PALETA.textoTenue }}>
+            <input type="checkbox" checked={item.fijo ?? false} onChange={(e) => onActualizarCostoYFijo(Number(costoTexto) || null, e.target.checked)} />
+            Fijo
+          </label>
+          <button type="button" onClick={guardarCosto}>Guardar</button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditandoCosto(true)}
+          style={{ background: 'transparent', textAlign: 'left', padding: 0, color: PALETA.textoTenue, fontSize: '0.78rem' }}
+        >
+          {item.costoAproximado ? formatoPesos(item.costoAproximado) : 'Sin costo aproximado'}
+          {item.fijo && ' · gasto fijo (cuenta en tu meta diaria)'} — tocar para editar
+        </button>
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>

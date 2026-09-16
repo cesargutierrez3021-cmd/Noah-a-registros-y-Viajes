@@ -7,6 +7,7 @@ import { CATALOGO_MANTENIMIENTO } from '../../domain/mantenimiento/reglas'
 import { useTema } from '../../domain/tema/store'
 import { useVehiculo } from '../../domain/vehiculo/store'
 import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
+import { CampoMonto } from '../../components/CampoMonto'
 import { TarjetaMantenimiento } from './TarjetaMantenimiento'
 import { IMAGENES_MANTENIMIENTO } from './tarjetasMantenimiento'
 import type { CriterioIntervalo, PlantillaItemMantenimiento } from '../../domain/mantenimiento/types'
@@ -23,7 +24,7 @@ import type { TipoVehiculo } from '../../domain/vehiculo/types'
  */
 export function SeccionMantenimiento() {
   const { viajes, cargar: cargarViajes } = useViajes()
-  const { items, cargando, cargar, agregarDesdeCatalogo, agregarPersonalizado, eliminarItem, marcarRealizado, alertas } =
+  const { items, registros, cargando, cargar, agregarDesdeCatalogo, agregarPersonalizado, eliminarItem, marcarRealizado, actualizarCostoYFijo, alertas } =
     useMantenimiento()
   const { tema } = useTema()
   const animado = tema !== 'papel'
@@ -44,6 +45,8 @@ export function SeccionMantenimiento() {
   const [criterioEdicion, setCriterioEdicion] = useState<CriterioIntervalo>('km_o_dias')
   const [kmEdicion, setKmEdicion] = useState('')
   const [diasEdicion, setDiasEdicion] = useState('')
+  const [costoEdicion, setCostoEdicion] = useState('')
+  const [fijoEdicion, setFijoEdicion] = useState(false)
   const refEdicion = useRef<HTMLDivElement | null>(null)
 
   const [mostrarFormPersonalizado, setMostrarFormPersonalizado] = useState(false)
@@ -51,6 +54,8 @@ export function SeccionMantenimiento() {
   const [criterioNuevo, setCriterioNuevo] = useState<CriterioIntervalo>('km_o_dias')
   const [intervaloKmNuevo, setIntervaloKmNuevo] = useState('')
   const [intervaloDiasNuevo, setIntervaloDiasNuevo] = useState('')
+  const [costoNuevo, setCostoNuevo] = useState('')
+  const [fijoNuevo, setFijoNuevo] = useState(false)
 
   useEffect(() => {
     void cargarViajes()
@@ -68,6 +73,8 @@ export function SeccionMantenimiento() {
     setCriterioEdicion(plantilla.criterio)
     setKmEdicion(plantilla.intervaloKm !== null ? String(plantilla.intervaloKm) : '')
     setDiasEdicion(plantilla.intervaloDias !== null ? String(plantilla.intervaloDias) : '')
+    setCostoEdicion(plantilla.costoAproximado ? String(plantilla.costoAproximado) : '')
+    setFijoEdicion(false)
   }
 
   /**
@@ -91,6 +98,8 @@ export function SeccionMantenimiento() {
         criterio: criterioEdicion,
         intervaloKm: criterioEdicion === 'dias' ? null : Number(kmEdicion) || null,
         intervaloDias: criterioEdicion === 'km' ? null : Number(diasEdicion) || null,
+        costoAproximado: Number(costoEdicion) || null,
+        fijo: fijoEdicion,
       },
       kmActual,
     )
@@ -105,12 +114,16 @@ export function SeccionMantenimiento() {
         criterio: criterioNuevo,
         intervaloKm: criterioNuevo === 'dias' ? null : Number(intervaloKmNuevo) || null,
         intervaloDias: criterioNuevo === 'km' ? null : Number(intervaloDiasNuevo) || null,
+        costoAproximado: Number(costoNuevo) || null,
+        fijo: fijoNuevo,
       },
       kmActual,
     )
     setNombreNuevo('')
     setIntervaloKmNuevo('')
     setIntervaloDiasNuevo('')
+    setCostoNuevo('')
+    setFijoNuevo(false)
     setMostrarFormPersonalizado(false)
   }
 
@@ -132,11 +145,13 @@ export function SeccionMantenimiento() {
               key={estado.item.id}
               estado={estado}
               animado={animado}
+              vecesRealizado={registros.filter((r) => r.itemId === estado.item.id).length}
               onMarcarRealizado={() => {
                 void marcarRealizado(estado.item.id, kmActual, null, null)
                 void sincronizarRegistrosMantenimientoPendientes()
               }}
               onEliminar={estado.item.origen === 'personalizado' ? () => void eliminarItem(estado.item.id) : undefined}
+              onActualizarCostoYFijo={(costo, fijo) => void actualizarCostoYFijo(estado.item.id, costo, fijo)}
             />
           ))}
         </div>
@@ -209,6 +224,14 @@ export function SeccionMantenimiento() {
           {criterioEdicion !== 'km' && (
             <input type="number" placeholder="Cada cuántos días" value={diasEdicion} onChange={(e) => setDiasEdicion(e.target.value)} />
           )}
+          <label className="texto-mute">
+            Costo aproximado
+            <CampoMonto valor={costoEdicion} onValorCambia={setCostoEdicion} placeholder="Ej. 45.000" />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={fijoEdicion} onChange={(e) => setFijoEdicion(e.target.checked)} />
+            <span className="texto-mute">Es un gasto fijo — cuenta en mi meta diaria</span>
+          </label>
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" onClick={() => void confirmarAgregarDesdeCatalogo()}>Agregar</button>
             <button type="button" onClick={() => setEditandoPlantilla(null)} style={{ background: 'transparent' }}>Cancelar</button>
@@ -234,6 +257,14 @@ export function SeccionMantenimiento() {
             {criterioNuevo !== 'km' && (
               <input type="number" placeholder="Cada cuántos días" value={intervaloDiasNuevo} onChange={(e) => setIntervaloDiasNuevo(e.target.value)} />
             )}
+            <label className="texto-mute">
+              Costo aproximado
+              <CampoMonto valor={costoNuevo} onValorCambia={setCostoNuevo} placeholder="Ej. 45.000" />
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={fijoNuevo} onChange={(e) => setFijoNuevo(e.target.checked)} />
+              <span className="texto-mute">Es un gasto fijo — cuenta en mi meta diaria</span>
+            </label>
             <button type="button" onClick={() => void manejarAgregarPersonalizado()}>Guardar</button>
           </>
         )}

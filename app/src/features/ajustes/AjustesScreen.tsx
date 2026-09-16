@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTema } from '../../domain/tema/store'
 import { TEMAS_DISPONIBLES } from '../../domain/tema/types'
@@ -10,6 +10,8 @@ import { useVehiculo } from '../../domain/vehiculo/store'
 import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
 import { useViajes } from '../../domain/viajes/store'
 import { PLATAFORMAS_DISPONIBLES } from '../../domain/viajes/types'
+import { useMetaDiaria } from '../../domain/metaDiaria/store'
+import { CampoMonto } from '../../components/CampoMonto'
 import { AnillosOrbitales } from '../../components/graficos/AnillosOrbitales'
 import { Cristal3D } from '../../components/graficos/Cristal3D'
 import { Prisma } from '../../components/graficos/Prisma'
@@ -32,14 +34,25 @@ const TOTAL_MUESTRA = 4_500_000
  * cuando sea. Reusa el mismo store/lista que OnboardingScreen (D-18): no
  * hay una segunda fuente de temas disponibles.
  */
-type SeccionAjustes = 'vehiculo' | 'plataforma' | 'tema' | 'estadisticas'
+type SeccionAjustes = 'vehiculo' | 'plataforma' | 'tema' | 'estadisticas' | 'metaDiaria'
 
 export function AjustesScreen() {
   const { tema, elegirTema } = useTema()
   const { estilo, elegirEstilo } = useEstiloGrafico()
   const { tipoVehiculo, elegirVehiculo } = useVehiculo()
   const { plataformaPreferida, elegirPlataformaPreferida } = useViajes()
+  const { presupuestoGasolinaMensual, cargar: cargarMetaDiaria, actualizarPresupuestoGasolina } = useMetaDiaria()
   const animado = tema !== 'papel'
+
+  const [gasolinaTexto, setGasolinaTexto] = useState('')
+
+  useEffect(() => {
+    cargarMetaDiaria()
+  }, [cargarMetaDiaria])
+
+  useEffect(() => {
+    setGasolinaTexto(presupuestoGasolinaMensual ? String(presupuestoGasolinaMensual) : '')
+  }, [presupuestoGasolinaMensual])
 
   /**
    * 2026-09-15, pedido explícito del usuario: "todo lo que esté en ajustes
@@ -110,6 +123,23 @@ export function AjustesScreen() {
             </button>
           ))}
         </div>
+      </SeccionDesplegable>
+
+      <SeccionDesplegable titulo="Meta diaria" abierta={seccionAbierta === 'metaDiaria'} onToggle={() => alternar('metaDiaria')}>
+        <p className="texto-mute" style={{ marginBottom: 16 }}>
+          En Trabajo, "Estado del sistema" te muestra cuánto llevas de tu meta del día — se calcula sola con tus gastos fijos del hogar, cuotas de deudas, aportes de ahorro planeados y mantenimientos marcados como fijos. Lo único que falta es un aproximado de cuánto gastas en gasolina al mes (esto NO es un gasto real, solo un estimado para el cálculo — tus cargas de gasolina de siempre se siguen registrando igual en Gastos).
+        </p>
+        <label className="texto-mute">
+          Gasolina aproximada al mes
+          <CampoMonto valor={gasolinaTexto} onValorCambia={setGasolinaTexto} placeholder="Ej. 400.000" />
+        </label>
+        <button
+          type="button"
+          style={{ marginTop: 12 }}
+          onClick={() => actualizarPresupuestoGasolina(Number(gasolinaTexto) || null)}
+        >
+          Guardar
+        </button>
       </SeccionDesplegable>
 
       <SeccionDesplegable titulo="Tema" abierta={seccionAbierta === 'tema'} onToggle={() => alternar('tema')}>

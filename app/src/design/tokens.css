@@ -416,6 +416,42 @@
   font-size: 0.85rem;
 }
 
+/* --- Meta diaria (2026-09-16, pedido explícito del usuario) --- */
+.tt-meta-diaria {
+  margin-top: 12px;
+  text-align: left;
+}
+.tt-meta-diaria__fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+  color: var(--tt-texto-mute);
+  margin-bottom: 6px;
+}
+.tt-meta-diaria__fila strong {
+  color: var(--tt-texto);
+  font-family: var(--tt-fuente-display);
+  font-size: 1rem;
+}
+.tt-meta-diaria__pista {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tt-superficie-alta);
+  overflow: hidden;
+}
+.tt-meta-diaria__barra {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tt-meta-diaria__detalle {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--tt-texto-mute);
+}
+
 .tt-boton-cta {
   display: flex;
   align-items: center;
