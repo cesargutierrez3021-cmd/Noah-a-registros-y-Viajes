@@ -57,13 +57,34 @@ const POSICIONES: Record<string, { left: number; top: number; width: number; rot
  * `variante`: 'ejecutivo' usa el segundo lote de fotos (vidrio ahumado
  * negro + bronce/dorado mate, la misma escena pero en ese material) en vez
  * de swapear colores por CSS — son fotos distintas, no un filtro.
+ *
+ * 2026-09-16, bug real reportado por el usuario ("cuando pongo deudas, en
+ * ingreso me suma cualquier cosa"): la placa central, con "INGRESO" grabado
+ * en la foto, mostraba `total` — que en BalanceScreen.tsx es `sumaCuatro`
+ * (Hogar+Deudas+Ahorro+Libre, el denominador para que esas 4 porciones
+ * sumen 100% entre sí), NO el ingreso real de los viajes. Agregar una deuda
+ * sube `sumaCuatro` y por lo tanto ese número — exactamente el bug
+ * reportado. Ahora recibe `ingresoReal` aparte (domain/estadisticas,
+ * `calcularResumen(viajes).ingresos` vía `balance.ingresosTotales`) para
+ * esa placa — `total` se sigue usando solo para lo que ya usaba antes de
+ * esto (nada más, era su único uso).
  */
-export function Cristal3D({ items, total, animado = true, variante = 'clasico' }: { items: ItemDistribucion[]; total: number; animado?: boolean; variante?: VarianteGrafico }) {
+export function Cristal3D({
+  items,
+  ingresoReal,
+  animado = true,
+  variante = 'clasico',
+}: {
+  items: ItemDistribucion[]
+  ingresoReal: number
+  animado?: boolean
+  variante?: VarianteGrafico
+}) {
   const ejecutivo = variante === 'ejecutivo'
   const imagenes = ejecutivo ? IMAGENES_MATTE : IMAGENES_COLOR
 
   const placas = [
-    { clave: 'ingreso', color: COLOR_TEXTO_EJECUTIVO, texto: formatoPesosCorto(total) },
+    { clave: 'ingreso', color: COLOR_TEXTO_EJECUTIVO, texto: formatoPesosCorto(ingresoReal) },
     ...items.slice(0, 4).map((item) => ({ clave: item.clave, color: ejecutivo ? COLOR_TEXTO_EJECUTIVO : item.color, texto: `${Math.round(item.porcentaje)}%` })),
   ]
 

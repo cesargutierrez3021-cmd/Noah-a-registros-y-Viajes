@@ -25,8 +25,24 @@ function formatoPesosCorto(monto: number): string {
  * `variante`: 'ejecutivo' conserva la misma estructura y movimiento —
  * solo cambia a la paleta grafito/dorado fija de paletaEjecutiva.ts en vez
  * del color propio de cada categoría.
+ *
+ * 2026-09-16, mismo bug real que Cristal3D (ver el comentario largo ahí):
+ * la "fuente" 💰 ya decía en el comentario original "el ingreso total como
+ * fuente" pero recibía `total` = `sumaCuatro` (Hogar+Deudas+Ahorro+Libre),
+ * no el ingreso real — agregar una deuda inflaba este número también.
+ * Ahora recibe `ingresoReal` aparte.
  */
-export function Prisma({ items, total, animado = true, variante = 'clasico' }: { items: ItemDistribucion[]; total: number; animado?: boolean; variante?: VarianteGrafico }) {
+export function Prisma({
+  items,
+  ingresoReal,
+  animado = true,
+  variante = 'clasico',
+}: {
+  items: ItemDistribucion[]
+  ingresoReal: number
+  animado?: boolean
+  variante?: VarianteGrafico
+}) {
   const ejecutivo = variante === 'ejecutivo'
   const superficie = ejecutivo ? SUPERFICIE_EJECUTIVA : 'var(--color-superficie)'
   const colorFuente = ejecutivo ? TONOS_EJECUTIVOS[0] : 'var(--color-acento)'
@@ -38,7 +54,7 @@ export function Prisma({ items, total, animado = true, variante = 'clasico' }: {
         style={{ borderColor: colorFuente, color: colorFuente, background: `color-mix(in srgb, ${colorFuente} 16%, ${superficie})` }}
       >
         <span className="prisma__fuente-icono">💰</span>
-        <b>{formatoPesosCorto(total)}</b>
+        <b>{formatoPesosCorto(ingresoReal)}</b>
       </div>
 
       <div className="prisma__lineas">

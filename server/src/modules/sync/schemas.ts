@@ -71,6 +71,10 @@ export const esquemaGastoSync = z.object({
 const esquemaCuotaProgramada = z.object({
   monto: z.number().positive(),
   frecuencia: z.enum(['semanal', 'quincenal', 'mensual']),
+  // 2026-09-16: ancla real de fecha, ver el comentario largo en CuotaProgramada (cliente, domain/deudas/types.ts).
+  diaDelMes: z.number().int().min(1).max(31).nullable().optional().default(null),
+  diasDelMes: z.tuple([z.number().int().min(1).max(31), z.number().int().min(1).max(31)]).nullable().optional().default(null),
+  diaDeLaSemana: z.number().int().min(0).max(6).nullable().optional().default(null),
 })
 
 export const esquemaDeudaSync = z.object({

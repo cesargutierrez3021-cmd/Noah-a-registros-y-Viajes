@@ -25,7 +25,15 @@ const ITEMS_MUESTRA: ItemDistribucion[] = [
   { clave: 'ahorro', etiqueta: 'Ahorro', monto: 810_000, porcentaje: 18, color: '#b7a4ff' },
   { clave: 'libre', etiqueta: 'Libre', monto: 1_575_000, porcentaje: 35, color: '#78c8ff' },
 ]
-const TOTAL_MUESTRA = 4_500_000
+/**
+ * 2026-09-16: antes esto era "TOTAL_MUESTRA" y era exactamente la suma de
+ * los 4 ítems de arriba (coincidencia que ocultaba el bug real — ver el
+ * comentario largo en Cristal3D.tsx) — un ingreso real no tiene por qué
+ * coincidir con esa suma, así que acá se usa un valor distinto a propósito,
+ * para que la vista previa muestre la diferencia real entre "ingreso" y
+ * "total repartido entre las 4 categorías".
+ */
+const INGRESO_MUESTRA = 5_800_000
 
 /**
  * Ajustes (2026-09-15, pedido explícito del usuario): "en ajustes... de
@@ -191,10 +199,10 @@ export function AjustesScreen() {
 
               <div style={{ padding: '8px 0' }}>
                 {e.valor === 'anillos' && <AnillosOrbitales items={ITEMS_MUESTRA} animado={animado} />}
-                {e.valor === 'cristal3d' && <Cristal3D items={ITEMS_MUESTRA} total={TOTAL_MUESTRA} animado={animado} />}
-                {e.valor === 'cristal3d_ejecutivo' && <Cristal3D items={ITEMS_MUESTRA} total={TOTAL_MUESTRA} animado={animado} variante="ejecutivo" />}
-                {e.valor === 'prisma' && <Prisma items={ITEMS_MUESTRA} total={TOTAL_MUESTRA} animado={animado} />}
-                {e.valor === 'prisma_ejecutivo' && <Prisma items={ITEMS_MUESTRA} total={TOTAL_MUESTRA} animado={animado} variante="ejecutivo" />}
+                {e.valor === 'cristal3d' && <Cristal3D items={ITEMS_MUESTRA} ingresoReal={INGRESO_MUESTRA} animado={animado} />}
+                {e.valor === 'cristal3d_ejecutivo' && <Cristal3D items={ITEMS_MUESTRA} ingresoReal={INGRESO_MUESTRA} animado={animado} variante="ejecutivo" />}
+                {e.valor === 'prisma' && <Prisma items={ITEMS_MUESTRA} ingresoReal={INGRESO_MUESTRA} animado={animado} />}
+                {e.valor === 'prisma_ejecutivo' && <Prisma items={ITEMS_MUESTRA} ingresoReal={INGRESO_MUESTRA} animado={animado} variante="ejecutivo" />}
               </div>
 
               <button type="button" onClick={() => elegirEstilo(e.valor)} disabled={e.valor === estilo}>

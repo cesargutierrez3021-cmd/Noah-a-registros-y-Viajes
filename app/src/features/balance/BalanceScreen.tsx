@@ -155,7 +155,7 @@ export function BalanceScreen() {
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <GraficoDistribucion items={itemsDistribucion} total={sumaCuatro} />
+        <GraficoDistribucion items={itemsDistribucion} ingresoReal={balance.ingresosTotales} />
       </div>
 
       <div style={{ marginBottom: 20 }}>

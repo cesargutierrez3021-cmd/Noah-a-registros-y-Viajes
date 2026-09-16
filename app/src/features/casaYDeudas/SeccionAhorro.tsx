@@ -7,6 +7,7 @@ import { CampoMonto } from '../../components/CampoMonto'
 export function SeccionAhorro() {
   const { metas, cargando, cargar, agregarMeta, abonar, actualizarAporteMensual } = useAhorro()
 
+  const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [nombre, setNombre] = useState('')
   const [montoObjetivo, setMontoObjetivo] = useState('')
   const [aporteMensual, setAporteMensual] = useState('')
@@ -39,6 +40,7 @@ export function SeccionAhorro() {
       setNombre('')
       setMontoObjetivo('')
       setAporteMensual('')
+      setMostrarFormulario(false)
     } finally {
       setGuardando(false)
     }
@@ -69,6 +71,11 @@ export function SeccionAhorro() {
         Ponete una meta con el monto que querés juntar, y andá abonando — el saldo sube solo hasta llegar.
       </p>
 
+      <button type="button" style={{ marginBottom: 16 }} onClick={() => setMostrarFormulario((v) => !v)}>
+        {mostrarFormulario ? 'Cancelar' : '+ Agregar meta'}
+      </button>
+
+      {mostrarFormulario && (
       <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 12, alignItems: 'stretch' }}>
         <label className="texto-mute">
           Nombre
@@ -90,6 +97,7 @@ export function SeccionAhorro() {
           {guardando ? 'Guardando…' : 'Crear meta'}
         </button>
       </div>
+      )}
 
       <h3 className="texto-mute">En progreso</h3>
       {cargando && <p className="texto-mute">Cargando…</p>}

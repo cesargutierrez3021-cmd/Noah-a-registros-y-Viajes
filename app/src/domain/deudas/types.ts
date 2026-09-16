@@ -14,6 +14,26 @@ export type FrecuenciaCuota = 'semanal' | 'quincenal' | 'mensual'
 export interface CuotaProgramada {
   monto: number
   frecuencia: FrecuenciaCuota
+  /**
+   * 2026-09-16, pedido explícito del usuario: "cuando le pongo cuota
+   * semanal o quincenal o mensual, no hay una fecha para solucionar...
+   * ¿cómo vas a ver qué día es la cuota?" — sin esto, `proximaFechaCuotaDeuda`
+   * (domain/avisos/calculos.ts) solo podía APROXIMAR contando intervalos de
+   * calendario desde que se cargó la deuda, un día que no significa nada
+   * real para el conductor. Ahora el conductor elige el ancla real —
+   * SOLO el campo que corresponde a `frecuencia` se usa, los otros dos
+   * quedan en `null`:
+   * - mensual   → `diaDelMes` (1-31, mismo patrón que ConceptoFijo.diaDelMes)
+   * - quincenal → `diasDelMes`, DOS días del mes — "cada quincena no es
+   *   siempre igual para todo el mundo" (palabras del usuario)
+   * - semanal   → `diaDeLaSemana` (0=domingo..6=sábado, igual que Date.getDay())
+   * Opcionales (no `| null` sin `?`) para no romper deudas ya sincronizadas
+   * antes de este campo (D-16) — sin ancla puesta, cae de vuelta a la
+   * aproximación vieja.
+   */
+  diaDelMes?: number | null
+  diasDelMes?: [number, number] | null
+  diaDeLaSemana?: number | null
 }
 
 export interface Deuda {

@@ -10,14 +10,36 @@ const FRECUENCIAS: { valor: FrecuenciaCuota; etiqueta: string }[] = [
   { valor: 'mensual', etiqueta: 'Mensual' },
 ]
 
+const DIAS_SEMANA: { valor: number; etiqueta: string }[] = [
+  { valor: 1, etiqueta: 'Lunes' },
+  { valor: 2, etiqueta: 'Martes' },
+  { valor: 3, etiqueta: 'Miércoles' },
+  { valor: 4, etiqueta: 'Jueves' },
+  { valor: 5, etiqueta: 'Viernes' },
+  { valor: 6, etiqueta: 'Sábado' },
+  { valor: 0, etiqueta: 'Domingo' },
+]
+
+/** Texto corto de la ancla real de una cuota (ver CuotaProgramada.diaDelMes/diasDelMes/diaDeLaSemana) — '' si es una cuota vieja sin ancla puesta. */
+function textoAncla(cuota: { frecuencia: FrecuenciaCuota; diaDelMes?: number | null; diasDelMes?: [number, number] | null; diaDeLaSemana?: number | null }): string {
+  if (cuota.frecuencia === 'mensual' && cuota.diaDelMes != null) return ` · día ${cuota.diaDelMes} de cada mes`
+  if (cuota.frecuencia === 'quincenal' && cuota.diasDelMes) return ` · días ${cuota.diasDelMes[0]} y ${cuota.diasDelMes[1]} de cada mes`
+  if (cuota.frecuencia === 'semanal' && cuota.diaDeLaSemana != null) return ` · cada ${DIAS_SEMANA.find((d) => d.valor === cuota.diaDeLaSemana)?.etiqueta.toLowerCase()}`
+  return ''
+}
+
 export function SeccionDeudas() {
   const { deudas, cargando, cargar, agregarDeuda, abonar, actualizarFechaLimite } = useDeudas()
 
+  const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [nombre, setNombre] = useState('')
   const [saldoInicial, setSaldoInicial] = useState('')
   const [tieneCuota, setTieneCuota] = useState(false)
   const [montoCuota, setMontoCuota] = useState('')
   const [frecuenciaCuota, setFrecuenciaCuota] = useState<FrecuenciaCuota>('mensual')
+  const [diaDelMesCuota, setDiaDelMesCuota] = useState('1')
+  const [diasDelMesCuota, setDiasDelMesCuota] = useState<[string, string]>(['1', '15'])
+  const [diaDeLaSemanaCuota, setDiaDeLaSemanaCuota] = useState(1)
   const [fechaLimite, setFechaLimite] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -46,7 +68,13 @@ export function SeccionDeudas() {
         setError('El monto de la cuota tiene que ser un número mayor a 0 (o desmarcá "tiene cuota fija").')
         return
       }
-      cuota = { monto: montoNumero, frecuencia: frecuenciaCuota }
+      cuota = {
+        monto: montoNumero,
+        frecuencia: frecuenciaCuota,
+        diaDelMes: frecuenciaCuota === 'mensual' ? Number(diaDelMesCuota) || 1 : null,
+        diasDelMes: frecuenciaCuota === 'quincenal' ? [Number(diasDelMesCuota[0]) || 1, Number(diasDelMesCuota[1]) || 15] as [number, number] : null,
+        diaDeLaSemana: frecuenciaCuota === 'semanal' ? diaDeLaSemanaCuota : null,
+      }
     }
     setGuardando(true)
     try {
@@ -57,6 +85,7 @@ export function SeccionDeudas() {
       setTieneCuota(false)
       setMontoCuota('')
       setFechaLimite('')
+      setMostrarFormulario(false)
     } finally {
       setGuardando(false)
     }
@@ -88,6 +117,12 @@ export function SeccionDeudas() {
         Cargá la deuda una vez con su saldo inicial, y andá abonando — el saldo baja solo.
       </p>
 
+      {/* 2026-09-16, pedido explícito del usuario: "me toca hacer mucho scroll... prefiero que sea un botoncito que agregar y así se despliegue el menú" */}
+      <button type="button" style={{ marginBottom: 16 }} onClick={() => setMostrarFormulario((v) => !v)}>
+        {mostrarFormulario ? 'Cancelar' : '+ Agregar deuda'}
+      </button>
+
+      {mostrarFormulario && (
       <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 12, alignItems: 'stretch' }}>
         <label className="texto-mute">
           Nombre
@@ -121,6 +156,35 @@ export function SeccionDeudas() {
                 ))}
               </select>
             </label>
+            {/* 2026-09-16, pedido explícito del usuario: "¿cómo vas a ver qué día es la cuota de cada mes?... agrega la opción" — el día/fecha real de la cuota, no solo la frecuencia. */}
+            {frecuenciaCuota === 'mensual' && (
+              <label className="texto-mute">
+                Día del mes en que se paga
+                <input type="number" inputMode="numeric" min={1} max={31} value={diaDelMesCuota} onChange={(e) => setDiaDelMesCuota(e.target.value)} style={{ display: 'block', width: '100%' }} />
+              </label>
+            )}
+            {frecuenciaCuota === 'quincenal' && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <label className="texto-mute" style={{ flex: 1 }}>
+                  Primer día del mes
+                  <input type="number" inputMode="numeric" min={1} max={31} value={diasDelMesCuota[0]} onChange={(e) => setDiasDelMesCuota([e.target.value, diasDelMesCuota[1]])} style={{ display: 'block', width: '100%' }} />
+                </label>
+                <label className="texto-mute" style={{ flex: 1 }}>
+                  Segundo día del mes
+                  <input type="number" inputMode="numeric" min={1} max={31} value={diasDelMesCuota[1]} onChange={(e) => setDiasDelMesCuota([diasDelMesCuota[0], e.target.value])} style={{ display: 'block', width: '100%' }} />
+                </label>
+              </div>
+            )}
+            {frecuenciaCuota === 'semanal' && (
+              <label className="texto-mute">
+                Día de la semana
+                <select value={diaDeLaSemanaCuota} onChange={(e) => setDiaDeLaSemanaCuota(Number(e.target.value))} style={{ display: 'block', width: '100%' }}>
+                  {DIAS_SEMANA.map((d) => (
+                    <option key={d.valor} value={d.valor}>{d.etiqueta}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </>
         )}
         {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
@@ -128,6 +192,7 @@ export function SeccionDeudas() {
           {guardando ? 'Guardando…' : 'Agregar deuda'}
         </button>
       </div>
+      )}
 
       <h3 className="texto-mute">Activas</h3>
       {cargando && <p className="texto-mute">Cargando…</p>}
@@ -142,6 +207,7 @@ export function SeccionDeudas() {
             {d.cuotaProgramada && (
               <span className="texto-mute">
                 Cuota: ${d.cuotaProgramada.monto.toLocaleString('es-CO')} {FRECUENCIAS.find((f) => f.valor === d.cuotaProgramada!.frecuencia)?.etiqueta.toLowerCase()}
+                {textoAncla(d.cuotaProgramada)}
               </span>
             )}
             <span className="texto-mute">

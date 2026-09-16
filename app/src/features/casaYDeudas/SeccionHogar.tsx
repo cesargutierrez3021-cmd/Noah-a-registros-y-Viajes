@@ -6,6 +6,9 @@ import { CampoMonto } from '../../components/CampoMonto'
 export function SeccionHogar() {
   const { gastos, conceptos, cargando, cargar, agregarGastoUnico, agregarConceptoFijo, actualizarMontoConceptoFijo, desactivarConceptoFijo } = useHogar()
 
+  const [mostrarFormUnico, setMostrarFormUnico] = useState(false)
+  const [mostrarFormFijo, setMostrarFormFijo] = useState(false)
+
   const [nombreUnico, setNombreUnico] = useState('')
   const [montoUnico, setMontoUnico] = useState('')
   const [errorUnico, setErrorUnico] = useState<string | null>(null)
@@ -40,6 +43,7 @@ export function SeccionHogar() {
       void sincronizarHogarPendiente()
       setNombreUnico('')
       setMontoUnico('')
+      setMostrarFormUnico(false)
     } finally {
       setGuardandoUnico(false)
     }
@@ -68,6 +72,7 @@ export function SeccionHogar() {
       setNombreFijo('')
       setMontoFijo('')
       setDiaFijo('1')
+      setMostrarFormFijo(false)
     } finally {
       setGuardandoFijo(false)
     }
@@ -97,6 +102,11 @@ export function SeccionHogar() {
       </p>
 
       <h3 className="texto-mute">Gasto único</h3>
+      {/* 2026-09-16, pedido explícito del usuario: menos scroll — el formulario queda detrás de un botón. */}
+      <button type="button" style={{ marginBottom: 16 }} onClick={() => setMostrarFormUnico((v) => !v)}>
+        {mostrarFormUnico ? 'Cancelar' : '+ Agregar gasto único'}
+      </button>
+      {mostrarFormUnico && (
       <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 12, alignItems: 'stretch' }}>
         <label className="texto-mute">
           Nombre
@@ -111,8 +121,13 @@ export function SeccionHogar() {
           {guardandoUnico ? 'Guardando…' : 'Agregar gasto único'}
         </button>
       </div>
+      )}
 
       <h3 className="texto-mute">Gasto fijo mensual</h3>
+      <button type="button" style={{ marginBottom: 16 }} onClick={() => setMostrarFormFijo((v) => !v)}>
+        {mostrarFormFijo ? 'Cancelar' : '+ Agregar gasto fijo'}
+      </button>
+      {mostrarFormFijo && (
       <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 12, alignItems: 'stretch' }}>
         <label className="texto-mute">
           Nombre
@@ -131,6 +146,7 @@ export function SeccionHogar() {
           {guardandoFijo ? 'Guardando…' : 'Agregar gasto fijo'}
         </button>
       </div>
+      )}
 
       <h3 className="texto-mute">Gastos fijos activos</h3>
       {!cargando && conceptosActivos.length === 0 && <p className="texto-mute">No hay gastos fijos activos.</p>}
