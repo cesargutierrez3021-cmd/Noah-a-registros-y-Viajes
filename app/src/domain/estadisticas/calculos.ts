@@ -191,11 +191,29 @@ export function desglosePorFranjaHoraria(viajes: Viaje[]): DesglosePor<FranjaHor
     grupos.set(clave, lista)
   }
 
-  // Orden fijo del día, no por ingreso — a diferencia de zona/plataforma, acá
-  // el orden cronológico es más legible que ordenar por plata (D-18: no
-  // copiar el mismo criterio de orden sin pensar si aplica).
+  // Orden fijo del día (cronológico), no por ingreso — esta función es la
+  // fuente compartida de datos crudos por franja (también la usa
+  // MiaBurbuja.tsx para el contexto que se le manda a MIA, donde el orden
+  // no importa). El RANKING "cuál franja es mejor" que pidió el usuario
+  // (2026-09-17) es una decisión de presentación, no de este cálculo — se
+  // ordena en la pantalla que lo muestra (SeccionEstadisticas.tsx), mismo
+  // criterio que ya usan porPlataforma/porZona (D-18: no repetir la
+  // decisión de orden en dos lugares).
   const ORDEN: FranjaHoraria[] = ['mañana', 'mediodía', 'tarde', 'noche']
   return ORDEN.filter((f) => grupos.has(f)).map((clave) => ({ clave, resumen: calcularResumen(grupos.get(clave)!) }))
+}
+
+/**
+ * 2026-09-17, pedido explícito del usuario: además del dinero total por
+ * franja (lo que define el ranking "cuál es mejor"), pidió "como segunda
+ * puntuación que tenga relevancia dinero por kilómetro" — cuánto rinde cada
+ * km recorrido en esa franja, no solo cuánto entra en total (una franja con
+ * pocos viajes largos puede ganar menos en total que una con muchos viajes
+ * cortos, pero rendir más por km). Mismo criterio de "null si no se puede
+ * dividir" que ya usa `CostoPorKm.costoPorKm` (D-18).
+ */
+export function ingresoPorKm(resumen: ResumenViajes): number | null {
+  return resumen.kmTotales === 0 ? null : resumen.ingresos / resumen.kmTotales
 }
 
 const UNA_HORA_MS = 3_600_000

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
 import { useBonos } from '../../domain/bonos/store'
-import { agruparPorPeriodo, calcularResumen, desglosePorPlataforma, desglosePorZona, desglosePorZonaFin, desglosePorFranjaHoraria } from '../../domain/estadisticas/calculos'
+import { agruparPorPeriodo, calcularResumen, desglosePorPlataforma, desglosePorZona, desglosePorZonaFin, desglosePorFranjaHoraria, ingresoPorKm } from '../../domain/estadisticas/calculos'
 import type { ResumenViajes, UnidadPeriodo } from '../../domain/estadisticas/types'
 import { AnilloMeta } from '../../components/graficos/AnilloMeta'
 import { useTema } from '../../domain/tema/store'
@@ -19,19 +19,24 @@ function formatoMoneda(valor: number): string {
  * ver components/graficos/), cada uno con movimiento real, mostrando el %
  * de ingresos que representa cada entrada dentro de su propio desglose.
  *
- * Colores: "Por franja horaria" es SIEMPRE el mismo set fijo de 4
- * categorías (mañana/mediodía/tarde/noche) — mismo caso que Balance, se
- * reusa el mismo orden validado con la skill dataviz (azul/naranja/aqua/
- * amarillo, ver components/graficos/GraficoDistribucion.tsx). "Por plataforma" y "Por zona" NO son
- * un set fijo (el conductor puede trabajar 2 plataformas o 15 zonas
- * distintas) — ahí un color por entrada dejaría de ser seguro contra
- * daltonismo apenas hay más de 3-4 al mismo tiempo (ver el propio validador
- * de la skill: "todos contra todos" no pasa con más de 3 tonos). Por eso
- * usan un solo color (el acento del tema activo) para todas: la identidad
- * la lleva la etiqueta de texto, no el color — nunca fue una decisión al
- * azar, es la misma regla que ya se siguió en Balance.
+ * "Por plataforma" y "Por zona" NO son un set fijo (el conductor puede
+ * trabajar 2 plataformas o 15 zonas distintas) — ahí un color por entrada
+ * dejaría de ser seguro contra daltonismo apenas hay más de 3-4 al mismo
+ * tiempo (ver el propio validador de la skill: "todos contra todos" no pasa
+ * con más de 3 tonos). Por eso usan un solo color (el acento del tema
+ * activo) para todas: la identidad la lleva la etiqueta de texto, no el
+ * color — nunca fue una decisión al azar, es la misma regla que ya se
+ * siguió en Balance.
+ *
+ * "Por franja horaria" (2026-09-17, corrección posterior): dejó de ser un
+ * grid de anillos y pasó a ser un RANKING 1-4 — pedido explícito del
+ * usuario: "que me muestres cuál zona horaria es mejor... ranking del 1 al
+ * 4... según los viajes, los kilómetros y el dinero hecho". Ordenado por
+ * dinero total (criterio que el usuario marcó como el que define el
+ * puesto); dinero por km es "una segunda puntuación que tenga relevancia"
+ * (sus palabras) — se muestra junto a viajes/km, pero no reordena el
+ * ranking. Ver `franjaRanking` más abajo.
  */
-const COLORES_FRANJA: Record<string, string> = { mañana: '#3987e5', mediodía: '#d95926', tarde: '#199e70', noche: '#c98500' }
 const TOPE_ANILLOS = 5
 
 function porcentajesDeIngresos(items: { clave: string; resumen: ResumenViajes }[]): { clave: string; resumen: ResumenViajes; porcentaje: number }[] {
@@ -57,6 +62,10 @@ export function SeccionEstadisticas() {
   const porZona = desglosePorZona(viajes)
   const porZonaFin = desglosePorZonaFin(viajes)
   const porFranja = desglosePorFranjaHoraria(viajes)
+  // Ranking 1-4 por dinero total (D-18: mismo helper `ingresoPorKm` que ya existe para "$/km", no se reinventa la división acá).
+  const franjaRanking = [...porFranja]
+    .sort((a, b) => b.resumen.ingresos - a.resumen.ingresos)
+    .map(({ clave, resumen }) => ({ clave, resumen, dineroPorKm: ingresoPorKm(resumen) }))
 
   return (
     <div id="seccion-estadisticas">
@@ -163,25 +172,33 @@ export function SeccionEstadisticas() {
         </>
       )}
 
-      {porFranja.length > 0 && (
+      {franjaRanking.length > 0 && (
         <>
-          <h3 className="texto-mute">Por franja horaria</h3>
+          <h3 className="texto-mute">Por franja horaria — ¿cuál te rinde más?</h3>
           <p className="texto-mute" style={{ fontSize: '0.78rem', marginBottom: 8 }}>
             Mañana 4:00-11:30 · Mediodía 11:30-15:00 · Tarde 15:00-20:00 · Noche 20:00-4:00 — según la hora en que recoges, no en la que cierras.
+            Ranking por dinero total; $/km como segunda referencia.
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
-            {porcentajesDeIngresos(porFranja).map(({ clave, resumen, porcentaje }) => (
-              <AnilloMeta
-                key={clave}
-                porcentaje={porcentaje}
-                color={COLORES_FRANJA[clave] ?? 'var(--color-acento)'}
-                valorCentral={`${Math.round(porcentaje)}%`}
-                etiqueta={clave}
-                detalle={`${resumen.cantidadViajes} viajes`}
-                animado={animado}
-              />
-            ))}
-          </div>
+          <ul className="lista-viajes" style={{ marginBottom: 24 }}>
+            {franjaRanking.map(({ clave, resumen, dineroPorKm }, indice) => {
+              const rango = indice + 1
+              return (
+                <li key={clave} className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+                  <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className={`tt-rango-badge${rango === 1 ? ' tt-rango-badge--primero' : ''}`}>{rango}</span>
+                      <strong style={{ textTransform: 'capitalize' }}>{clave}</strong>
+                    </span>
+                    <strong>{formatoMoneda(resumen.ingresos)}</strong>
+                  </span>
+                  <span className="texto-mute" style={{ fontSize: '0.78rem' }}>
+                    {resumen.cantidadViajes} viaje{resumen.cantidadViajes === 1 ? '' : 's'} · {resumen.kmTotales.toFixed(0)} km
+                    {dineroPorKm !== null ? ` · ${formatoMoneda(dineroPorKm)}/km` : ' · sin km registrados'}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
         </>
       )}
     </div>
