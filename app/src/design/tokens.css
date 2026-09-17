@@ -1030,29 +1030,23 @@ textarea:focus {
   background-clip: text;
   color: transparent;
 }
-.balance-ahorro__ola {
-  animation: balance-ahorro-ola 3.6s linear infinite;
+/*
+  2026-09-17, pedido explícito del usuario: "no me gusta ese contenedor...
+  quiero que sea el mismo tarro de cristal con su tapa, pero que vayan
+  apareciendo monedas de oro por dentro a medida que voy ahorrando" — el
+  líquido con olas/burbujas se reemplaza por monedas que aparecen una a una
+  (mismo tarro/tapa/vidrio de siempre, solo cambia qué hay adentro).
+*/
+.balance-ahorro__moneda {
+  animation: balance-ahorro-moneda-aparece 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: center;
+  transform-box: fill-box;
 }
-.balance-ahorro__ola--2 {
-  animation-duration: 5.2s;
-  animation-direction: reverse;
+@keyframes balance-ahorro-moneda-aparece {
+  0% { opacity: 0; transform: scale(0); }
+  100% { opacity: 1; transform: scale(1); }
 }
-@keyframes balance-ahorro-ola {
-  from { transform: translateX(0); }
-  to { transform: translateX(-200px); }
-}
-.balance-ahorro__burbuja {
-  fill: rgba(255, 255, 255, 0.55);
-  animation: balance-ahorro-burbuja 3.4s ease-in infinite;
-}
-@keyframes balance-ahorro-burbuja {
-  0% { transform: translateY(0); opacity: 0; }
-  15% { opacity: 0.85; }
-  90% { opacity: 0.15; }
-  100% { transform: translateY(-150px); opacity: 0; }
-}
-.balance-ahorro--estatico .balance-ahorro__ola,
-.balance-ahorro--estatico .balance-ahorro__burbuja {
+.balance-ahorro--estatico .balance-ahorro__moneda {
   animation: none;
 }
 .balance-ahorro--cumplida .balance-ahorro__porcentaje {

@@ -17,6 +17,7 @@ import { sincronizarViajesPendientes } from './domain/viajes/sync'
 import { sincronizarJornadasPendientes } from './domain/jornada/sync'
 import { sincronizarRegistrosMantenimientoPendientes } from './domain/mantenimiento/sync'
 import { sincronizarGastosPendientes } from './domain/gastos/sync'
+import { sincronizarBonosPendientes } from './domain/bonos/sync'
 import { sincronizarDeudasPendientes } from './domain/deudas/sync'
 import { sincronizarHogarPendiente } from './domain/hogar/sync'
 import { sincronizarAhorroPendiente } from './domain/ahorro/sync'
@@ -67,6 +68,7 @@ export function App() {
     registrarSincronizacionAutomatica('jornadas', sincronizarJornadasPendientes)
     registrarSincronizacionAutomatica('mantenimiento', sincronizarRegistrosMantenimientoPendientes)
     registrarSincronizacionAutomatica('gastos', sincronizarGastosPendientes)
+    registrarSincronizacionAutomatica('bonos', sincronizarBonosPendientes)
     registrarSincronizacionAutomatica('deudas', sincronizarDeudasPendientes)
     registrarSincronizacionAutomatica('hogar', sincronizarHogarPendiente)
     registrarSincronizacionAutomatica('ahorro', sincronizarAhorroPendiente)

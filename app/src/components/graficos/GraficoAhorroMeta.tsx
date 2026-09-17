@@ -9,14 +9,25 @@ import type { MetaAhorro } from '../../domain/ahorro/types'
  * (GraficoDistribucion/Cristal3D). Reemplaza al `AnilloMeta` chico que
  * vivía ahí antes (mismo dato, presentación muchísimo más grande y viva).
  *
- * Diseño: un frasco de vidrio con el líquido del ahorro subiendo hasta el
- * % de la meta, con olas de verdad (dos capas desfasadas, en loop),
- * burbujas subiendo y un brillo de vidrio fijo — mismo espíritu que
+ * Diseño: un frasco de vidrio con un brillo fijo — mismo espíritu que
  * Cristal3D (SVG + CSS, sin librería de gráficos de terceros) pero
  * enteramente dibujado en código (acá no hay fotos que recortar: es un
  * frasco, no una placa física). El % y el monto se cuentan hacia arriba al
  * montar (`useContadorAnimado`) para que se sienta "vivo", no un texto
  * estático.
+ *
+ * 2026-09-17, pedido explícito del usuario ("no me gusta ese contenedor...
+ * quiero que sea el mismo tarro de cristal con su tapa, pero que vayan
+ * apareciendo monedas de oro por dentro a medida que voy ahorrando"): el
+ * líquido con olas/burbujas que subía con el % se reemplazó por monedas de
+ * oro que van apareciendo y apilándose adentro del MISMO frasco/tapa de
+ * siempre (nada del vidrio cambió). Las monedas ocupan posiciones fijas en
+ * una grilla (columnas x filas) dentro del frasco, con un jitter
+ * determinístico (mismo índice → misma posición siempre, para que no
+ * "salten" en cada re-render) para que no se vean perfectamente alineadas —
+ * una pila real de monedas, no una cuadrícula. Se revelan de a una, de
+ * abajo hacia arriba, en la misma cantidad que el contador de % — cuantas
+ * más lleva ahorradas, más monedas hay visibles.
  */
 
 const ANCHO = 200
@@ -26,6 +37,43 @@ const FRASCO_Y = 34
 const FRASCO_ANCHO = 140
 const FRASCO_ALTO = 196
 const FRASCO_RADIO = 42
+
+const MONEDA_PAD = 16
+const MONEDA_COLUMNAS = 4
+const MONEDA_FILAS = 9
+const MONEDA_TOTAL = MONEDA_COLUMNAS * MONEDA_FILAS
+const MONEDA_RADIO = 12
+
+interface PosicionMoneda { x: number; y: number; rotacion: number }
+
+/** Pseudo-aleatorio determinístico (misma semilla → mismo valor siempre) — nada de Math.random en render, se vería "saltando" en cada re-render. */
+function jitter(semilla: number, rango: number): number {
+  const bruto = Math.sin(semilla * 12.9898) * 43758.5453
+  return ((bruto - Math.floor(bruto)) - 0.5) * 2 * rango
+}
+
+function posicionesMonedas(): PosicionMoneda[] {
+  const interiorAncho = FRASCO_ANCHO - MONEDA_PAD * 2
+  const interiorAlto = FRASCO_ALTO - MONEDA_PAD * 2
+  const colAncho = interiorAncho / MONEDA_COLUMNAS
+  const filaAlto = interiorAlto / MONEDA_FILAS
+  const posiciones: PosicionMoneda[] = []
+  for (let i = 0; i < MONEDA_TOTAL; i++) {
+    const col = i % MONEDA_COLUMNAS
+    const fila = Math.floor(i / MONEDA_COLUMNAS)
+    // fila 0 = la de más abajo, para que se "llene" desde el fondo del frasco hacia arriba.
+    const xBase = FRASCO_X + MONEDA_PAD + colAncho * col + colAncho / 2
+    const yBase = FRASCO_Y + FRASCO_ALTO - MONEDA_PAD - filaAlto * fila - filaAlto / 2
+    posiciones.push({
+      x: xBase + jitter(i * 2, 5),
+      y: yBase + jitter(i * 2 + 1, 4),
+      rotacion: jitter(i * 2 + 2, 30),
+    })
+  }
+  return posiciones
+}
+
+const POSICIONES_MONEDAS = posicionesMonedas()
 
 function formatoPesos(monto: number): string {
   return `$${Math.round(monto).toLocaleString('es-CO')}`
@@ -76,15 +124,15 @@ export function GraficoAhorroMeta({ metas, animado }: { metas: MetaAhorro[]; ani
       <div className="balance-ahorro balance-ahorro--vacio">
         <div className="balance-ahorro__vacio-icono">🫙</div>
         <p className="texto-mute" style={{ margin: 0, textAlign: 'center' }}>
-          Todavía no tienes una meta de ahorro. Creá una en el panel Ahorro y acá va a ir subiendo el líquido.
+          Todavía no tienes una meta de ahorro. Creá una en el panel Ahorro y acá van a ir apareciendo las monedas.
         </p>
       </div>
     )
   }
 
-  const alturaLiquido = (porcentajeVisual / 100) * FRASCO_ALTO
-  const superficieY = FRASCO_Y + FRASCO_ALTO - alturaLiquido
-  const mostrarBurbujas = animado && porcentajeTrazo > 8
+  // Al menos 1 moneda visible apenas hay algo ahorrado, aunque el % redondee a 0 (una meta grande con un aporte chico).
+  const cantidadMonedas =
+    ahorradoTotal <= 0 ? 0 : Math.max(1, Math.min(MONEDA_TOTAL, Math.round((porcentajeVisual / 100) * MONEDA_TOTAL)))
 
   const etiquetaMeta =
     metas.length === 1 ? metas[0].nombre : `${metas.length} metas de ahorro`
@@ -96,11 +144,12 @@ export function GraficoAhorroMeta({ metas, animado }: { metas: MetaAhorro[]; ani
           <clipPath id="balanceAhorroClip">
             <rect x={FRASCO_X} y={FRASCO_Y} width={FRASCO_ANCHO} height={FRASCO_ALTO} rx={FRASCO_RADIO} />
           </clipPath>
-          <linearGradient id="balanceAhorroLiquido" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#d6c8ff" />
-            <stop offset="45%" stopColor="#b7a4ff" />
-            <stop offset="100%" stopColor="#7c5cd9" />
-          </linearGradient>
+          {/* Moneda de oro — luz arriba-izquierda (35%/30%), sombra abajo-derecha, mismo criterio de "una sola fuente de luz" que el resto de la app. */}
+          <radialGradient id="balanceAhorroMoneda" cx="35%" cy="30%" r="75%">
+            <stop offset="0%" stopColor="#fff2c4" />
+            <stop offset="45%" stopColor="#f3c34d" />
+            <stop offset="100%" stopColor="#b9812a" />
+          </radialGradient>
           <linearGradient id="balanceAhorroVidrio" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#ffffff" stopOpacity="0.16" />
             <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
@@ -110,9 +159,9 @@ export function GraficoAhorroMeta({ metas, animado }: { metas: MetaAhorro[]; ani
             tarro fuera más cristalino, negro, transparentoso... no que sea
             negro, sino no se llenaría la barra" — vidrio ahumado, no vidrio
             blanco/claro como antes, pero MUY transparente en el medio (12%
-            de opacidad) para que el líquido se siga viendo clarísimo a
-            cualquier nivel; solo se oscurece un poco arriba/abajo, como el
-            reflejo real de un vidrio oscuro grueso.
+            de opacidad) para que las monedas de adentro se sigan viendo
+            clarísimas a cualquier nivel; solo se oscurece un poco
+            arriba/abajo, como el reflejo real de un vidrio oscuro grueso.
           */}
           <linearGradient id="balanceAhorroVidrioCuerpo" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#04060a" stopOpacity="0.55" />
@@ -122,7 +171,7 @@ export function GraficoAhorroMeta({ metas, animado }: { metas: MetaAhorro[]; ani
           </linearGradient>
         </defs>
 
-        {/* Tapa, decorativa — no forma parte del recorte del líquido. Metal oscuro, a tono con el vidrio ahumado del cuerpo. */}
+        {/* Tapa, decorativa — no forma parte del recorte de las monedas. Metal oscuro, a tono con el vidrio ahumado del cuerpo. */}
         <rect x={ANCHO / 2 - 34} y={10} width={68} height={16} rx={6} fill="#2c3040" opacity={0.75} />
         <rect x={ANCHO / 2 - 30} y={18} width={60} height={16} rx={5} fill="#1a1d27" opacity={0.7} />
 
@@ -130,44 +179,26 @@ export function GraficoAhorroMeta({ metas, animado }: { metas: MetaAhorro[]; ani
         <rect x={FRASCO_X} y={FRASCO_Y} width={FRASCO_ANCHO} height={FRASCO_ALTO} rx={FRASCO_RADIO} fill="url(#balanceAhorroVidrioCuerpo)" stroke="rgba(255,255,255,0.32)" strokeWidth={2} />
 
         <g clipPath="url(#balanceAhorroClip)">
-          {/* Bloque de líquido — llega hasta bien abajo del viewBox para no dejar hueco cuando la ola se mueve. */}
-          <rect x={FRASCO_X - 10} y={superficieY - 6} width={FRASCO_ANCHO + 20} height={ALTO - superficieY + 20} fill="url(#balanceAhorroLiquido)" />
-
           {/*
-            Tres niveles de transform anidados, cada uno dueño de UNA sola cosa, para
-            que no choquen entre sí: el atributo SVG `transform` (estático) y la
-            propiedad CSS `transform` animada se pisan si conviven en el mismo
-            elemento (la animación gana y borra el estático). Nivel 1: posición base
-            de la ola cerca de la tapa del frasco (atributo, fijo). Nivel 2: cuánto
-            sube el líquido según el % (estilo inline, cambia con el contador).
-            Nivel 3 (en cada <path>, ver clases más abajo): el loop horizontal
-            infinito, con `animation` en CSS — es el único que toca `transform` ahí.
+            Cada moneda es un <g> estático (posición/rotación por atributo SVG,
+            fijas) que envuelve al elemento con la clase animada — mismo criterio
+            que ya usaba esta gráfica para las olas: el atributo SVG `transform`
+            (estático) y una animación CSS de `transform` en el MISMO elemento se
+            pisan entre sí, así que cada uno vive en su propio nivel. La animación
+            de "aparecer" (ver tokens.css) solo escala/desvanece — nunca mueve —
+            así que no le hace falta un nivel propio, alcanza con `transform-box:
+            fill-box` para que escale sobre su propio centro sin pisar el translate
+            del padre.
           */}
-          <g transform={`translate(0, ${FRASCO_Y - 6})`}>
-            <g style={{ transform: `translateY(${superficieY - FRASCO_Y}px)` }}>
-              <path
-                className="balance-ahorro__ola balance-ahorro__ola--1"
-                d="M-200,10 C-175,0 -125,20 -100,10 C-75,0 -25,20 0,10 C25,0 75,20 100,10 C125,0 175,20 200,10 C225,0 275,20 300,10 V40 H-200 Z"
-                fill="#c7b8ff"
-                opacity={0.55}
-              />
-              <path
-                className="balance-ahorro__ola balance-ahorro__ola--2"
-                d="M-200,14 C-166,26 -134,2 -100,14 C-66,26 -34,2 0,14 C34,26 66,2 100,14 C134,26 166,2 200,14 C234,26 266,2 300,14 V44 H-200 Z"
-                fill="#9a86e8"
-                opacity={0.6}
-              />
+          {POSICIONES_MONEDAS.slice(0, cantidadMonedas).map((pos, i) => (
+            <g key={i} transform={`translate(${pos.x}, ${pos.y}) rotate(${pos.rotacion})`}>
+              <g className="balance-ahorro__moneda">
+                <circle r={MONEDA_RADIO} fill="url(#balanceAhorroMoneda)" stroke="#8a6a1f" strokeWidth={1.2} />
+                <circle r={MONEDA_RADIO - 3.5} fill="none" stroke="#f4d68a" strokeWidth={1} opacity={0.5} />
+                <ellipse cx={-3} cy={-3} rx={4} ry={2.4} fill="#fff4d6" opacity={0.6} />
+              </g>
             </g>
-          </g>
-
-          {mostrarBurbujas && (
-            <g className="balance-ahorro__burbujas">
-              <circle className="balance-ahorro__burbuja" cx={FRASCO_X + 26} cy={FRASCO_Y + FRASCO_ALTO - 20} r={3.4} style={{ animationDelay: '0s' }} />
-              <circle className="balance-ahorro__burbuja" cx={FRASCO_X + 60} cy={FRASCO_Y + FRASCO_ALTO - 14} r={2.6} style={{ animationDelay: '1.1s' }} />
-              <circle className="balance-ahorro__burbuja" cx={FRASCO_X + 92} cy={FRASCO_Y + FRASCO_ALTO - 26} r={3.8} style={{ animationDelay: '2.2s' }} />
-              <circle className="balance-ahorro__burbuja" cx={FRASCO_X + 114} cy={FRASCO_Y + FRASCO_ALTO - 10} r={2.2} style={{ animationDelay: '0.6s' }} />
-            </g>
-          )}
+          ))}
         </g>
 
         {/* Brillo de vidrio, fijo — recortado al mismo contorno del frasco. */}

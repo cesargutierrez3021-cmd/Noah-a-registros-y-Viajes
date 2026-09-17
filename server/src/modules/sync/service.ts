@@ -4,6 +4,7 @@ import type {
   JornadaSyncEntrada,
   RegistroMantenimientoSyncEntrada,
   GastoSyncEntrada,
+  BonoSyncEntrada,
   DeudaSyncEntrada,
   AbonoDeudaSyncEntrada,
   MetaAhorroSyncEntrada,
@@ -76,6 +77,13 @@ export const servicioSync = {
     const existente = await repositorioSync.buscarGastoPorId(gasto.id)
     verificarPertenencia(usuarioId, existente, 'Este gasto ya pertenece a otra cuenta.')
     await repositorioSync.guardarGasto(usuarioId, gasto)
+  },
+
+  /** Mismo criterio que sincronizarGasto. Ver schema.prisma (modelo Bono). */
+  async sincronizarBono(usuarioId: string, bono: BonoSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarBonoPorId(bono.id)
+    verificarPertenencia(usuarioId, existente, 'Este bono ya pertenece a otra cuenta.')
+    await repositorioSync.guardarBono(usuarioId, bono)
   },
 
   /** Mismo criterio que sincronizarViaje. Ver schema.prisma (modelo Deuda) sobre por qué esta sí se sincroniza mutable, sin soporte de borrado. */

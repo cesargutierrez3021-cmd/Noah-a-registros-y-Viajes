@@ -24,6 +24,7 @@ model Usuario {
   jornadas       Jornada[]
   registrosMantenimiento RegistroMantenimiento[]
   gastos         Gasto[]
+  bonos          Bono[]
   deudas         Deuda[]
   abonosDeuda    AbonoDeuda[]
   metasAhorro    MetaAhorro[]
@@ -206,6 +207,25 @@ model Gasto {
 
   @@index([usuarioId])
   @@map("gastos")
+}
+
+/// 2026-09-17, pedido explícito del usuario: "bono" de una plataforma (ej.
+/// Uber/DiDi por cumplir X viajes) — plata que entra pero NO es un viaje.
+/// Mismo criterio append-only que Gasto (nunca se edita ni se borra, solo
+/// monto + fecha, sin categoría ni plataforma — el usuario pidió "solo el
+/// monto" a propósito, sin fricción). Solo cuenta en `ingresos` de
+/// domain/estadisticas/calculos.ts, `calcularResumen` — nunca en
+/// `cantidadViajes` ni en `ingresoPromedioPorViaje` (un bono no es un viaje).
+model Bono {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  monto              Float
+  fechaISO           DateTime  @map("fecha")
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@map("bonos")
 }
 
 /// Bloque 3 (dominios nuevos) — deudas. A diferencia de Gasto/RegistroMantenimiento

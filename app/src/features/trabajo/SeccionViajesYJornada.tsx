@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useViajes } from '../../domain/viajes/store'
 import { useJornada } from '../../domain/jornada/store'
+import { useBonos } from '../../domain/bonos/store'
 import { sincronizarViajesPendientes } from '../../domain/viajes/sync'
 import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
+import { sincronizarBonosPendientes } from '../../domain/bonos/sync'
 import { fechaNegocioISO, limitesDiaBogotaISODesdeClave } from '../../lib/fechas'
 import { PLATAFORMAS_DISPONIBLES as PLATAFORMAS } from '../../domain/viajes/types'
 
@@ -22,18 +24,30 @@ import { PLATAFORMAS_DISPONIBLES as PLATAFORMAS } from '../../domain/viajes/type
  * — el usuario pidió que apareciera justo debajo de "Estado del sistema"
  * (SeccionPulso.tsx), no acá abajo, donde había que hacer scroll para
  * encontrarla.
+ *
+ * 2026-09-17, pedido explícito del usuario: "Agregar bono" (domain/bonos)
+ * vive acá, justo debajo del selector de plataforma ("los iconos... que está
+ * ahí lo de agregar viajes"). Esta sección ya se monta en TrabajoScreen.tsx
+ * como hermana de SeccionPulso, no adentro de ninguna de sus pestañas — por
+ * eso ya es "siempre visible sin importar la pantalla que esté
+ * seleccionando" sin necesidad de tocar nada de esa estructura. A propósito
+ * fuera de los dos bloques `viajeEnCurso`/`!viajeEnCurso`: un bono no
+ * depende de si hay un viaje en curso o no.
  */
 export function SeccionViajesYJornada() {
   const { viajeEnCurso, viajes, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje } = useViajes()
   const { agregarViajeAJornadaAbierta, cargar: cargarJornadas } = useJornada()
+  const { agregarBono, cargar: cargarBonos } = useBonos()
 
   const [ingreso, setIngreso] = useState('')
   const [diaHistorial, setDiaHistorial] = useState(() => fechaNegocioISO())
+  const [montoBono, setMontoBono] = useState('')
 
   useEffect(() => {
     void cargar()
     void cargarJornadas()
-  }, [cargar, cargarJornadas])
+    void cargarBonos()
+  }, [cargar, cargarJornadas, cargarBonos])
 
   async function manejarFinalizar() {
     const viaje = await finalizarViaje({ ingreso: Number(ingreso) || 0, distanciaReportadaPlataforma: null })
@@ -43,9 +57,28 @@ export function SeccionViajesYJornada() {
     void sincronizarJornadasPendientes()
   }
 
+  async function manejarAgregarBono() {
+    const monto = Number(montoBono)
+    if (!monto || monto <= 0) return
+    await agregarBono(monto)
+    setMontoBono('')
+    void sincronizarBonosPendientes()
+  }
+
   return (
     <div id="seccion-viajes-jornada">
       <h2 className="tt-titulo-seccion">Jornada y viajes</h2>
+
+      <div className="tarjeta-viaje" style={{ marginBottom: 16, gap: 8, alignItems: 'center' }}>
+        <input
+          type="number"
+          placeholder="Monto del bono"
+          value={montoBono}
+          onChange={(e) => setMontoBono(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <button type="button" onClick={() => void manejarAgregarBono()}>Agregar bono</button>
+      </div>
 
       {!viajeEnCurso && (
         <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 8 }}>

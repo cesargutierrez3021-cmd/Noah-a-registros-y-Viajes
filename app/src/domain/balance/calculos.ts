@@ -3,6 +3,7 @@ import type { Gasto } from '../gastos/types'
 import type { Deuda } from '../deudas/types'
 import type { GastoHogar } from '../hogar/types'
 import type { MetaAhorro } from '../ahorro/types'
+import type { Bono } from '../bonos/types'
 import { calcularResumen } from '../estadisticas/calculos'
 
 /**
@@ -50,8 +51,9 @@ export function calcularBalanceGeneral(
   deudas: Deuda[],
   gastosDeHogar: GastoHogar[],
   metasAhorro: MetaAhorro[] = [],
+  bonos: Bono[] = [],
 ): BalanceGeneral {
-  const ingresosTotales = calcularResumen(viajes).ingresos
+  const ingresosTotales = calcularResumen(viajes, bonos).ingresos
   const gastosOperativos = gastos.reduce((acc, g) => acc + g.monto, 0)
   const totalGastosHogar = gastosDeHogar.reduce((acc, g) => acc + g.monto, 0)
   const deudaPendienteTotal = deudas.reduce((acc, d) => acc + Math.max(d.saldoActual, 0), 0)

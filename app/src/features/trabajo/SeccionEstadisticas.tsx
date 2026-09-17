@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
+import { useBonos } from '../../domain/bonos/store'
 import { agruparPorPeriodo, calcularResumen, desglosePorPlataforma, desglosePorZona, desglosePorFranjaHoraria } from '../../domain/estadisticas/calculos'
 import type { ResumenViajes, UnidadPeriodo } from '../../domain/estadisticas/types'
 import { AnilloMeta } from '../../components/graficos/AnilloMeta'
@@ -40,16 +41,18 @@ function porcentajesDeIngresos(items: { clave: string; resumen: ResumenViajes }[
 
 export function SeccionEstadisticas() {
   const { viajes, cargar } = useViajes()
+  const { bonos, cargar: cargarBonos } = useBonos()
   const { tema } = useTema()
   const animado = tema !== 'papel'
   const [unidad, setUnidad] = useState<UnidadPeriodo>('dia')
 
   useEffect(() => {
     void cargar()
-  }, [cargar])
+    void cargarBonos()
+  }, [cargar, cargarBonos])
 
-  const resumenGeneral = calcularResumen(viajes)
-  const porPeriodo = agruparPorPeriodo(viajes, unidad)
+  const resumenGeneral = calcularResumen(viajes, bonos)
+  const porPeriodo = agruparPorPeriodo(viajes, unidad, bonos)
   const porPlataforma = desglosePorPlataforma(viajes)
   const porZona = desglosePorZona(viajes)
   const porFranja = desglosePorFranjaHoraria(viajes)

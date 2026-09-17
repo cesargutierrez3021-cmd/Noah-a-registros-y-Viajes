@@ -5,6 +5,7 @@ import { useGastos } from '../../domain/gastos/store'
 import { useDeudas } from '../../domain/deudas/store'
 import { useHogar } from '../../domain/hogar/store'
 import { useAhorro } from '../../domain/ahorro/store'
+import { useBonos } from '../../domain/bonos/store'
 import { useMantenimiento } from '../../domain/mantenimiento/store'
 import { useAuth } from '../../domain/auth/store'
 import { useTema } from '../../domain/tema/store'
@@ -60,6 +61,7 @@ export function BalanceScreen() {
   const { deudas, cargar: cargarDeudas } = useDeudas()
   const { gastos: gastosHogar, cargar: cargarHogar } = useHogar()
   const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
+  const { bonos, cargar: cargarBonos } = useBonos()
   const { registros: registrosMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
   const { autenticado } = useAuth()
   const { tema } = useTema()
@@ -84,10 +86,11 @@ export function BalanceScreen() {
     void cargarDeudas()
     void cargarHogar()
     void cargarAhorro()
+    void cargarBonos()
     void cargarMantenimiento()
-  }, [cargarViajes, cargarGastos, cargarDeudas, cargarHogar, cargarAhorro, cargarMantenimiento])
+  }, [cargarViajes, cargarGastos, cargarDeudas, cargarHogar, cargarAhorro, cargarBonos, cargarMantenimiento])
 
-  const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar, metasAhorro)
+  const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar, metasAhorro, bonos)
 
   /**
    * 2026-09-16, pedido explícito del usuario: "falta la gráfica de los

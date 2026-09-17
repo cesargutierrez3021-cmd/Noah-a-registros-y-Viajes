@@ -6,6 +6,7 @@ import { useGastos } from '../../domain/gastos/store'
 import { useHogar } from '../../domain/hogar/store'
 import { useDeudas } from '../../domain/deudas/store'
 import { useAhorro } from '../../domain/ahorro/store'
+import { useBonos } from '../../domain/bonos/store'
 import { useMantenimiento } from '../../domain/mantenimiento/store'
 import { useMetaDiaria } from '../../domain/metaDiaria/store'
 import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
@@ -71,13 +72,19 @@ function claveDiaDeHoy(): string {
  * los números son reales (mismos stores/funciones de siempre, D-3/D-18) —
  * lo único nuevo de esta sesión es cómo se ven.
  *
- * Interpretación de dos ambigüedades de la guía visual (documentadas acá
+ * Interpretación de una ambigüedad de la guía visual (documentada acá
  * para no tener que redecidir después): "Gasolina/km" usa SOLO los gastos de
  * categoría 'gasolina' (no todos los gastos, eso ya lo cubre el desglose de
- * "Resumen" más abajo) — la etiqueta ahora sí corresponde al dato real. Y
- * "Agregar bono" de la guía no se incluyó: ese concepto no existe como
- * dominio en MIA (no se inventó un botón que no hace nada) — quedan
- * "Agregar viaje" y "Agregar gasto", que sí llevan a algo real.
+ * "Resumen" más abajo) — la etiqueta ahora sí corresponde al dato real.
+ *
+ * 2026-09-17, pedido explícito del usuario: el bloque "Operación y
+ * registros" (Agregar viaje/Agregar gasto/Mantenimiento) se quitó de acá —
+ * los tres solo llevaban a algo que ya existe como pestaña propia ("Lectura
+ * del día" para viajes, "Mantenim. y gastos" para el resto), era redundante
+ * ("eso ya está"). "Agregar bono" (domain/bonos, nuevo este mismo pedido) NO
+ * vive acá — el usuario pidió que quede afuera, siempre visible sin importar
+ * la pestaña — ver SeccionViajesYJornada.tsx, que ya se monta como hermano
+ * de este componente en TrabajoScreen.tsx.
  */
 export function SeccionPulso() {
   const { viajes, viajeEnCurso } = useViajes()
@@ -86,6 +93,7 @@ export function SeccionPulso() {
   const { conceptos: conceptosHogar, cargar: cargarHogar } = useHogar()
   const { deudas, cargar: cargarDeudas } = useDeudas()
   const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
+  const { bonos, cargar: cargarBonos } = useBonos()
   const { items: itemsMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
   const { presupuestoGasolinaMensual, cargar: cargarMetaDiaria } = useMetaDiaria()
 
@@ -101,13 +109,14 @@ export function SeccionPulso() {
     void cargarHogar()
     void cargarDeudas()
     void cargarAhorro()
+    void cargarBonos()
     void cargarMantenimiento()
     cargarMetaDiaria()
-  }, [cargarHogar, cargarDeudas, cargarAhorro, cargarMantenimiento, cargarMetaDiaria])
+  }, [cargarHogar, cargarDeudas, cargarAhorro, cargarBonos, cargarMantenimiento, cargarMetaDiaria])
 
   const jornada = jornadaAbierta()
 
-  const porDia = useMemo(() => agruparPorPeriodo(viajes, 'dia'), [viajes])
+  const porDia = useMemo(() => agruparPorPeriodo(viajes, 'dia', bonos), [viajes, bonos])
   const resumenHoy = useMemo(() => {
     return porDia.find((p) => p.clave === claveDiaDeHoy())?.resumen ?? calcularResumen([])
   }, [porDia])
@@ -156,10 +165,14 @@ export function SeccionPulso() {
     () => viajes.filter((v: Viaje) => v.estado === 'finalizado' && v.inicioISO >= rango.desde && v.inicioISO < rango.hasta),
     [viajes, rango.desde, rango.hasta],
   )
-  const resumenPeriodo = useMemo(() => calcularResumen(viajesDelPeriodo), [viajesDelPeriodo])
+  const bonosDelPeriodo = useMemo(
+    () => bonos.filter((b) => b.fechaISO >= rango.desde && b.fechaISO < rango.hasta),
+    [bonos, rango.desde, rango.hasta],
+  )
+  const resumenPeriodo = useMemo(() => calcularResumen(viajesDelPeriodo, bonosDelPeriodo), [viajesDelPeriodo, bonosDelPeriodo])
   const gastoTotalPeriodo = sumaTotalGastos(gastos, rango.desde, rango.hasta)
   const netoPeriodo = resumenPeriodo.ingresos - gastoTotalPeriodo
-  const historial = useMemo(() => agruparPorPeriodo(viajes, 'dia').slice(0, 5), [viajes])
+  const historial = useMemo(() => agruparPorPeriodo(viajes, 'dia', bonos).slice(0, 5), [viajes, bonos])
 
   async function manejarJornada() {
     if (jornada) {
@@ -178,10 +191,6 @@ export function SeccionPulso() {
       void mostrarBurbuja('0.0', '0m', !!viajeEnCurso, viajes.length)
     }
     void sincronizarJornadasPendientes()
-  }
-
-  function irA(idSeccion: string) {
-    document.getElementById(idSeccion)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   return (
@@ -382,19 +391,6 @@ export function SeccionPulso() {
               </span>
               <span>{formatoPesos(gastoTotalPeriodo)}</span>
             </div>
-          </div>
-
-          <h2 className="tt-divisor">Operación y registros</h2>
-          <div className="tt-acciones">
-            <button type="button" className="tt-accion-boton" onClick={() => irA('seccion-viajes-jornada')}>
-              Agregar viaje
-            </button>
-            <button type="button" className="tt-accion-boton" onClick={() => setVista('mantenimiento')}>
-              Agregar gasto
-            </button>
-            <button type="button" className="tt-accion-boton" onClick={() => setVista('mantenimiento')}>
-              Mantenimiento
-            </button>
           </div>
 
           <button type="button" className="tt-acordeon" onClick={() => setHistorialAbierto((v) => !v)}>

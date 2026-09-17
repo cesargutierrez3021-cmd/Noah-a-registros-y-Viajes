@@ -92,6 +92,13 @@ export interface GastoSyncEntrada {
   notas: string | null
 }
 
+/** 2026-09-17, pedido explícito del usuario: "bono" de plataforma — solo monto y fecha. */
+export interface BonoSyncEntrada {
+  id: string
+  monto: number
+  fechaISO: string
+}
+
 /** Lo que el cliente manda por deuda (Bloque 3). Se reenvía completa en cada abono (mismo criterio que Jornada). */
 export interface DeudaSyncEntrada {
   id: string

@@ -1,6 +1,7 @@
 import type { Viaje } from '../viajes/types'
 import type { Jornada } from '../jornada/types'
 import type { Gasto } from '../gastos/types'
+import type { Bono } from '../bonos/types'
 import { horaLocalBogota } from '../../lib/fechas'
 import type {
   CostoPorKm,
@@ -20,16 +21,28 @@ function soloFinalizados(viajes: Viaje[]): Viaje[] {
   return viajes.filter((v) => v.estado === 'finalizado')
 }
 
-export function calcularResumen(viajes: Viaje[]): ResumenViajes {
+/**
+ * `bonos` (2026-09-17, pedido explícito del usuario): un bono de plataforma
+ * (ej. Uber/DiDi por cumplir X viajes) es plata real que entra, pero NO es
+ * un viaje — se suma a `ingresos`, pero a propósito NUNCA a `cantidadViajes`
+ * ni al numerador de `ingresoPromedioPorViaje` (ese promedio sigue siendo
+ * solo de viajes reales, sin inflarse ni desinflarse por un bono). Opcional
+ * con default `[]` para no romper ningún llamador existente que no tiene
+ * bonos en su alcance (desgloses por plataforma/zona/franja horaria — un
+ * bono no tiene ninguna de esas tres cosas, así que no le corresponde
+ * aparecer ahí).
+ */
+export function calcularResumen(viajes: Viaje[], bonos: Bono[] = []): ResumenViajes {
   const finalizados = soloFinalizados(viajes)
   const cantidadViajes = finalizados.length
   const kmTotales = finalizados.reduce((acc, v) => acc + v.distancia.kmTotalesReales, 0)
-  const ingresos = finalizados.reduce((acc, v) => acc + v.ingreso, 0)
+  const ingresosViajes = finalizados.reduce((acc, v) => acc + v.ingreso, 0)
+  const ingresosBonos = bonos.reduce((acc, b) => acc + b.monto, 0)
   return {
     cantidadViajes,
     kmTotales,
-    ingresos,
-    ingresoPromedioPorViaje: cantidadViajes === 0 ? 0 : ingresos / cantidadViajes,
+    ingresos: ingresosViajes + ingresosBonos,
+    ingresoPromedioPorViaje: cantidadViajes === 0 ? 0 : ingresosViajes / cantidadViajes,
   }
 }
 
@@ -58,20 +71,36 @@ function claveDePeriodo(fechaISO: string, unidad: UnidadPeriodo): string {
   return claveMes(fechaISO)
 }
 
-/** Agrupa por día, semana o mes, usando la fecha de inicio del viaje. Orden: más reciente primero. */
-export function agruparPorPeriodo(viajes: Viaje[], unidad: UnidadPeriodo): PuntoPeriodo[] {
+/**
+ * Agrupa por día, semana o mes, usando la fecha de inicio del viaje. Orden:
+ * más reciente primero. `bonos` (2026-09-17, opcional, default `[]`, mismo
+ * criterio que en `calcularResumen`) se agrupan por su propia fecha con el
+ * mismo criterio de período, y se cruzan por clave — así un bono del mismo
+ * día/semana/mes que un viaje termina en el mismo punto del resultado.
+ */
+export function agruparPorPeriodo(viajes: Viaje[], unidad: UnidadPeriodo, bonos: Bono[] = []): PuntoPeriodo[] {
   const finalizados = soloFinalizados(viajes)
-  const grupos = new Map<string, Viaje[]>()
+  const gruposViajes = new Map<string, Viaje[]>()
 
   for (const viaje of finalizados) {
     const clave = claveDePeriodo(viaje.inicioISO, unidad)
-    const lista = grupos.get(clave) ?? []
+    const lista = gruposViajes.get(clave) ?? []
     lista.push(viaje)
-    grupos.set(clave, lista)
+    gruposViajes.set(clave, lista)
   }
 
-  return Array.from(grupos.entries())
-    .map(([clave, viajesDelPeriodo]) => ({ clave, resumen: calcularResumen(viajesDelPeriodo) }))
+  const gruposBonos = new Map<string, Bono[]>()
+  for (const bono of bonos) {
+    const clave = claveDePeriodo(bono.fechaISO, unidad)
+    const lista = gruposBonos.get(clave) ?? []
+    lista.push(bono)
+    gruposBonos.set(clave, lista)
+  }
+
+  const todasLasClaves = new Set([...gruposViajes.keys(), ...gruposBonos.keys()])
+
+  return Array.from(todasLasClaves)
+    .map((clave) => ({ clave, resumen: calcularResumen(gruposViajes.get(clave) ?? [], gruposBonos.get(clave) ?? []) }))
     .sort((a, b) => b.clave.localeCompare(a.clave))
 }
 

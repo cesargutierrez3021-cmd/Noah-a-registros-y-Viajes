@@ -5,6 +5,7 @@ import { useConversacion } from '../../domain/conversacion/store'
 import { pedirPermisoVoz } from '../../domain/conversacion/voz'
 import type { ContextoConversacionEnvio } from '../../domain/conversacion/api'
 import { useViajes } from '../../domain/viajes/store'
+import { useBonos } from '../../domain/bonos/store'
 import { useMantenimiento } from '../../domain/mantenimiento/store'
 import { useAuth } from '../../domain/auth/store'
 import { agruparPorPeriodo, calcularResumen, desglosePorZona, desglosePorFranjaHoraria } from '../../domain/estadisticas/calculos'
@@ -39,6 +40,7 @@ export function MiaBurbuja() {
     limpiarSolicitudApertura,
   } = useConversacion()
   const { viajes, cargar: cargarViajes } = useViajes()
+  const { bonos, cargar: cargarBonos } = useBonos()
   const { items: itemsMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
   const { autenticado } = useAuth()
 
@@ -62,8 +64,9 @@ export function MiaBurbuja() {
   useEffect(() => {
     if (!abierta) return
     void cargarViajes()
+    void cargarBonos()
     cargarMantenimiento()
-  }, [abierta, cargarViajes, cargarMantenimiento])
+  }, [abierta, cargarViajes, cargarBonos, cargarMantenimiento])
 
   useEffect(() => {
     if (!abierta) return
@@ -97,9 +100,9 @@ export function MiaBurbuja() {
 
   function armarContexto(): ContextoConversacionEnvio {
     const kmActual = calcularResumen(viajes).kmTotales
-    const porDia = agruparPorPeriodo(viajes, 'dia')
+    const porDia = agruparPorPeriodo(viajes, 'dia', bonos)
     const puntoHoy = porDia.find((p) => p.clave === claveDiaDeHoy())
-    const puntoSemana = agruparPorPeriodo(viajes, 'semana')[0]
+    const puntoSemana = agruparPorPeriodo(viajes, 'semana', bonos)[0]
     const alertas = useMantenimiento.getState().alertas(kmActual)
 
     return {

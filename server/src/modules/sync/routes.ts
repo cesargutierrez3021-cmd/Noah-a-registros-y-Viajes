@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { servicioSync, ErrorSync } from './service.js'
-import { esquemaViajeSync, esquemaJornadaSync, esquemaRegistroMantenimientoSync, esquemaGastoSync, esquemaDeudaSync, esquemaAbonoDeudaSync, esquemaMetaAhorroSync, esquemaAbonoAhorroSync, esquemaConceptoFijoSync, esquemaGastoHogarSync } from './schemas.js'
+import { esquemaViajeSync, esquemaJornadaSync, esquemaRegistroMantenimientoSync, esquemaGastoSync, esquemaBonoSync, esquemaDeudaSync, esquemaAbonoDeudaSync, esquemaMetaAhorroSync, esquemaAbonoAhorroSync, esquemaConceptoFijoSync, esquemaGastoHogarSync } from './schemas.js'
 import { requiereAutenticacion } from '../auth/middleware.js'
 import { async } from '../../http/asyncHandler.js'
 import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
@@ -113,6 +113,28 @@ rutasSync.post(
     } catch (err) {
       if (err instanceof ErrorSync) {
         logEventoSeguridad({ tipo: 'sync_conflicto_pertenencia', ip: req.ip ?? 'desconocida', detalle: `gastoId=${gasto.id}` })
+      }
+      throw err
+    }
+  }),
+)
+
+/**
+ * POST /sync/bonos — 2026-09-17, pedido explícito del usuario. Mismo patrón
+ * que /gastos: upsert por id, un bono por request.
+ */
+rutasSync.post(
+  '/bonos',
+  requiereAutenticacion,
+  limitadorSync,
+  async(async (req: Request, res: Response) => {
+    const bono = esquemaBonoSync.parse(req.body)
+    try {
+      await servicioSync.sincronizarBono(req.usuarioId!, bono)
+      res.json({ id: bono.id, sincronizado: true })
+    } catch (err) {
+      if (err instanceof ErrorSync) {
+        logEventoSeguridad({ tipo: 'sync_conflicto_pertenencia', ip: req.ip ?? 'desconocida', detalle: `bonoId=${bono.id}` })
       }
       throw err
     }

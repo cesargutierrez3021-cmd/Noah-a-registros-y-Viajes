@@ -5,6 +5,7 @@ import type {
   JornadaSyncEntrada,
   RegistroMantenimientoSyncEntrada,
   GastoSyncEntrada,
+  BonoSyncEntrada,
   DeudaSyncEntrada,
   AbonoDeudaSyncEntrada,
   MetaAhorroSyncEntrada,
@@ -131,6 +132,25 @@ export const repositorioSync = {
     await prisma.gasto.upsert({
       where: { id: gasto.id },
       create: { id: gasto.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ningún bono con ese id. */
+  async buscarBonoPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.bono.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  async guardarBono(usuarioId: string, bono: BonoSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      monto: bono.monto,
+      fechaISO: new Date(bono.fechaISO),
+    }
+
+    await prisma.bono.upsert({
+      where: { id: bono.id },
+      create: { id: bono.id, ...datos },
       update: datos,
     })
   },

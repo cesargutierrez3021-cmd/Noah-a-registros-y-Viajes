@@ -68,6 +68,13 @@ export const esquemaGastoSync = z.object({
   notas: z.string().nullable(),
 })
 
+/** 2026-09-17, pedido explícito del usuario: "bono" de plataforma — solo monto y fecha, sin fricción. */
+export const esquemaBonoSync = z.object({
+  id: z.string().uuid('El id del bono debe ser el UUID generado en el cliente'),
+  monto: z.number().positive(),
+  fechaISO: z.string(),
+})
+
 const esquemaCuotaProgramada = z.object({
   monto: z.number().positive(),
   frecuencia: z.enum(['semanal', 'quincenal', 'mensual']),
