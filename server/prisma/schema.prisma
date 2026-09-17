@@ -288,6 +288,14 @@ model MetaAhorro {
   nombre             String
   montoObjetivo      Float     @map("monto_objetivo")
   saldoActual        Float     @map("saldo_actual")
+  /// 2026-09-17, pedido explícito del usuario: "no me aparece fecha de
+  /// límite para ahorrar" — mismo campo y mismo criterio que
+  /// Deuda.fechaLimiteISO (fecha real, puesta a mano, editable, null = sin
+  /// fecha puesta todavía). A diferencia de Deuda, hoy no dispara ningún
+  /// aviso propio (domain/avisos solo cubre deudas/hogar) — se guarda para
+  /// mostrarla en la tarjeta de la meta; si más adelante se pide un aviso de
+  /// ahorro, este es el campo que ya existe para eso.
+  fechaLimiteISO     DateTime? @map("fecha_limite")
   /// 2026-09-16 (corrección posterior, misma sesión): reemplaza el
   /// `aporteMensualObjetivo Float?` de la ronda anterior — un solo número
   /// no dejaba decir "ahorro X por SEMANA" (bug real reportado: "la meta

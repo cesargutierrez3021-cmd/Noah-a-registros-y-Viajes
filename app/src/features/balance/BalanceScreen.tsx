@@ -58,7 +58,7 @@ function FilaResumen({ nombre, monto, porcentaje, color }: { nombre: string; mon
 export function BalanceScreen() {
   const { viajes, cargar: cargarViajes } = useViajes()
   const { gastos, cargar: cargarGastos } = useGastos()
-  const { deudas, cargar: cargarDeudas } = useDeudas()
+  const { deudas, abonos: abonosDeuda, cargar: cargarDeudas } = useDeudas()
   const { gastos: gastosHogar, cargar: cargarHogar } = useHogar()
   const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
   const { bonos, cargar: cargarBonos } = useBonos()
@@ -105,15 +105,37 @@ export function BalanceScreen() {
   const costoMantenimientoRealizado = registrosMantenimiento.reduce((acc, r) => acc + (r.costo ?? 0), 0)
   const gastosVehiculoTotal = balance.gastosOperativos + costoMantenimientoRealizado
 
-  // 2026-09-15, pedido explícito del usuario, con referencia visual propia:
-  // Hogar/Deudas/Ahorro/Vehículo/Libre, sumando 100% entre sí — NO % del
-  // ingreso total (una deuda acumulada puede superar el ingreso de un solo
-  // período, eso rompería el sentido de "porciones de una torta"). Libre
-  // (balance neto) se recorta a 0 para este reparto si diera negativo — un
-  // "libre" negativo no es una porción positiva de nada, ya se ve en rojo
-  // en la lista de abajo.
+  // 2026-09-17 (corrección posterior, misma sesión, pedido explícito del
+  // usuario): "ese porcentaje equivale al ingreso... si tengo un ingreso de
+  // un millón, que me muestre qué porcentaje se va a deudas... pero sin
+  // ingreso no hay nada. ¿Cómo me va a decir que el 95% es de deudas si el
+  // ingreso es cero?" — el diseño anterior (comentario de abajo, ya no
+  // vigente) calculaba el % contra la SUMA de las categorías entre sí, así
+  // que con ingreso $0 una deuda grande igual se llevaba casi el 100% del
+  // reparto. Ahora cada % es monto/ingresosTotales — sin ingreso, las 5
+  // dan 0%, tal como pidió. Ya no suman 100% entre sí a propósito (cada
+  // anillo/placa es su propio medidor "% de mi ingreso", no una porción de
+  // una torta — ver AnillosOrbitales.tsx/Prisma.tsx/Cristal3D.tsx, ninguno
+  // de los 3 estilos depende de que las porciones sumen 100).
   const librePositivo = Math.max(balance.balanceNeto, 0)
-  const sumaCategorias = balance.gastosDeHogar + balance.deudaPendienteTotal + balance.ahorroTotal + gastosVehiculoTotal + librePositivo
+  const ingresos = balance.ingresosTotales
+  function porcentajeDeIngreso(monto: number): number {
+    return ingresos > 0 ? Math.max(0, Math.min(100, (monto / ingresos) * 100)) : 0
+  }
+  // 2026-09-17, mismo pedido: "cuando llegue la fecha de pagos de deudas...
+  // si yo marco que se pagó o se abonó, ahí sí que vaya sumando... y así
+  // vaya apareciendo el porcentaje" — `deudaPendienteTotal` es un STOCK (lo
+  // que TODAVÍA se debe, baja al abonar) — mostrar ESE número contra el
+  // ingreso no tiene el comportamiento que pidió (pagar una cuota bajaría
+  // el % en vez de subirlo, y una deuda vieja grande mostraría 100% para
+  // siempre así no se haya movido nada este período). Acá "Deudas" pasa a
+  // ser un FLUJO, igual criterio que las otras 4 categorías (todas suman
+  // dinero que YA salió/entró, nunca "lo que falta"): el total abonado de
+  // verdad (`AbonoDeuda.monto`, ya cargado por `useDeudas()` arriba) —
+  // empieza en $0 y solo crece cuando de verdad se confirma un pago.
+  // `deudaPendienteTotal` sigue intacto en el resto de la pantalla (el
+  // acordeón "Deudas" de abajo, que el usuario dijo que está bien así).
+  const totalAbonadoDeudas = abonosDeuda.reduce((acc, a) => acc + a.monto, 0)
   // 2026-09-15, el usuario mandó la referencia exacta de color para
   // Hogar/Deudas/Ahorro/Libre (paquete "prism-crystal-orbit-package",
   // ORIGINAL_COMPONENTS.tsx: C.green/coral/lilac/sky). "Vehículo" (2026-09-16,
@@ -127,11 +149,11 @@ export function BalanceScreen() {
   // material/luz, sin foto nueva). El orden acá ya no importa para ese
   // componente (usa `items.slice(0,5)`, las 5 categorías completas).
   const itemsDistribucion: ItemDistribucion[] = [
-    { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#55e3a0', porcentaje: sumaCategorias > 0 ? (balance.gastosDeHogar / sumaCategorias) * 100 : 0 },
-    { clave: 'deudas', etiqueta: 'Deudas', monto: balance.deudaPendienteTotal, color: '#ff9d83', porcentaje: sumaCategorias > 0 ? (balance.deudaPendienteTotal / sumaCategorias) * 100 : 0 },
-    { clave: 'ahorro', etiqueta: 'Ahorro', monto: balance.ahorroTotal, color: '#b7a4ff', porcentaje: sumaCategorias > 0 ? (balance.ahorroTotal / sumaCategorias) * 100 : 0 },
-    { clave: 'libre', etiqueta: 'Libre', monto: librePositivo, color: '#78c8ff', porcentaje: sumaCategorias > 0 ? (librePositivo / sumaCategorias) * 100 : 0 },
-    { clave: 'vehiculo', etiqueta: 'Vehículo', monto: gastosVehiculoTotal, color: '#f0c987', porcentaje: sumaCategorias > 0 ? (gastosVehiculoTotal / sumaCategorias) * 100 : 0 },
+    { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#55e3a0', porcentaje: porcentajeDeIngreso(balance.gastosDeHogar) },
+    { clave: 'deudas', etiqueta: 'Deudas', monto: totalAbonadoDeudas, color: '#ff9d83', porcentaje: porcentajeDeIngreso(totalAbonadoDeudas) },
+    { clave: 'ahorro', etiqueta: 'Ahorro', monto: balance.ahorroTotal, color: '#b7a4ff', porcentaje: porcentajeDeIngreso(balance.ahorroTotal) },
+    { clave: 'libre', etiqueta: 'Libre', monto: librePositivo, color: '#78c8ff', porcentaje: porcentajeDeIngreso(librePositivo) },
+    { clave: 'vehiculo', etiqueta: 'Vehículo', monto: gastosVehiculoTotal, color: '#f0c987', porcentaje: porcentajeDeIngreso(gastosVehiculoTotal) },
   ]
 
   // 2026-09-15, pedido explícito del usuario: "después de la gráfica

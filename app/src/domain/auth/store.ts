@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { guardarTokens, borrarTokens, haySesion, URL_BASE } from '../../lib/api'
 import { registrarse, iniciarSesion, solicitarRecuperacion, restablecerContrasena } from './api'
+import { restaurarTodoDesdeServidor } from '../restauracion/restaurar'
 import type { Usuario } from './types'
 
 /**
@@ -37,6 +38,13 @@ export const useAuth = create<EstadoAuth>((set) => ({
     try {
       const { usuario, tokenAcceso, tokenRefresco } = await registrarse(email, contrasena)
       guardarTokens(tokenAcceso, tokenRefresco)
+      // Cuenta recién creada — normalmente no hay nada que restaurar, pero si
+      // el usuario ya se había registrado antes en otro teléfono con este
+      // mismo email (ver el comentario largo de restaurarTodoDesdeServidor),
+      // esto lo trae de vuelta igual. Best-effort: un fallo acá no debe
+      // impedir que el registro/login en sí cuente como exitoso — los
+      // tokens ya quedaron guardados, la próxima sesión puede reintentarlo.
+      await restaurarTodoDesdeServidor().catch(() => undefined)
       set({ usuario, cargando: false })
       return true
     } catch (error) {
@@ -50,6 +58,12 @@ export const useAuth = create<EstadoAuth>((set) => ({
     try {
       const { usuario, tokenAcceso, tokenRefresco } = await iniciarSesion(email, contrasena)
       guardarTokens(tokenAcceso, tokenRefresco)
+      // 2026-09-17, pedido explícito del usuario ("cada vez que instalo la
+      // aplicación se borran todos los datos... supuestamente estamos
+      // conectados... para guardar la base de datos"): acá es donde se
+      // restaura de verdad — iniciar sesión después de reinstalar es
+      // exactamente el caso que reportó. Ver domain/restauracion/restaurar.ts.
+      await restaurarTodoDesdeServidor().catch(() => undefined)
       set({ usuario, cargando: false })
       return true
     } catch (error) {

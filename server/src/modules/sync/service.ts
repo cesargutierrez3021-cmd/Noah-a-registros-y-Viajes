@@ -166,4 +166,9 @@ export const servicioSync = {
       throw err
     }
   },
+
+  /** Ver el comentario largo en repository.ts, `obtenerTodo` — restauración completa al iniciar sesión. */
+  async obtenerTodo(usuarioId: string) {
+    return repositorioSync.obtenerTodo(usuarioId)
+  },
 }

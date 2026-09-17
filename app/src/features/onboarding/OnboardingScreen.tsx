@@ -1,38 +1,50 @@
 import { useState } from 'react'
 import { solicitarNotificaciones, solicitarUbicacion, solicitarIgnorarOptimizacionBateria, solicitarBurbuja, solicitarMicrofono } from '../../domain/onboarding/permisos'
+import { useOnboarding } from '../../domain/onboarding/store'
 import { useTema, previsualizarTema } from '../../domain/tema/store'
 import { TEMAS_DISPONIBLES } from '../../domain/tema/types'
 import type { Tema } from '../../domain/tema/types'
 import { useVehiculo } from '../../domain/vehiculo/store'
 import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
+import { useAuth } from '../../domain/auth/store'
 
-type Paso = 'bienvenida' | 'notificaciones' | 'ubicacion' | 'bateria' | 'burbuja' | 'microfono' | 'tema' | 'vehiculo'
+type Paso = 'bienvenida' | 'notificaciones' | 'ubicacion' | 'bateria' | 'burbuja' | 'microfono' | 'tema' | 'vehiculo' | 'cuenta'
 
-const ORDEN: Paso[] = ['bienvenida', 'notificaciones', 'ubicacion', 'bateria', 'burbuja', 'microfono', 'tema', 'vehiculo']
+const ORDEN: Paso[] = ['bienvenida', 'notificaciones', 'ubicacion', 'bateria', 'burbuja', 'microfono', 'tema', 'vehiculo', 'cuenta']
 
 /**
- * Se muestra mientras falte tema o vehículo por elegir (App.tsx decide esto
- * mirando `useTema().yaElegido` y `useVehiculo().yaElegido`). El paso inicial
- * arranca en 'vehiculo' cuando el tema ya está elegido pero el vehículo no
- * (2026-09-15, pedido explícito del usuario: "elegir vehículo" se agrega
- * como paso nuevo DESPUÉS de que ya existían usuarios con tema elegido — a
- * esos no hay que volver a pedirles permisos ni tema, solo el paso nuevo).
+ * Se muestra mientras falte tema, vehículo o el paso de cuenta por resolver
+ * (App.tsx decide esto mirando `useTema().yaElegido`, `useVehiculo().yaElegido`
+ * y `useOnboarding().cuentaVista`). El paso inicial se calcula mirando qué
+ * falta de verdad — no siempre 'bienvenida' — para no volver a pedirle
+ * permisos ni tema a alguien que ya los tenía cuando se agregó un paso nuevo
+ * (2026-09-15: 'vehiculo' se agregó así; 2026-09-17: 'cuenta' se agrega con
+ * el mismo criterio).
  *
  * Cada paso de permiso sigue el mismo patrón: explicar en una frase por qué
  * hace falta, un botón que pide el permiso de verdad (domain/onboarding/permisos.ts),
  * y avanza al siguiente paso pase lo que pase (conceda o no) — nunca bloquea.
+ *
+ * 'cuenta' (2026-09-17, pedido explícito del usuario, tras reportar que
+ * reinstalar la app le borraba todo): "obviamente también más tarde
+ * omitir... que se solucione todo de una vez y siga" — mismo criterio de
+ * "nunca bloquea" que los pasos de permiso: ofrece iniciar sesión o crear
+ * cuenta ahí mismo (así los datos quedan respaldados, ver
+ * domain/restauracion/restaurar.ts), pero un botón "Más tarde" lo saltea sin
+ * fricción. Es el ÚLTIMO paso — no hace falta un `siguiente()` explícito
+ * después, App.tsx desmonta este componente apenas `cuentaVista` pasa a true.
  */
 export function OnboardingScreen() {
   const { yaElegido: temaYaElegido, elegirTema } = useTema()
-  const { elegirVehiculo } = useVehiculo()
-  const [paso, setPaso] = useState<Paso>(temaYaElegido ? 'vehiculo' : 'bienvenida')
+  const { yaElegido: vehiculoYaElegido, elegirVehiculo } = useVehiculo()
+  const [paso, setPaso] = useState<Paso>(!temaYaElegido ? 'bienvenida' : !vehiculoYaElegido ? 'vehiculo' : 'cuenta')
   const [pidiendo, setPidiendo] = useState(false)
   /** Tema que se está VIENDO ahora mismo (repintado real, ver previsualizarTema) — todavía no confirmado. */
   const [temaPrevia, setTemaPrevia] = useState<Tema>('verde')
 
   function siguiente() {
     const i = ORDEN.indexOf(paso)
-    setPaso(ORDEN[i + 1] ?? 'vehiculo')
+    setPaso(ORDEN[i + 1] ?? 'cuenta')
   }
 
   async function manejarPermiso(solicitar: () => Promise<boolean>) {
@@ -172,7 +184,7 @@ export function OnboardingScreen() {
               <button
                 key={v.valor}
                 type="button"
-                onClick={() => elegirVehiculo(v.valor)}
+                onClick={() => { elegirVehiculo(v.valor); siguiente() }}
                 style={{ textAlign: 'left', padding: 16, border: '1px solid var(--color-borde)' }}
               >
                 <strong style={{ display: 'block', marginBottom: 4 }}>{v.nombre}</strong>
@@ -182,7 +194,63 @@ export function OnboardingScreen() {
           </div>
         </>
       )}
+
+      {paso === 'cuenta' && <PasoCuenta />}
     </div>
+  )
+}
+
+/**
+ * Ver el comentario largo de 'cuenta' más arriba. Formulario mínimo (email +
+ * contraseña, login/registro en un toggle) — mismo patrón que
+ * CuentaScreen.tsx pero sin "olvidé mi contraseña" (eso puede esperar a la
+ * pantalla completa, no hace falta acá para no alargar el onboarding).
+ */
+function PasoCuenta() {
+  const { cargando, error, registrarse, iniciarSesion } = useAuth()
+  const { marcarCuentaVista } = useOnboarding()
+  const [modo, setModo] = useState<'login' | 'registro'>('registro')
+  const [email, setEmail] = useState('')
+  const [contrasena, setContrasena] = useState('')
+
+  async function manejarEnviar(evento: React.FormEvent) {
+    evento.preventDefault()
+    const exito = modo === 'login' ? await iniciarSesion(email, contrasena) : await registrarse(email, contrasena)
+    if (exito) marcarCuentaVista()
+  }
+
+  return (
+    <>
+      <h1 className="titulo-pantalla">{modo === 'login' ? 'Inicia sesión' : 'Creá tu cuenta'}</h1>
+      <p className="texto-mute" style={{ marginBottom: 24 }}>
+        Así tus datos quedan guardados — si cambiás de teléfono o reinstalás la app, no se pierden. Podés hacerlo después desde Ajustes si preferís.
+      </p>
+
+      <form onSubmit={(e) => void manejarEnviar(e)} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+        <input
+          type="password"
+          placeholder="Contraseña (mínimo 8 caracteres)"
+          value={contrasena}
+          onChange={(e) => setContrasena(e.target.value)}
+          autoComplete={modo === 'login' ? 'current-password' : 'new-password'}
+          minLength={8}
+          required
+        />
+        <button type="submit" disabled={cargando}>
+          {cargando ? 'Un momento…' : modo === 'login' ? 'Entrar' : 'Crear cuenta'}
+        </button>
+      </form>
+
+      {error && <p className="texto-mute" style={{ color: '#f04646', marginBottom: 16 }}>{error}</p>}
+
+      <button type="button" onClick={() => setModo(modo === 'login' ? 'registro' : 'login')} disabled={cargando} style={{ background: 'transparent', marginBottom: 8 }}>
+        {modo === 'login' ? '¿No tenés cuenta? Crear una' : '¿Ya tenés cuenta? Iniciar sesión'}
+      </button>
+      <button type="button" onClick={marcarCuentaVista} disabled={cargando} style={{ background: 'transparent' }}>
+        Más tarde
+      </button>
+    </>
   )
 }
 

@@ -7,11 +7,13 @@ interface EstadoAhorro {
   abonos: AbonoAhorro[]
   cargando: boolean
   cargar: () => Promise<void>
-  agregarMeta: (nombre: string, montoObjetivo: number, aportePlaneado: AportePlaneado | null) => Promise<MetaAhorro>
+  agregarMeta: (nombre: string, montoObjetivo: number, aportePlaneado: AportePlaneado | null, fechaLimiteISO: string | null) => Promise<MetaAhorro>
   /** Crea el abono Y actualiza saldoActual de la meta — misma transacción lógica que Deudas.abonar. */
   abonar: (metaId: string, monto: number) => Promise<void>
   /** Cambia SOLO el aporte planeado — mismo patrón que Deudas.actualizarFechaLimite. */
   actualizarAportePlaneado: (metaId: string, aportePlaneado: AportePlaneado | null) => Promise<void>
+  /** Cambia SOLO la fecha límite — mismo patrón exacto que Deudas.actualizarFechaLimite. */
+  actualizarFechaLimite: (metaId: string, fechaLimiteISO: string | null) => Promise<void>
   /** Metas con saldoActual < montoObjetivo. Mismo criterio que Deudas.deudasActivas, invertido. */
   metasEnProgreso: () => MetaAhorro[]
 }
@@ -31,13 +33,14 @@ export const useAhorro = create<EstadoAhorro>((set, get) => ({
     set({ metas, abonos, cargando: false })
   },
 
-  agregarMeta: async (nombre, montoObjetivo, aportePlaneado) => {
+  agregarMeta: async (nombre, montoObjetivo, aportePlaneado, fechaLimiteISO) => {
     const meta: MetaAhorro = {
       id: generarId(),
       nombre,
       montoObjetivo,
       saldoActual: 0,
       aportePlaneado,
+      fechaLimiteISO,
       creadaEnISO: new Date().toISOString(),
       pendienteDeSync: true,
     }
@@ -50,6 +53,14 @@ export const useAhorro = create<EstadoAhorro>((set, get) => ({
     const meta = get().metas.find((m) => m.id === metaId)
     if (!meta) return
     const metaActualizada: MetaAhorro = { ...meta, aportePlaneado, pendienteDeSync: true }
+    await repositorioAhorro.guardarMeta(metaActualizada)
+    set({ metas: get().metas.map((m) => (m.id === metaId ? metaActualizada : m)) })
+  },
+
+  actualizarFechaLimite: async (metaId, fechaLimiteISO) => {
+    const meta = get().metas.find((m) => m.id === metaId)
+    if (!meta) return
+    const metaActualizada: MetaAhorro = { ...meta, fechaLimiteISO, pendienteDeSync: true }
     await repositorioAhorro.guardarMeta(metaActualizada)
     set({ metas: get().metas.map((m) => (m.id === metaId ? metaActualizada : m)) })
   },

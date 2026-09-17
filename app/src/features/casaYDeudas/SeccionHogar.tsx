@@ -4,7 +4,7 @@ import { sincronizarHogarPendiente } from '../../domain/hogar/sync'
 import { CampoMonto } from '../../components/CampoMonto'
 
 export function SeccionHogar() {
-  const { gastos, conceptos, cargando, cargar, agregarGastoUnico, agregarConceptoFijo, actualizarMontoConceptoFijo, desactivarConceptoFijo } = useHogar()
+  const { gastos, conceptos, pendientesDeConfirmar, cargando, cargar, agregarGastoUnico, agregarConceptoFijo, actualizarMontoConceptoFijo, desactivarConceptoFijo, confirmarGastoFijo } = useHogar()
 
   const [mostrarFormUnico, setMostrarFormUnico] = useState(false)
   const [mostrarFormFijo, setMostrarFormFijo] = useState(false)
@@ -92,14 +92,37 @@ export function SeccionHogar() {
     void sincronizarHogarPendiente()
   }
 
+  async function manejarConfirmar(conceptoFijoId: string) {
+    await confirmarGastoFijo(conceptoFijoId)
+    void sincronizarHogarPendiente()
+  }
+
   const conceptosActivos = conceptos.filter((c) => c.activo)
   const historialOrdenado = [...gastos].sort((a, b) => b.fechaISO.localeCompare(a.fechaISO))
 
   return (
     <>
       <p className="texto-mute" style={{ marginBottom: 16 }}>
-        Los gastos fijos (arriendo, servicios) se cargan una sola vez y se autogeneran solos cada mes.
+        Los gastos fijos (arriendo, servicios) se cargan una sola vez — cada mes, cuando llega la fecha, confirmás con un toque que ya se pagó.
       </p>
+
+      {/* 2026-09-17, pedido explícito del usuario: "botoncito de chulo... hoy es 5, se vence hoy y la cuota eran 500... que yo le despiche paga y él ya suma que se pagó" — ver domain/hogar/calculos.ts, calcularGastosFijosPendientesDeConfirmar. */}
+      {pendientesDeConfirmar.length > 0 && (
+        <>
+          <h3 className="texto-mute">Pendientes de confirmar este mes</h3>
+          <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            {pendientesDeConfirmar.map((p) => (
+              <li key={p.conceptoFijoId} className="tarjeta-viaje" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>
+                  <strong>{p.nombre}</strong>
+                  <span className="texto-mute" style={{ display: 'block', fontSize: '0.78rem' }}>${p.monto.toLocaleString('es-CO')}</span>
+                </span>
+                <button type="button" onClick={() => void manejarConfirmar(p.conceptoFijoId)}>✓ Ya pagué</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h3 className="texto-mute">Gasto único</h3>
       {/* 2026-09-16, pedido explícito del usuario: menos scroll — el formulario queda detrás de un botón. */}

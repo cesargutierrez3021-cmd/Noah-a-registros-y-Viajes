@@ -13,6 +13,7 @@ import { AvisoBanner } from './features/avisos/AvisoBanner'
 import { AvisosScreen } from './features/avisos/AvisosScreen'
 import { useTema } from './domain/tema/store'
 import { useVehiculo } from './domain/vehiculo/store'
+import { useOnboarding } from './domain/onboarding/store'
 import { sincronizarViajesPendientes } from './domain/viajes/sync'
 import { sincronizarJornadasPendientes } from './domain/jornada/sync'
 import { sincronizarRegistrosMantenimientoPendientes } from './domain/mantenimiento/sync'
@@ -62,6 +63,7 @@ import { registrarSincronizacionAutomatica } from './lib/autoSync'
 export function App() {
   const { yaElegido: temaYaElegido } = useTema()
   const { yaElegido: vehiculoYaElegido } = useVehiculo()
+  const { cuentaVista } = useOnboarding()
 
   useEffect(() => {
     registrarSincronizacionAutomatica('viajes', sincronizarViajesPendientes)
@@ -75,7 +77,7 @@ export function App() {
     registrarEscuchaBurbuja()
   }, [])
 
-  if (!temaYaElegido || !vehiculoYaElegido) {
+  if (!temaYaElegido || !vehiculoYaElegido || !cuentaVista) {
     return <OnboardingScreen />
   }
 

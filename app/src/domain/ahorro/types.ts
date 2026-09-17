@@ -44,6 +44,14 @@ export interface MetaAhorro {
    * meta diaria (mismo criterio opcional que `Deuda.cuotaProgramada`).
    */
   aportePlaneado: AportePlaneado | null
+  /**
+   * 2026-09-17, pedido explícito del usuario: "no me aparece fecha de
+   * límite para ahorrar... si yo quiero ponerme una meta, no aparece la
+   * fecha que yo quiero como límite" — mismo campo y mismo criterio que
+   * `Deuda.fechaLimiteISO` (domain/deudas/types.ts): fecha real, puesta a
+   * mano, editable cuando quiera, null = sin fecha puesta todavía.
+   */
+  fechaLimiteISO: string | null
   creadaEnISO: string
   /**
    * Igual que Deuda: mutable (`saldoActual` cambia) pero deliberadamente sin

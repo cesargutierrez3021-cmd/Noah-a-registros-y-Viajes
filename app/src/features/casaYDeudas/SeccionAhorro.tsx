@@ -12,16 +12,19 @@ const FRECUENCIAS: { valor: FrecuenciaCuota; etiqueta: string }[] = [
 
 /** Mismo patrón exacto que SeccionDeudas.tsx, invertido: el saldo SUBE hacia el objetivo en vez de bajar. */
 export function SeccionAhorro() {
-  const { metas, cargando, cargar, agregarMeta, abonar, actualizarAportePlaneado } = useAhorro()
+  const { metas, cargando, cargar, agregarMeta, abonar, actualizarAportePlaneado, actualizarFechaLimite } = useAhorro()
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [nombre, setNombre] = useState('')
   const [montoObjetivo, setMontoObjetivo] = useState('')
   const [aporteMonto, setAporteMonto] = useState('')
   const [aporteFrecuencia, setAporteFrecuencia] = useState<FrecuenciaCuota>('mensual')
+  const [fechaLimite, setFechaLimite] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [montosAbono, setMontosAbono] = useState<Record<string, string>>({})
+  /** Fecha límite editada por meta, mientras el usuario escribe — mismo patrón `fechasEdicion` de SeccionDeudas.tsx. */
+  const [fechasEdicion, setFechasEdicion] = useState<Record<string, string>>({})
   /**
    * 2026-09-16, corrección de un bug real ("no aumentaba la meta diaria...
    * si pongo semanalmente X valor, tiene que coger ese valor semanalmente"):
@@ -51,11 +54,12 @@ export function SeccionAhorro() {
     try {
       const aporteNumero = Number(aporteMonto)
       const aportePlaneado = Number.isFinite(aporteNumero) && aporteNumero > 0 ? { monto: aporteNumero, frecuencia: aporteFrecuencia } : null
-      await agregarMeta(nombre.trim(), objetivoNumero, aportePlaneado)
+      await agregarMeta(nombre.trim(), objetivoNumero, aportePlaneado, fechaLimite ? new Date(fechaLimite).toISOString() : null)
       void sincronizarAhorroPendiente()
       setNombre('')
       setMontoObjetivo('')
       setAporteMonto('')
+      setFechaLimite('')
       setMostrarFormulario(false)
     } finally {
       setGuardando(false)
@@ -77,6 +81,14 @@ export function SeccionAhorro() {
     await abonar(metaId, monto)
     void sincronizarAhorroPendiente()
     setMontosAbono((actuales) => ({ ...actuales, [metaId]: '' }))
+  }
+
+  async function manejarActualizarFecha(metaId: string) {
+    const fecha = fechasEdicion[metaId]
+    if (!fecha) return
+    await actualizarFechaLimite(metaId, new Date(fecha).toISOString())
+    void sincronizarAhorroPendiente()
+    setFechasEdicion((actuales) => ({ ...actuales, [metaId]: '' }))
   }
 
   const enProgreso = metas.filter((m) => m.saldoActual < m.montoObjetivo)
@@ -117,6 +129,10 @@ export function SeccionAhorro() {
             Se usa para calcular tu meta diaria (Trabajo) — no es un abono, es solo cuánto planeás meterle y con qué frecuencia.
           </span>
         </label>
+        <label className="texto-mute">
+          Fecha límite (opcional)
+          <input type="date" value={fechaLimite} onChange={(e) => setFechaLimite(e.target.value)} style={{ display: 'block', width: '100%' }} />
+        </label>
         {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
         <button type="button" onClick={() => void manejarAgregar()} disabled={guardando}>
           {guardando ? 'Guardando…' : 'Crear meta'}
@@ -136,6 +152,18 @@ export function SeccionAhorro() {
               <span className="texto-mute">
                 ${m.saldoActual.toLocaleString('es-CO')} de ${m.montoObjetivo.toLocaleString('es-CO')} · {porcentaje}%
               </span>
+              <span className="texto-mute">
+                {m.fechaLimiteISO ? `Límite: ${new Date(m.fechaLimiteISO).toLocaleDateString('es-CO')}` : 'Sin fecha límite puesta'}
+              </span>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="date"
+                  value={fechasEdicion[m.id] ?? ''}
+                  onChange={(e) => setFechasEdicion((actuales) => ({ ...actuales, [m.id]: e.target.value }))}
+                  style={{ flex: 1 }}
+                />
+                <button type="button" onClick={() => void manejarActualizarFecha(m.id)}>{m.fechaLimiteISO ? 'Cambiar fecha' : 'Poner fecha límite'}</button>
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <CampoMonto
                   valor={montosAbono[m.id] ?? ''}

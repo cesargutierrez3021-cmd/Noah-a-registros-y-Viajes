@@ -116,6 +116,8 @@ export const esquemaMetaAhorroSync = z.object({
   creadaEnISO: z.string(),
   // 2026-09-16 (corrección posterior, misma sesión): reemplaza aporteMensualObjetivo (número fijo) por {monto,frecuencia}.
   aportePlaneado: esquemaAportePlaneado.nullable().optional().default(null),
+  // 2026-09-17, pedido explícito del usuario: fecha límite de la meta, mismo criterio que Deuda.fechaLimiteISO.
+  fechaLimiteISO: z.string().nullable().optional().default(null),
 })
 
 export const esquemaAbonoAhorroSync = z.object({

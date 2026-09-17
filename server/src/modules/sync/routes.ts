@@ -285,3 +285,23 @@ rutasSync.post(
     }
   }),
 )
+
+/**
+ * GET /sync/todo — 2026-09-17, pedido explícito del usuario: el sync hasta
+ * acá era de una sola vía (push), así que reinstalar la app perdía todo aunque
+ * hubiera cuenta. Esta ruta devuelve los 11 recursos completos del usuario
+ * autenticado en un solo request — la usa domain/restauracion/ en el cliente,
+ * una sola vez al iniciar sesión (login o registro), nunca en el loop de sync
+ * automático normal (eso sigue siendo solo push, ver el resto de este
+ * archivo). Mismo `limitadorSync` que las rutas de arriba — un usuario real
+ * inicia sesión unas pocas veces por instalación, nunca en ráfaga.
+ */
+rutasSync.get(
+  '/todo',
+  requiereAutenticacion,
+  limitadorSync,
+  async(async (req: Request, res: Response) => {
+    const datos = await servicioSync.obtenerTodo(req.usuarioId!)
+    res.json(datos)
+  }),
+)

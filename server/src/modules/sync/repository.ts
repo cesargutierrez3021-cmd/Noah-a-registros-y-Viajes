@@ -222,6 +222,7 @@ export const repositorioSync = {
       saldoActual: meta.saldoActual,
       creadaEnISO: new Date(meta.creadaEnISO),
       aportePlaneado: (meta.aportePlaneado ?? undefined) as Prisma.InputJsonValue | undefined,
+      fechaLimiteISO: meta.fechaLimiteISO ? new Date(meta.fechaLimiteISO) : null,
     }
 
     await prisma.metaAhorro.upsert({
@@ -301,5 +302,48 @@ export const repositorioSync = {
       create: { id: gasto.id, ...datos },
       update: datos,
     })
+  },
+
+  /**
+   * 2026-09-17, pedido explícito del usuario ("cada vez que instalo la
+   * aplicación, se borran todos los datos... supuestamente estamos
+   * conectados... para guardar la base de datos"): hasta acá, el sync era de
+   * una sola vía — el cliente subía datos (los 11 `guardarX` de arriba) pero
+   * nunca los volvía a bajar, así que reinstalar la app perdía todo aunque
+   * el usuario tuviera cuenta y los datos siguieran intactos en la base.
+   * Esta función junta los 11 recursos de un usuario en un solo viaje de
+   * ida — se usa una sola vez, al iniciar sesión (ver domain/restauracion/
+   * en el cliente), no en cada sync como las de arriba. `Promise.all`
+   * porque son 11 lecturas independientes contra la misma base, no hay
+   * razón para hacerlas en serie.
+   */
+  async obtenerTodo(usuarioId: string) {
+    const [
+      viajes,
+      jornadas,
+      registrosMantenimiento,
+      gastos,
+      bonos,
+      deudas,
+      abonosDeuda,
+      metasAhorro,
+      abonosAhorro,
+      conceptosFijos,
+      gastosHogar,
+    ] = await Promise.all([
+      prisma.viaje.findMany({ where: { usuarioId } }),
+      prisma.jornada.findMany({ where: { usuarioId } }),
+      prisma.registroMantenimiento.findMany({ where: { usuarioId } }),
+      prisma.gasto.findMany({ where: { usuarioId } }),
+      prisma.bono.findMany({ where: { usuarioId } }),
+      prisma.deuda.findMany({ where: { usuarioId } }),
+      prisma.abonoDeuda.findMany({ where: { usuarioId } }),
+      prisma.metaAhorro.findMany({ where: { usuarioId } }),
+      prisma.abonoAhorro.findMany({ where: { usuarioId } }),
+      prisma.conceptoFijo.findMany({ where: { usuarioId } }),
+      prisma.gastoHogar.findMany({ where: { usuarioId } }),
+    ])
+
+    return { viajes, jornadas, registrosMantenimiento, gastos, bonos, deudas, abonosDeuda, metasAhorro, abonosAhorro, conceptosFijos, gastosHogar }
   },
 }

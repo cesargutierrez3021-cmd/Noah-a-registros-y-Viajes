@@ -10,6 +10,7 @@ export async function subirMetaAhorro(meta: MetaAhorro): Promise<void> {
     saldoActual: meta.saldoActual,
     creadaEnISO: meta.creadaEnISO,
     aportePlaneado: meta.aportePlaneado,
+    fechaLimiteISO: meta.fechaLimiteISO,
   })
 }
 
