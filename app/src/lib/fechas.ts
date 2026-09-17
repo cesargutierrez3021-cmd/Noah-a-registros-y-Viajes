@@ -39,8 +39,15 @@ export function limitesDiaBogotaISODesdeClave(claveDia: string) {
   return { desde: new Date(inicio).toISOString(), hasta: new Date(inicio + 86400000).toISOString() }
 }
 
-/** Hora local (0-23) en Bogotá de un ISO dado — para franjas horarias (domain/estadisticas). */
-export function horaLocalBogota(fechaISO: string): number {
-  const partes = new Intl.DateTimeFormat('en-US', { timeZone: ZONA_HORARIA_NEGOCIO, hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(fechaISO))
-  return Number(partes.find((p) => p.type === 'hour')?.value ?? 0)
+/**
+ * Minutos transcurridos desde medianoche (0-1439) en Bogotá de un ISO dado —
+ * para franjas horarias (domain/estadisticas). Con minutos, no solo hora
+ * entera, porque los cortes de franja (2026-09-17, pedido explícito del
+ * usuario) caen en medias horas ("11 y media de la mañana").
+ */
+export function minutosDelDiaLocalBogota(fechaISO: string): number {
+  const partes = new Intl.DateTimeFormat('en-US', { timeZone: ZONA_HORARIA_NEGOCIO, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(fechaISO))
+  const hora = Number(partes.find((p) => p.type === 'hour')?.value ?? 0)
+  const minuto = Number(partes.find((p) => p.type === 'minute')?.value ?? 0)
+  return hora * 60 + minuto
 }

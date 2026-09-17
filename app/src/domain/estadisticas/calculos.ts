@@ -2,7 +2,7 @@ import type { Viaje } from '../viajes/types'
 import type { Jornada } from '../jornada/types'
 import type { Gasto } from '../gastos/types'
 import type { Bono } from '../bonos/types'
-import { horaLocalBogota } from '../../lib/fechas'
+import { minutosDelDiaLocalBogota } from '../../lib/fechas'
 import type {
   CostoPorKm,
   DesglosePor,
@@ -119,22 +119,12 @@ export function desglosePorPlataforma(viajes: Viaje[]): DesglosePor<string>[] {
     .sort((a, b) => b.resumen.ingresos - a.resumen.ingresos)
 }
 
-/**
- * Desglose por zona de RECOGIDA (domain/viajes/zonasBogota.ts) — a propósito
- * `zonaInicio`, no `zonaFin`: 2026-09-15, pedido explícito del usuario —
- * "qué suena mejor" se decide por dónde recoges al pasajero, no por dónde lo
- * dejas (ahí ya cobraste, esa zona no te sirve para decidir dónde pararte la
- * próxima vez). `zona` queda como respaldo para viajes viejos, de antes de
- * que existiera la separación inicio/fin (ver migración
- * 20260914090000_viaje_zonas_inicio_fin). Viajes sin zona detectada
- * (manuales, o GPS que no alcanzó a ubicar) se agrupan aparte.
- */
-export function desglosePorZona(viajes: Viaje[]): DesglosePor<string>[] {
+function desglosePorZonaGenerico(viajes: Viaje[], zonaDe: (v: Viaje) => string | null): DesglosePor<string>[] {
   const finalizados = soloFinalizados(viajes)
   const grupos = new Map<string, Viaje[]>()
 
   for (const viaje of finalizados) {
-    const clave = viaje.zonaInicio ?? viaje.zona ?? SIN_ZONA
+    const clave = zonaDe(viaje) ?? viaje.zona ?? SIN_ZONA
     const lista = grupos.get(clave) ?? []
     lista.push(viaje)
     grupos.set(clave, lista)
@@ -146,16 +136,47 @@ export function desglosePorZona(viajes: Viaje[]): DesglosePor<string>[] {
 }
 
 /**
+ * Desglose por zona de RECOGIDA (domain/viajes/zonasBogota.ts) — a propósito
+ * `zonaInicio`, no `zonaFin`: 2026-09-15, pedido explícito del usuario —
+ * "qué suena mejor" se decide por dónde recoges al pasajero, no por dónde lo
+ * dejas (ahí ya cobraste, esa zona no te sirve para decidir dónde pararte la
+ * próxima vez). `zona` queda como respaldo para viajes viejos, de antes de
+ * que existiera la separación inicio/fin (ver migración
+ * 20260914090000_viaje_zonas_inicio_fin). Viajes sin zona detectada
+ * (manuales, o GPS que no alcanzó a ubicar) se agrupan aparte.
+ */
+export function desglosePorZona(viajes: Viaje[]): DesglosePor<string>[] {
+  return desglosePorZonaGenerico(viajes, (v) => v.zonaInicio)
+}
+
+/**
+ * 2026-09-17, pedido explícito del usuario: "en qué zona es donde dejo más
+ * viajes, donde finalizo los viajes" — complemento de `desglosePorZona`
+ * (recogida), mismo criterio (D-18: reusa `desglosePorZonaGenerico`), pero
+ * con `zonaFin`. Útil para lo contrario de la de recogida: no dónde
+ * pararse a esperar el próximo viaje, sino a qué zonas suele terminar
+ * llevando pasajeros.
+ */
+export function desglosePorZonaFin(viajes: Viaje[]): DesglosePor<string>[] {
+  return desglosePorZonaGenerico(viajes, (v) => v.zonaFin)
+}
+
+/**
  * A qué franja horaria pertenece un ISO, en hora de Bogotá (nunca UTC crudo
- * — mismo criterio que `fechaNegocioISO`, D-18: reutiliza `horaLocalBogota`
- * en vez de sacar la hora a mano). Cortes fijos, ver FranjaHoraria en types.ts.
+ * — mismo criterio que `fechaNegocioISO`, D-18: reutiliza
+ * `minutosDelDiaLocalBogota` en vez de sacar la hora a mano).
+ *
+ * 2026-09-17, pedido explícito del usuario, cortes en minutos del día
+ * (0 = medianoche): mañana 240-689 (4:00-11:29), mediodía 690-899
+ * (11:30-14:59), tarde 900-1199 (15:00-19:59), noche 1200-239 (20:00-3:59,
+ * cruza medianoche). Ver FranjaHoraria en types.ts.
  */
 export function franjaHoraria(fechaISO: string): FranjaHoraria {
-  const hora = horaLocalBogota(fechaISO)
-  if (hora >= 5 && hora < 12) return 'mañana'
-  if (hora >= 12 && hora < 14) return 'mediodía'
-  if (hora >= 14 && hora < 19) return 'tarde'
-  return 'noche' // 19:00–4:59, cruza medianoche
+  const minutos = minutosDelDiaLocalBogota(fechaISO)
+  if (minutos >= 240 && minutos < 690) return 'mañana'
+  if (minutos >= 690 && minutos < 900) return 'mediodía'
+  if (minutos >= 900 && minutos < 1200) return 'tarde'
+  return 'noche' // 20:00–3:59, cruza medianoche
 }
 
 /** Desglose por franja horaria de INICIO del viaje — mismo criterio de "recogida" que desglosePorZona. */

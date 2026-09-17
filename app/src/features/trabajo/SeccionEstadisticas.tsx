@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
 import { useBonos } from '../../domain/bonos/store'
-import { agruparPorPeriodo, calcularResumen, desglosePorPlataforma, desglosePorZona, desglosePorFranjaHoraria } from '../../domain/estadisticas/calculos'
+import { agruparPorPeriodo, calcularResumen, desglosePorPlataforma, desglosePorZona, desglosePorZonaFin, desglosePorFranjaHoraria } from '../../domain/estadisticas/calculos'
 import type { ResumenViajes, UnidadPeriodo } from '../../domain/estadisticas/types'
 import { AnilloMeta } from '../../components/graficos/AnilloMeta'
 import { useTema } from '../../domain/tema/store'
@@ -55,6 +55,7 @@ export function SeccionEstadisticas() {
   const porPeriodo = agruparPorPeriodo(viajes, unidad, bonos)
   const porPlataforma = desglosePorPlataforma(viajes)
   const porZona = desglosePorZona(viajes)
+  const porZonaFin = desglosePorZonaFin(viajes)
   const porFranja = desglosePorFranjaHoraria(viajes)
 
   return (
@@ -137,11 +138,36 @@ export function SeccionEstadisticas() {
         </>
       )}
 
+      {/* 2026-09-17, pedido explícito del usuario: "en qué zona es donde dejo más viajes, donde finalizo los viajes" — complemento de la de arriba, ver desglosePorZonaFin (D-18: misma función genérica, solo cambia zonaInicio por zonaFin). */}
+      {porZonaFin.length > 0 && (
+        <>
+          <h3 className="texto-mute">Por zona donde dejas (Bogotá)</h3>
+          <p className="texto-mute" style={{ fontSize: '0.78rem', marginBottom: 8 }}>% de tus ingresos, top {Math.min(TOPE_ANILLOS, porZonaFin.length)} de {porZonaFin.length} zonas.</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+            {porcentajesDeIngresos(porZonaFin)
+              .sort((a, b) => b.resumen.ingresos - a.resumen.ingresos)
+              .slice(0, TOPE_ANILLOS)
+              .map(({ clave, resumen, porcentaje }) => (
+                <AnilloMeta
+                  key={clave}
+                  porcentaje={porcentaje}
+                  color="var(--color-acento)"
+                  valorCentral={`${Math.round(porcentaje)}%`}
+                  etiqueta={clave}
+                  detalle={`${resumen.cantidadViajes} viajes`}
+                  tamano={84}
+                  animado={animado}
+                />
+              ))}
+          </div>
+        </>
+      )}
+
       {porFranja.length > 0 && (
         <>
           <h3 className="texto-mute">Por franja horaria</h3>
           <p className="texto-mute" style={{ fontSize: '0.78rem', marginBottom: 8 }}>
-            Mañana 5-12 · Mediodía 12-14 · Tarde 14-19 · Noche 19-5 — según la hora en que recoges, no en la que cierras.
+            Mañana 4:00-11:30 · Mediodía 11:30-15:00 · Tarde 15:00-20:00 · Noche 20:00-4:00 — según la hora en que recoges, no en la que cierras.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
             {porcentajesDeIngresos(porFranja).map(({ clave, resumen, porcentaje }) => (

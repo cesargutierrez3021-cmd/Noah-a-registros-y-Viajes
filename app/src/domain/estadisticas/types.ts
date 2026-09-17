@@ -15,8 +15,16 @@ export type UnidadPeriodo = 'dia' | 'semana' | 'mes'
 /**
  * 2026-09-15, pedido explícito del usuario: saber en qué franja del día le
  * va mejor. Cuatro cortes fijos (no configurables todavía — D-18, no
- * construir sin necesidad confirmada): mañana 5-12, mediodía 12-14, tarde
- * 14-19, noche 19-5 (cruza medianoche). Ver `franjaHoraria()` en calculos.ts.
+ * construir sin necesidad confirmada).
+ *
+ * 2026-09-17 (misma sesión, corrección posterior): el usuario redefinió los
+ * 4 cortes con sus propias palabras — "el primer horario va a ser de 4 de
+ * la mañana a 11 y media de la mañana, el segundo de 11 y media a 3 de la
+ * tarde, el otro de 3 de la tarde a 8 de la noche, y el otro de 8 de la
+ * noche a 4 de la mañana": mañana 4:00-11:30, mediodía 11:30-15:00, tarde
+ * 15:00-20:00, noche 20:00-4:00 (cruza medianoche). Los 4 NOMBRES se
+ * mantienen igual (el usuario no pidió renombrarlos, solo mover los
+ * cortes) — ver `franjaHoraria()` en calculos.ts.
  */
 export type FranjaHoraria = 'mañana' | 'mediodía' | 'tarde' | 'noche'
 
