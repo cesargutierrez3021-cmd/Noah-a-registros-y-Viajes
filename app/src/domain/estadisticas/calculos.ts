@@ -124,7 +124,7 @@ function desglosePorZonaGenerico(viajes: Viaje[], zonaDe: (v: Viaje) => string |
   const grupos = new Map<string, Viaje[]>()
 
   for (const viaje of finalizados) {
-    const clave = zonaDe(viaje) ?? viaje.zona ?? SIN_ZONA
+    const clave = zonaDe(viaje) ?? viaje.localidad ?? viaje.zona ?? SIN_ZONA
     const lista = grupos.get(clave) ?? []
     lista.push(viaje)
     grupos.set(clave, lista)
@@ -137,28 +137,41 @@ function desglosePorZonaGenerico(viajes: Viaje[], zonaDe: (v: Viaje) => string |
 
 /**
  * Desglose por zona de RECOGIDA (domain/viajes/zonasBogota.ts) — a propósito
- * `zonaInicio`, no `zonaFin`: 2026-09-15, pedido explícito del usuario —
- * "qué suena mejor" se decide por dónde recoges al pasajero, no por dónde lo
- * dejas (ahí ya cobraste, esa zona no te sirve para decidir dónde pararte la
- * próxima vez). `zona` queda como respaldo para viajes viejos, de antes de
- * que existiera la separación inicio/fin (ver migración
- * 20260914090000_viaje_zonas_inicio_fin). Viajes sin zona detectada
- * (manuales, o GPS que no alcanzó a ubicar) se agrupan aparte.
+ * `localidadInicio` primero, no `zonaInicio`: 2026-09-17, bug real
+ * encontrado en la auditoría de esta ronda — `zonaInicio`/`zonaFin`/`zona`
+ * salen de `obtenerZonaCustom()` (geofencing.ts), que consulta
+ * `ZONAS_CUSTOM`, un array vacío a propósito ("zonas comerciales se agregan
+ * acá sin contaminar la capa oficial", pero nunca se llegó a cargar
+ * ninguna) — esos 3 campos son SIEMPRE `null` en cualquier viaje real, de
+ * GPS o manual. El dato real de dónde recogiste/dejaste sale de
+ * `obtenerLocalidad()` (las 20 localidades oficiales de Bogotá), guardado en
+ * `localidadInicio`/`localidadFin` — antes de este fix, esta estadística
+ * mostraba "Sin zona detectada" el 100% del tiempo, para cualquier
+ * cantidad de viajes. Mismo orden de fallback que ya usaba CORRECTAMENTE
+ * `SeccionViajesYJornada.tsx` para el historial (`localidadInicio ??
+ * zonaInicio ?? localidad ?? zona`) — se iguala acá (D-18: un solo criterio
+ * de "cuál zona mostrar" para toda la app, no dos que además no
+ * coincidían).
+ *
+ * 2026-09-15, pedido explícito del usuario (sigue vigente): "qué suena
+ * mejor" se decide por dónde recoges al pasajero, no por dónde lo dejas
+ * (ahí ya cobraste, esa zona no te sirve para decidir dónde pararte la
+ * próxima vez) — por eso esta usa el lado de INICIO, no el de fin.
  */
 export function desglosePorZona(viajes: Viaje[]): DesglosePor<string>[] {
-  return desglosePorZonaGenerico(viajes, (v) => v.zonaInicio)
+  return desglosePorZonaGenerico(viajes, (v) => v.localidadInicio ?? v.zonaInicio)
 }
 
 /**
  * 2026-09-17, pedido explícito del usuario: "en qué zona es donde dejo más
  * viajes, donde finalizo los viajes" — complemento de `desglosePorZona`
  * (recogida), mismo criterio (D-18: reusa `desglosePorZonaGenerico`), pero
- * con `zonaFin`. Útil para lo contrario de la de recogida: no dónde
+ * con el lado de FIN. Útil para lo contrario de la de recogida: no dónde
  * pararse a esperar el próximo viaje, sino a qué zonas suele terminar
  * llevando pasajeros.
  */
 export function desglosePorZonaFin(viajes: Viaje[]): DesglosePor<string>[] {
-  return desglosePorZonaGenerico(viajes, (v) => v.zonaFin)
+  return desglosePorZonaGenerico(viajes, (v) => v.localidadFin ?? v.zonaFin)
 }
 
 /**

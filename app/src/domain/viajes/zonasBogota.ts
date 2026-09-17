@@ -156,3 +156,12 @@ export const ZONAS_BOGOTA: Zona[] = [
     ],
   },
 ]
+
+/**
+ * 2026-09-17, pedido explícito del usuario: "agregar viaje... se me abre un
+ * menú desplegable donde yo pueda escoger las zonas" — el formulario de
+ * viaje manual (AgregarViajeManualScreen.tsx) necesita solo los NOMBRES
+ * para el `<select>`, no los polígonos completos (esos ya viven en el
+ * bundle igual, por geofencing.ts, D-18: no se duplica la lista a mano acá).
+ */
+export const NOMBRES_ZONAS_BOGOTA: string[] = ZONAS_BOGOTA.map((z) => z.nombre)
