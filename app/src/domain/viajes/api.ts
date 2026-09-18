@@ -25,10 +25,6 @@ export async function subirViaje(viaje: Viaje): Promise<void> {
     ingreso: viaje.ingreso,
     localidad: viaje.localidad,
     zona: viaje.zona,
-    localidadInicio: viaje.localidadInicio,
-    zonaInicio: viaje.zonaInicio,
-    localidadFin: viaje.localidadFin,
-    zonaFin: viaje.zonaFin,
   })
 }
 

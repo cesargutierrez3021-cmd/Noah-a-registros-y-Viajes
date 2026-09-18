@@ -26,7 +26,10 @@ export interface DistanciaReal {
   kmHastaRecoger: number
   /** Km recorridos con el pasajero a bordo. */
   kmConPasajero: number
-  /** Suma de los dos anteriores. Se calcula, nunca se guarda a mano. */
+  /** Suma de los dos anteriores. Se calcula al finalizar el viaje — pero si el
+   *  GPS falló (ver GpsTrackingService.kt / distancia.ts), el conductor puede
+   *  corregirlo a mano después (`corregirKmViaje` en store.ts, editable desde
+   *  el historial de viajes). Ya no es "nunca se guarda a mano". */
   kmTotalesReales: number
 }
 
@@ -44,11 +47,6 @@ export interface Viaje {
   ingreso: number
   localidad: string | null
   zona: string | null
-  /** Ubicación administrativa al iniciar y terminar el recorrido. */
-  localidadInicio: string | null
-  zonaInicio: string | null
-  localidadFin: string | null
-  zonaFin: string | null
   /** true mientras el viaje no se ha confirmado como sincronizado con el backend. */
   pendienteDeSync: boolean
 }

@@ -5,7 +5,6 @@ import { servicioBilling } from './service.js'
 import { requiereAutenticacion } from '../auth/middleware.js'
 import { async } from '../../http/asyncHandler.js'
 import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
-import { env } from '../../config/env.js'
 
 export const rutasBilling = Router()
 
@@ -15,6 +14,7 @@ export const rutasBilling = Router()
 const limitadorBilling = crearLimitadorDeTasa(60 * 1000, 5, 'Demasiadas validaciones de compra seguidas. Espera un momento.')
 
 const esquemaValidarCompra = z.object({
+  packageName: z.string().min(1),
   productId: z.string().min(1),
   purchaseToken: z.string().min(1),
 })
@@ -31,8 +31,8 @@ rutasBilling.post(
   requiereAutenticacion,
   limitadorBilling,
   async(async (req: Request, res: Response) => {
-    const { productId, purchaseToken } = esquemaValidarCompra.parse(req.body)
-    const plan = await servicioBilling.validarCompra(req.usuarioId!, env.googlePlayPackageName, productId, purchaseToken)
+    const { packageName, productId, purchaseToken } = esquemaValidarCompra.parse(req.body)
+    const plan = await servicioBilling.validarCompra(req.usuarioId!, packageName, productId, purchaseToken)
     res.json(plan)
   }),
 )

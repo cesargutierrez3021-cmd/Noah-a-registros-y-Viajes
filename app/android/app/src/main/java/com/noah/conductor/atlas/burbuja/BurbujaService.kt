@@ -2,11 +2,13 @@
 
 package com.noah.conductor.atlas.burbuja
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -15,7 +17,11 @@ import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -53,7 +59,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         const val EXTRA_ESTILO = "estilo"
         const val EXTRA_TOTAL_VIAJES = "totalViajes"
         const val EXTRA_SOLO_ESTILO = "soloEstilo"
-        private const val CANAL_ID = "mia_burbuja"
+        private const val CANAL_ID = "noah_burbuja"
         private const val NOTIF_ID = 4201
         private const val UMBRAL_TOQUE_MS = 650L
         private const val UMBRAL_ARRASTRE_PX = 12
@@ -66,6 +72,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     }
 
     private lateinit var windowManager: WindowManager
+    private lateinit var locationManager: LocationManager
     private var vistaBurbuja: View? = null
     private var vistaResumen: View? = null
     private var vistaManija: View? = null
@@ -90,6 +97,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private var inicioViajeMs = 0L
     private var kmAcumulados = 0.0
     private var viajesContados = 0
+    private var ultimaUbicacion: Location? = null
     private var tts: TextToSpeech? = null
     private val handler = Handler(Looper.getMainLooper())
     private val reloj = object : Runnable {
@@ -100,17 +108,58 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
             }
         }
     }
+    private val locationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            // La red puede saltar decenas o cientos de metros. Solo el proveedor
+            // GPS se usa como fuente oficial de kilómetros.
+            if (location.provider != LocationManager.GPS_PROVIDER) return
+            if (location.accuracy <= 0f || location.accuracy > PRECISION_MAXIMA_M) {
+                ultimaUbicacion = null
+                return
+            }
+            val anterior = ultimaUbicacion
+            if (anterior != null) {
+                val distancia = anterior.distanceTo(location)
+                val segundos = ((location.time - anterior.time).coerceAtLeast(1L)) / 1000.0
+                val velocidad = distancia / segundos
+                val umbralM = maxOf(8f, (location.accuracy + anterior.accuracy) * 0.5f)
+                // Tras una pérdida de señal no se une el punto nuevo al anterior:
+                // hacerlo convertiría un salto GPS en kilómetros recorridos.
+                if (segundos > INTERVALO_MAXIMO_S) {
+                    ultimaUbicacion = location
+                    actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
+                    return
+                }
+                if (distancia >= umbralM && velocidad >= VELOCIDAD_MINIMA_MS && velocidad <= VELOCIDAD_MAXIMA_MS) {
+                    kmAcumulados += distancia / 1000.0
+                } else if (velocidad > VELOCIDAD_MAXIMA_MS) {
+                    // Punto incompatible con la velocidad de una moto/carro: se
+                    // descarta y se reinicia la referencia para no arrastrar el salto.
+                    ultimaUbicacion = location
+                    actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
+                    return
+                }
+            }
+            ultimaUbicacion = location
+            actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
+        }
+        override fun onProviderEnabled(provider: String) {}
+        override fun onProviderDisabled(provider: String) {}
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onCreate() {
         super.onCreate()
         activo = true
-        val apariencia = getSharedPreferences("mia-burbuja", MODE_PRIVATE)
+        val apariencia = getSharedPreferences("noah-burbuja", MODE_PRIVATE)
         colorAcento = apariencia.getString(EXTRA_COLOR_ACENTO, colorAcento) ?: colorAcento
         colorFg = apariencia.getString(EXTRA_COLOR_FG, colorFg) ?: colorFg
         colorSurface = apariencia.getString(EXTRA_COLOR_SURFACE, colorSurface) ?: colorSurface
         estilo = apariencia.getString(EXTRA_ESTILO, estilo) ?: estilo
-        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", true).apply()
+        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", true).apply()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         tts = TextToSpeech(this, this)
     }
     override fun onInit(status: Int) { if (status == TextToSpeech.SUCCESS) tts?.language = Locale("es", "CO") }
@@ -124,10 +173,10 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         colorAcento = intent?.getStringExtra(EXTRA_COLOR_ACENTO) ?: colorAcento
         colorFg = intent?.getStringExtra(EXTRA_COLOR_FG) ?: colorFg
         colorSurface = intent?.getStringExtra(EXTRA_COLOR_SURFACE) ?: colorSurface
-        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putString(EXTRA_COLOR_ACENTO, colorAcento).putString(EXTRA_COLOR_FG, colorFg).putString(EXTRA_COLOR_SURFACE, colorSurface).apply()
+        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit().putString(EXTRA_COLOR_ACENTO, colorAcento).putString(EXTRA_COLOR_FG, colorFg).putString(EXTRA_COLOR_SURFACE, colorSurface).apply()
         tarjetaActiva = intent?.getBooleanExtra(EXTRA_TARJETA_ACTIVA, tarjetaActiva) ?: tarjetaActiva
         estilo = intent?.getStringExtra(EXTRA_ESTILO) ?: estilo
-        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putString(EXTRA_ESTILO, estilo).apply()
+        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit().putString(EXTRA_ESTILO, estilo).apply()
         val km = intent?.getStringExtra(EXTRA_KM) ?: formatearKm(kmAcumulados)
         val tiempo = intent?.getStringExtra(EXTRA_TIEMPO) ?: formatearTiempo(if (enViaje) System.currentTimeMillis() - inicioViajeMs else 0)
         val estadoSolicitado = intent?.getBooleanExtra(EXTRA_EN_VIAJE, enViaje) ?: enViaje
@@ -146,8 +195,8 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         activo = false
-        handler.removeCallbacksAndMessages(null); tts?.stop(); tts?.shutdown()
-        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", false).apply()
+        detenerGps(); handler.removeCallbacksAndMessages(null); tts?.stop(); tts?.shutdown()
+        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", false).apply()
         vistaResumen?.let { runCatching { windowManager.removeView(it) } }
         vistaManija?.let { runCatching { windowManager.removeView(it) } }
         vistaBurbuja?.let { runCatching { windowManager.removeView(it) } }
@@ -157,8 +206,8 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     private fun iniciarViaje(anunciar: Boolean) {
         if (enViaje) return
-        enViaje = true; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
-        handler.removeCallbacks(reloj); handler.post(reloj)
+        enViaje = true; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0; ultimaUbicacion = null
+        solicitarGps(); handler.removeCallbacks(reloj); handler.post(reloj)
         if (anunciar) hablar("Viaje iniciado")
         actualizarTextos("0.0", "0m")
     }
@@ -166,20 +215,27 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private fun finalizarViaje(anunciar: Boolean) {
         if (!enViaje) return
         val finMs = System.currentTimeMillis(); val duracionMs = (finMs - inicioViajeMs).coerceAtLeast(0L); val kmFinal = kmAcumulados; val inicioMs = inicioViajeMs
-        enViaje = false; handler.removeCallbacks(reloj)
+        enViaje = false; detenerGps(); handler.removeCallbacks(reloj)
         if (anunciar) hablar("Viaje finalizado")
         actualizarTextos(formatearKm(kmFinal), formatearTiempo(duracionMs))
-        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit()
+        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit()
             .putFloat("viaje_km", kmFinal.toFloat()).putLong("viaje_inicio", inicioMs)
             .putLong("viaje_fin", finMs).putLong("viaje_tiempo", duracionMs).apply()
         if (anunciar) BurbujaPlugin.instanciaActiva?.notificarAccion("terminar", kmFinal, inicioMs, finMs, duracionMs)
     }
 
-    private fun hablar(texto: String) { tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "mia-viaje-${System.currentTimeMillis()}") }
+    private fun solicitarGps() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        runCatching {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 5f, locationListener, Looper.getMainLooper())
+        }
+    }
+    private fun detenerGps() { runCatching { locationManager.removeUpdates(locationListener) }; ultimaUbicacion = null }
+    private fun hablar(texto: String) { tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "noah-viaje-${System.currentTimeMillis()}") }
     private fun crearCanalSiHaceFalta() { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { val nm = getSystemService(NotificationManager::class.java); if (nm.getNotificationChannel(CANAL_ID) == null) nm.createNotificationChannel(NotificationChannel(CANAL_ID, "Jornada activa", NotificationManager.IMPORTANCE_LOW)) } }
     private fun construirNotificacion(): android.app.Notification {
         val abrirApp = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        return NotificationCompat.Builder(this, CANAL_ID).setContentTitle("MIA · jornada abierta").setContentText("La burbuja muestra el tiempo y los kilómetros registrados.").setSmallIcon(R.mipmap.ic_launcher).setContentIntent(abrirApp).setOngoing(true).build()
+        return NotificationCompat.Builder(this, CANAL_ID).setContentTitle("NOAH · jornada abierta").setContentText("La burbuja está contando el tiempo y los kilómetros.").setSmallIcon(R.mipmap.ic_launcher).setContentIntent(abrirApp).setOngoing(true).build()
     }
 
     private fun crearBurbuja() {

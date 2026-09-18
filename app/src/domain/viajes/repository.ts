@@ -1,6 +1,6 @@
 import type { Viaje, CierreViajeInput, ViajeManualInput } from './types'
 import { calcularDistanciaReal } from './distancia'
-import { obtenerLocalidad, obtenerZonaCustom } from './geofencing'
+import { obtenerZona } from './geofencing'
 
 /**
  * Repositorio de viajes. Esta es la ÚNICA puerta de entrada/salida para leer o
@@ -75,12 +75,8 @@ export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje
   // (agrupación más amplia, ej. para tarifas) como dos capas separadas.
   // Si esa distinción se vuelve necesaria, se resuelve con un segundo array
   // de polígonos en geofencing.ts en vez de tocar esto de nuevo.
-  const puntoInicio = input.recorrido[0] ?? null
-  const puntoFin = input.recorrido[input.recorrido.length - 1] ?? null
-  const localidadInicio = puntoInicio ? obtenerLocalidad(puntoInicio) : null
-  const localidadFin = puntoFin ? obtenerLocalidad(puntoFin) : null
-  const zonaInicio = puntoInicio ? obtenerZonaCustom(puntoInicio) : null
-  const zonaFin = puntoFin ? obtenerZonaCustom(puntoFin) : null
+  const puntoDeReferencia = input.recorrido[input.recorrido.length - 1] ?? null
+  const zonaDetectada = puntoDeReferencia ? obtenerZona(puntoDeReferencia) : null
 
   return {
     id,
@@ -92,12 +88,8 @@ export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje
     distancia: calcularDistanciaReal(input),
     distanciaReportadaPlataforma: input.distanciaReportadaPlataforma,
     ingreso: input.ingreso,
-    localidad: localidadFin,
-    zona: zonaFin,
-    localidadInicio,
-    zonaInicio,
-    localidadFin,
-    zonaFin,
+    localidad: zonaDetectada,
+    zona: zonaDetectada,
     pendienteDeSync: true,
   }
 }
@@ -127,10 +119,6 @@ export function crearViajeManual(id: string, input: ViajeManualInput): Viaje {
     ingreso: input.ingreso,
     localidad: input.localidad,
     zona: input.zona,
-    localidadInicio: input.localidad,
-    zonaInicio: input.zona,
-    localidadFin: input.localidad,
-    zonaFin: input.zona,
     pendienteDeSync: true,
   }
 }

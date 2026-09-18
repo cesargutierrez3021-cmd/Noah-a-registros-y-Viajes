@@ -10,14 +10,13 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import org.json.JSONArray
-import org.json.JSONObject
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 
 /**
  * Foreground service tipo "location" para capturar el recorrido del viaje
@@ -54,7 +53,7 @@ class GpsTrackingService : Service() {
 
     private lateinit var fusedClient: FusedLocationProviderClient
     private var callback: LocationCallback? = null
-    private val prefs by lazy { getSharedPreferences("mia-gps", MODE_PRIVATE) }
+    private var cancellationSource: CancellationTokenSource? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -86,6 +85,28 @@ class GpsTrackingService : Service() {
 
         if (callback != null) return // ya está corriendo
 
+        // BUG REAL (auditoría): requestLocationUpdates con PRIORITY_HIGH_ACCURACY
+        // necesita un fix de GPS "en frío" — si el conductor arranca el viaje
+        // detenido (auto recién prendido, en un parqueadero, señal débil), ese
+        // primer fix puede tardar bastante. Si el viaje es corto o el conductor
+        // ya terminó de moverse antes de que llegue ese primer punto, `recorrido`
+        // queda con 0 o 1 puntos y `distanciaRecorridoKm()` (distancia.ts) da 0 —
+        // exactamente el síntoma "a veces marca 0.0 km" reportado.
+        // Fix: pedir un fix inmediato con getCurrentLocation (mezcla GPS+red,
+        // llega mucho más rápido aunque sea menos preciso) como PRIMER punto,
+        // mientras requestLocationUpdates sigue trayendo el stream de precisión
+        // real para el resto del recorrido.
+        try {
+            cancellationSource = CancellationTokenSource()
+            fusedClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cancellationSource!!.token)
+                .addOnSuccessListener { loc ->
+                    loc?.let { listener?.onLocation(it.latitude, it.longitude, it.accuracy, it.time) }
+                }
+        } catch (e: SecurityException) {
+            // Sin permisos — el catch de requestLocationUpdates de abajo ya
+            // detiene el servicio en ese caso, acá no hay nada más que hacer.
+        }
+
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, INTERVAL_MS)
             .setMinUpdateIntervalMillis(MIN_INTERVAL_MS)
             .build()
@@ -93,7 +114,6 @@ class GpsTrackingService : Service() {
         callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
-                guardarPunto(loc.latitude, loc.longitude, loc.accuracy, loc.time)
                 listener?.onLocation(loc.latitude, loc.longitude, loc.accuracy, loc.time)
             }
         }
@@ -110,6 +130,8 @@ class GpsTrackingService : Service() {
     }
 
     private fun stopTracking() {
+        cancellationSource?.cancel()
+        cancellationSource = null
         callback?.let { fusedClient.removeLocationUpdates(it) }
         callback = null
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -145,19 +167,8 @@ class GpsTrackingService : Service() {
         manager.createNotificationChannel(channel)
     }
 
-
-    private fun guardarPunto(lat: Double, lng: Double, accuracy: Float, timestampMs: Long) {
-        val puntos = runCatching { JSONArray(prefs.getString("puntos", "[]")) }.getOrElse { JSONArray() }
-        puntos.put(JSONObject().apply { put("lat", lat); put("lng", lng); put("precisionMetros", accuracy); put("timestampMs", timestampMs) })
-        // Mantener solo la traza activa; un viaje normal no debería crecer indefinidamente.
-        while (puntos.length() > 5000) puntos.remove(0)
-        prefs.edit().putString("puntos", puntos.toString()).apply()
-    }
-
-    fun obtenerPuntosPersistidos(): String = prefs.getString("puntos", "[]") ?: "[]"
-    fun limpiarPuntosPersistidos() { prefs.edit().remove("puntos").apply() }
-
     override fun onDestroy() {
+        cancellationSource?.cancel()
         callback?.let { fusedClient.removeLocationUpdates(it) }
         super.onDestroy()
     }

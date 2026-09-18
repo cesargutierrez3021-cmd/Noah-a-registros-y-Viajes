@@ -4,7 +4,9 @@
 
 > **Regla de comunicación durante el trabajo (pedida explícitamente por el usuario):** mientras se está trabajando en una sección/bloque, NO mandar mensajes narrando el progreso paso a paso — trabajar en silencio y solo escribir cuando: (a) hace falta preguntarle algo al usuario porque es una decisión real que cambiaría el resultado (no una duda que se puede resolver leyendo el código), o (b) pasó un error real que bloquea seguir. Al terminar una sección/bloque completo, entregar directamente el zip actualizado (con este plan actualizado adentro) sin preámbulo largo — un resumen breve de qué se hizo y cuál es el siguiente paso, y ya.
 
-Última actualización: **Bloque 4 — parte visual, SOLO Panel "Trabajo" (pedido explícito del usuario: "solo hace el diseño visual de la parte del trabajo... no me toques balance ni nada más por ahora").** Ver "Estado real de Bloque 4 — parte visual (solo Panel Trabajo)" para el detalle completo. Balance, Casa y Deudas, Cuenta y Planes siguen exactamente con el tema genérico de siempre — no se tocó ni una línea de esas pantallas.
+Última actualización: **Auditoría de bug real — GPS marcaba 0.0 km en viajes cortos o al arrancar detenido.** Causa encontrada y corregida en `GpsTrackingService.kt` (arranque en frío del GPS de alta precisión); además se agregó la posibilidad de corregir el kilometraje a mano después de finalizar un viaje (`corregirKmViaje` en `store.ts` + edición inline en `SeccionViajesYJornada.tsx`). Ver "Auditoría GPS — kilometraje en 0.0 (bug real encontrado y corregido)" para el detalle completo. Se entregó un PDF aparte (`auditoria-gps-kilometraje.pdf`) con el diagnóstico completo para el usuario.
+
+Antes de esto: **Bloque 4 — parte visual, SOLO Panel "Trabajo" (pedido explícito del usuario: "solo hace el diseño visual de la parte del trabajo... no me toques balance ni nada más por ahora").** Ver "Estado real de Bloque 4 — parte visual (solo Panel Trabajo)" para el detalle completo. Balance, Casa y Deudas, Cuenta y Planes siguen exactamente con el tema genérico de siempre — no se tocó ni una línea de esas pantallas.
 
 Antes de esto: **Bloque 4 (rediseño visual) — parte NO visual hecha, en 2 secciones (pedido explícito del usuario: hacer todo lo que no sea diseño/tema, dejando esa parte para después).** Ver "Estado real de Bloque 4 — parte no visual" para el detalle completo de las 2 secciones.
 
@@ -738,6 +740,28 @@ Esto disparó una revisión más amplia: **ninguna versión de ninguna dependenc
 **Lección para cualquier sesión futura de este proyecto:** un número de versión "razonable para la fecha actual" escrito sin poder consultar el registry real es una adivinanza, no un dato — cuando se agregue una dependencia nueva sin poder verificarla, hay que preferir `^X.0.0` (mayor confirmado, sin inventar el patch) en vez de una versión exacta con muchos decimales que "suena a que ya deberá existir para esta fecha".
 
 **No verificado todavía:** sigue sin poder correrse `npm install` real en este entorno — la próxima corrida de GitHub Actions (cliente) y del build de Render (backend) son las primeras pruebas reales de que estas versiones relajadas efectivamente resuelven.
+
+## Auditoría GPS — kilometraje en 0.0 (bug real encontrado y corregido)
+
+**Contexto:** el usuario reportó un patrón consistente — al iniciar un viaje por voz (burbuja de MIA) estando detenido, y empezar a moverse recién después, el kilometraje muchas veces quedaba en 0.0. Cuando ya estaba en movimiento al escuchar "inicia viaje", a veces sí funcionaba bien. Pidió auditoría + un PDF con el diagnóstico exacto, más la posibilidad de editar el km a mano.
+
+**Causa real, confirmada leyendo el código (no es una suposición sin verificar):**
+
+- `app/android/app/src/main/java/com/noah/conductor/atlas/gps/GpsTrackingService.kt` pedía las actualizaciones de ubicación solo con `Priority.PRIORITY_HIGH_ACCURACY` (GPS puro). Ese modo puede tardar bastante en conseguir su primer "fix" cuando arranca en frío (auto recién prendido, señal débil) — es un comportamiento conocido y documentado de la API de ubicación de Android, no un bug exótico.
+- `app/src/domain/viajes/distancia.ts` (`distanciaRecorridoKm`) sí está matemáticamente bien (Haversine correcto) — pero con 0 o 1 puntos en `recorrido`, el bucle `for (i=1; i<recorrido.length; i++)` nunca ejecuta ni una vez, y el resultado es 0 por diseño. Si el primer fix de alta precisión tarda más que la duración del tramo en el que el conductor se movió, el resultado final es exactamente el síntoma reportado.
+- Esto explica también por qué "a veces sí marca bien cuando ya está en movimiento": un teléfono que ya viene moviéndose (o que ya tenía el GPS "caliente" de un uso reciente, ej. Waze abierto) consigue el primer fix mucho más rápido.
+
+**Fix aplicado — `GpsTrackingService.kt`:** al arrancar a grabar (`startTracking()`), ahora se pide de entrada un punto rápido con `fusedClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, ...)` (mezcla GPS+red, mucho más rápido aunque menos preciso) como PRIMER punto del recorrido, mientras el `requestLocationUpdates` de alta precisión de siempre sigue trayendo el resto del recorrido sin cambios. Se agregó un `CancellationTokenSource` (cancelado en `stopTracking()`/`onDestroy()` para no dejar la tarea colgada si el servicio se detiene antes de que responda).
+
+**Fix aplicado — kilometraje editable (lo que pedía el usuario como red de seguridad, y porque el fix de arriba reduce el problema pero no lo elimina al 100%, ej. sin ninguna señal de ubicación disponible):**
+
+- `app/src/domain/viajes/store.ts` — nueva función `corregirKmViaje(id, kmCorregidos)`: reemplaza `distancia.kmTotalesReales` de un viaje ya finalizado (resetea `kmHastaRecoger` a 0 — una corrección manual no puede reconstruir ese desglose, mismo criterio que `crearViajeManual`), y marca `pendienteDeSync: true` para que el número corregido también suba al backend.
+- `app/src/features/trabajo/SeccionViajesYJornada.tsx` — el kilometraje de cada viaje en el historial ahora es tocable (subrayado + ✏️): al tocarlo aparece un input + botones ✓/✕ para guardar o cancelar la corrección.
+- `app/src/domain/viajes/types.ts` — se corrigió el comentario de `kmTotalesReales`, que decía explícitamente "nunca se guarda a mano" — eso ya no es cierto, se documentó el cambio de criterio ahí mismo.
+
+**Verificado esta sesión:** balance de llaves `{}`/paréntesis `()` en los 3 archivos TS/TSX tocados y en el `.kt` editado — todos correctos. **No verificado (mismo límite de siempre):** no hay forma de compilar Kotlin real ni probar esto en un teléfono físico desde este entorno — `getCurrentLocation()` para primer-fix-rápido es un patrón estándar y bien documentado de la API de ubicación de Android para este problema exacto, pero la primera prueba real la hace el usuario en su teléfono.
+
+Se entregó un PDF aparte (`auditoria-gps-kilometraje.pdf`) con este mismo diagnóstico en formato explicativo para el usuario, con los fragmentos de código exactos.
 
 ## Estado real de Bloque 4 — parte visual (solo Panel Trabajo)
 

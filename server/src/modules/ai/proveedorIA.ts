@@ -1,30 +1,40 @@
+/**
+ * Proxy de IA — Fase 9. Mismo patrón que `clasificadorIA.ts` (Fase 8): interfaz
+ * inyectable, sin implementación real, porque el proveedor de IA sigue sin
+ * decidirse (PLAN-MAESTRO, "Qué falta decidir" — "Proveedor de IA definitivo
+ * para el proxy del backend (Fase 9)"). No correspondía elegir uno por mi
+ * cuenta en este corte.
+ *
+ * A diferencia del clasificador de respaldo de Fase 8 (que se degrada
+ * silenciosamente a 'no_reconocida' cuando no hay proveedor — total, ya
+ * existía ese resultado desde antes), acá NO tiene sentido devolver una
+ * respuesta falsa disfrazada de análisis: el usuario pidió explícitamente
+ * un análisis con IA, así que el stub lanza un error tipado en vez de
+ * inventar una respuesta. `errorHandler.ts` lo traduce a un 503 claro.
+ */
+
+/**
+ * `prompt` ya viene armado por `contextoCompacto.ts` + la pregunta del
+ * usuario — el proveedor solo tiene que mandarlo al modelo y devolver el
+ * texto de la respuesta.
+ */
 export type ProveedorIA = (prompt: string) => Promise<string>
 
-export class ErrorProveedorIA extends Error { codigoHttp = 503 }
+export class ErrorProveedorIANoConfigurado extends Error {
+  codigoHttp = 503
 
-/** Proveedor OpenAI-compatible. Si no hay clave, falla explícitamente: nunca inventa datos. */
-export const proveedorSinImplementar: ProveedorIA = async (prompt) => {
-  const key = process.env.OPENAI_API_KEY
-  if (!key) throw new ErrorProveedorIA('El proveedor de IA no está configurado (OPENAI_API_KEY).')
-  const model = process.env.OPENAI_MODEL ?? 'gpt-5-mini'
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      max_tokens: 700,
-      messages: [
-        { role: 'system', content: 'Eres MIA, asistente de un conductor. Usa exclusivamente los datos proporcionados. Si falta un dato, dilo. Responde en español colombiano, directo y breve.' },
-        { role: 'user', content: prompt },
-      ],
-    }),
-  })
-  const data = await response.json().catch(() => null) as { error?: { message?: string }, choices?: Array<{ message?: { content?: string } }> } | null
-  if (!response.ok) throw new ErrorProveedorIA(data?.error?.message ?? `Proveedor IA HTTP ${response.status}`)
-  const answer = data?.choices?.[0]?.message?.content?.trim()
-  if (!answer) throw new ErrorProveedorIA('El proveedor IA devolvió una respuesta vacía.')
-  return answer
+  constructor() {
+    super('El proveedor de IA todavía no está configurado en el backend (Fase 9, proveedor sin decidir — ver PLAN-MAESTRO).')
+  }
 }
 
-export const proveedorIA = proveedorSinImplementar
+/**
+ * Implementación por defecto: no llama a ningún modelo, lanza el error de
+ * arriba. Cuando se decida el proveedor (PLAN-MAESTRO, "Qué falta decidir"),
+ * se escribe una función nueva con esta misma forma
+ * (`(prompt) => Promise<string>`) y se pasa como argumento — el resto del
+ * proxy (`analisis.ts`) no debería tener que cambiar.
+ */
+export const proveedorSinImplementar: ProveedorIA = async () => {
+  throw new ErrorProveedorIANoConfigurado()
+}

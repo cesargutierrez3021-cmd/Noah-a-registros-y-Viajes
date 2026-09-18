@@ -10,11 +10,13 @@ const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap',
 
 /** Misma lógica de orquestación que tenía ViajesScreen.tsx — solo se movió acá adentro del panel único. */
 export function SeccionViajesYJornada() {
-  const { viajes, viajeEnCurso, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje } = useViajes()
+  const { viajes, viajeEnCurso, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje, corregirKmViaje } = useViajes()
   const { jornadaAbierta, iniciarJornada, terminarJornada, agregarViajeAJornadaAbierta, cargar: cargarJornadas } =
     useJornada()
 
   const [ingreso, setIngreso] = useState('')
+  const [editandoKmId, setEditandoKmId] = useState<string | null>(null)
+  const [kmEnEdicion, setKmEnEdicion] = useState('')
 
   useEffect(() => {
     void cargar()
@@ -34,6 +36,14 @@ export function SeccionViajesYJornada() {
   async function manejarTerminarJornada() {
     await terminarJornada()
     void sincronizarJornadasPendientes()
+  }
+
+  async function guardarKmEditado(id: string) {
+    const km = Number(kmEnEdicion)
+    if (!Number.isFinite(km) || km < 0) return
+    await corregirKmViaje(id, km)
+    setEditandoKmId(null)
+    void sincronizarViajesPendientes()
   }
 
   return (
@@ -89,7 +99,32 @@ export function SeccionViajesYJornada() {
           {viajes.slice(0, 20).map((v) => (
             <li key={v.id} className="tarjeta-viaje">
               <span className="tarjeta-viaje__plataforma">{v.plataforma}</span>
-              <span className="tarjeta-viaje__km">{v.distancia.kmTotalesReales.toFixed(1)} km reales</span>
+              {editandoKmId === v.id ? (
+                <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    autoFocus
+                    value={kmEnEdicion}
+                    onChange={(e) => setKmEnEdicion(e.target.value)}
+                    style={{ width: 64 }}
+                  />
+                  <button type="button" onClick={() => void guardarKmEditado(v.id)}>✓</button>
+                  <button type="button" onClick={() => setEditandoKmId(null)}>✕</button>
+                </span>
+              ) : (
+                <span
+                  className="tarjeta-viaje__km"
+                  onClick={() => {
+                    setEditandoKmId(v.id)
+                    setKmEnEdicion(String(v.distancia.kmTotalesReales))
+                  }}
+                  style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
+                  title="El GPS puede fallar en viajes cortos o al arrancar detenido — toca para corregir el km a mano"
+                >
+                  {v.distancia.kmTotalesReales.toFixed(1)} km reales ✏️
+                </span>
+              )}
               <span className="tarjeta-viaje__ingreso">${v.ingreso.toLocaleString('es-CO')}</span>
             </li>
           ))}

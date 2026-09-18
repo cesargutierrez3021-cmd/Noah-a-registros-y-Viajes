@@ -1,4 +1,3 @@
-import { fechaNegocioISO, limitesDiaBogotaISO, limitesSemanaBogotaISO, limitesMesBogotaISO } from '../../lib/fechas'
 import { useMemo, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
 import { useJornada } from '../../domain/jornada/store'
@@ -28,10 +27,29 @@ function formatoDuracion(ms: number): string {
   return horas === 0 ? `${min}m` : `${horas}h ${min}m`
 }
 
-function limitesDeHoyISO(): { desde: string; hasta: string } { return limitesDiaBogotaISO() }
-function limitesDeSemanaISO(): { desde: string; hasta: string } { return limitesSemanaBogotaISO() }
+function limitesDeHoyISO(): { desde: string; hasta: string } {
+  const ahora = new Date()
+  const inicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate())
+  const fin = new Date(inicio)
+  fin.setDate(fin.getDate() + 1)
+  return { desde: inicio.toISOString(), hasta: fin.toISOString() }
+}
 
-function limitesDeMesISO(): { desde: string; hasta: string } { return limitesMesBogotaISO() }
+function limitesDeSemanaISO(): { desde: string; hasta: string } {
+  const ahora = new Date()
+  const diaSemanaISO = ahora.getDay() || 7 // domingo (0) pasa a 7, semana empieza lunes
+  const inicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() - diaSemanaISO + 1)
+  const fin = new Date(inicio)
+  fin.setDate(fin.getDate() + 7)
+  return { desde: inicio.toISOString(), hasta: fin.toISOString() }
+}
+
+function limitesDeMesISO(): { desde: string; hasta: string } {
+  const ahora = new Date()
+  const inicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1)
+  const fin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1)
+  return { desde: inicio.toISOString(), hasta: fin.toISOString() }
+}
 
 function limitesDe(periodo: PeriodoResumen): { desde: string; hasta: string } {
   if (periodo === 'hoy') return limitesDeHoyISO()
@@ -50,7 +68,7 @@ function sumaTotalGastos(gastos: Gasto[], desde: string, hasta: string): number 
 }
 
 function claveDiaDeHoy(): string {
-  return fechaNegocioISO()
+  return new Date().toISOString().slice(0, 10)
 }
 
 /**

@@ -94,21 +94,6 @@ class GpsTrackingPlugin : Plugin(), GpsTrackingService.GpsLocationListener {
     }
 
     @PluginMethod
-    fun getPersistedTrack(call: PluginCall) {
-        val r = JSObject()
-        // El servicio puede estar vivo aunque el WebView haya muerto; consultamos su prefs directamente.
-        val prefs = context.getSharedPreferences("mia-gps", android.content.Context.MODE_PRIVATE)
-        r.put("pointsJson", prefs.getString("puntos", "[]"))
-        call.resolve(r)
-    }
-
-    @PluginMethod
-    fun clearPersistedTrack(call: PluginCall) {
-        context.getSharedPreferences("mia-gps", android.content.Context.MODE_PRIVATE).edit().remove("puntos").apply()
-        call.resolve()
-    }
-
-    @PluginMethod
     fun stopTracking(call: PluginCall) {
         val intent = Intent(context, GpsTrackingService::class.java).apply {
             action = GpsTrackingService.ACTION_STOP
