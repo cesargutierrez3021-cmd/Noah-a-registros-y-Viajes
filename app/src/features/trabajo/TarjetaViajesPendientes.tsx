@@ -23,6 +23,11 @@ export function TarjetaViajesPendientes() {
 
   const [ingresosPendientes, setIngresosPendientes] = useState<Record<string, string>>({})
   const [plataformasPendientes, setPlataformasPendientes] = useState<Record<string, Plataforma>>({})
+  // Pedido explícito del usuario: el km que calcula el GPS puede fallar
+  // (quedar en cero o corto — ver el comentario de `recorridoDefinitivo` en
+  // domain/viajes/store.ts) y antes no había forma de corregirlo acá. Vacío
+  // = "no lo toqué", se usa el km calculado tal cual (ver `manejarCompletarIngreso`).
+  const [kmPendientes, setKmPendientes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void cargar()
@@ -33,9 +38,16 @@ export function TarjetaViajesPendientes() {
   async function manejarCompletarIngreso(viajeId: string, plataformaOriginal: Plataforma) {
     const monto = Number(ingresosPendientes[viajeId]) || 0
     const plataforma = plataformasPendientes[viajeId] ?? plataformaOriginal
-    await completarIngreso(viajeId, monto, plataforma)
+    const kmTexto = kmPendientes[viajeId]
+    const kmManual = kmTexto?.trim() ? Number(kmTexto) : undefined
+    await completarIngreso(viajeId, monto, plataforma, kmManual)
     await agregarViajeAJornadaAbierta(viajeId)
     setIngresosPendientes((prev) => {
+      const siguiente = { ...prev }
+      delete siguiente[viajeId]
+      return siguiente
+    })
+    setKmPendientes((prev) => {
       const siguiente = { ...prev }
       delete siguiente[viajeId]
       return siguiente
@@ -56,8 +68,23 @@ export function TarjetaViajesPendientes() {
       {viajesPendientesIngreso.map((v) => (
         <div key={v.id} className="tarjeta-viaje" style={{ flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
           <p className="texto-mute">
-            Terminaste este viaje desde la burbuja flotante — {v.distancia.kmTotalesReales.toFixed(1)} km. Solo falta el ingreso para guardarlo.
+            Terminaste este viaje desde la burbuja flotante. Solo falta el ingreso para guardarlo.
           </p>
+          <label className="texto-mute">
+            Kilómetros
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              placeholder={v.distancia.kmTotalesReales.toFixed(1)}
+              value={kmPendientes[v.id] ?? ''}
+              onChange={(e) => setKmPendientes((prev) => ({ ...prev, [v.id]: e.target.value }))}
+              style={{ display: 'block', width: '100%' }}
+            />
+            <span style={{ fontSize: '0.85em' }}>
+              Calculado por GPS: {v.distancia.kmTotalesReales.toFixed(1)} km. Corrígelo si no coincide con lo que marcó de verdad.
+            </span>
+          </label>
           <label className="texto-mute">
             Plataforma
             <select
