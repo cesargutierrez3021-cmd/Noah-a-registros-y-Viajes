@@ -72,8 +72,19 @@ interface EstadoViajes {
    * `pausarParaIngreso`). Puede haber varios al mismo tiempo; cada uno se
    * resuelve por separado, en cualquier orden — no hay un solo "el viaje
    * pendiente", son todos los que tengan `ingresoPendiente: true`.
+   *
+   * `kmManual`, opcional: pedido explícito del usuario ("no me deja editar
+   * el kilometraje") — el GPS puede fallar (ver `recorridoDefinitivo` más
+   * abajo) y dejar el km calculado en cero o incompleto; acá, al completar
+   * el ingreso, el conductor puede corregirlo a mano. Si se pasa un número
+   * válido, reemplaza `distancia` del viaje entero (mismo criterio que un
+   * viaje manual sin GPS, ver `crearViajeManual` en repository.ts: todo el
+   * km corregido cuenta como `kmConPasajero`, `kmHastaRecoger` en 0 — no hay
+   * forma de saber a mano dónde se cortaba la recogida). Si se omite, o no
+   * es un número finito y positivo, la distancia calculada por GPS queda
+   * intacta.
    */
-  completarIngreso: (viajeId: string, ingreso: number, plataforma: Plataforma) => Promise<void>
+  completarIngreso: (viajeId: string, ingreso: number, plataforma: Plataforma, kmManual?: number) => Promise<void>
   /** Bloque 2, ítem 4 — "agregar viaje manual". No toca `viajeEnCurso` ni el
    *  GPS para nada: es un camino totalmente aparte para cargar un viaje que
    *  ya pasó y no se registró en su momento. */
@@ -289,7 +300,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     return viaje
   },
 
-  completarIngreso: async (viajeId, ingreso, plataforma) => {
+  completarIngreso: async (viajeId, ingreso, plataforma, kmManual) => {
     const viaje = get().viajes.find((v) => v.id === viajeId)
     if (!viaje) return
     // 2026-09-15, pedido explícito del usuario: la burbuja arranca el viaje
@@ -297,7 +308,11 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     // porque no hay forma de preguntarla con un solo toque — acá, al
     // completar el ingreso con la app abierta, sí se puede corregir si ese
     // viaje puntual fue de otra plataforma.
-    const actualizado: Viaje = { ...viaje, ingreso, plataforma, ingresoPendiente: false, pendienteDeSync: true }
+    const kmCorregidoValido = typeof kmManual === 'number' && Number.isFinite(kmManual) && kmManual >= 0
+    const distancia = kmCorregidoValido
+      ? { kmHastaRecoger: 0, kmConPasajero: kmManual, kmTotalesReales: kmManual }
+      : viaje.distancia
+    const actualizado: Viaje = { ...viaje, ingreso, plataforma, distancia, ingresoPendiente: false, pendienteDeSync: true }
     await repositorioViajes.guardar(actualizado)
     set({ viajes: get().viajes.map((v) => (v.id === viajeId ? actualizado : v)) })
   },
