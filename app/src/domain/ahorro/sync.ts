@@ -1,12 +1,7 @@
+import type { ResultadoSincronizacion } from '../../lib/autoSync'
 import { haySesion } from '../../lib/api'
 import { repositorioAhorro } from './repository'
 import { subirAbonoAhorro, subirMetaAhorro } from './api'
-
-export interface ResultadoSincronizacion {
-  intentados: number
-  sincronizados: number
-  primerError: string | null
-}
 
 /**
  * Mismo patrón exacto que sincronizarDeudasPendientes (domain/deudas/sync.ts):

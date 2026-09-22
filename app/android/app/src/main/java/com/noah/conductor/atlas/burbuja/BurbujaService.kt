@@ -55,7 +55,6 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         private const val CANAL_ID = "mia_burbuja"
         private const val NOTIF_ID = 4201
         private const val UMBRAL_ARRASTRE_PX = 12
-        private const val UMBRAL_DESLIZAMIENTO_PX = 100
         // 2026-09-15, pedido explícito del usuario: mantener presionada la burbuja 2s termina
         // la jornada (y la cierra); doble-tap la pausa/reanuda. El tap simple (iniciar/terminar
         // un VIAJE) se retrasa este mismo tiempo de doble-tap para poder distinguir si viene un

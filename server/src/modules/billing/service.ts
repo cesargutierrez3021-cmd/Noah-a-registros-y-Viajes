@@ -29,6 +29,14 @@ export const servicioBilling = {
    *    se devuelve el plan que ya se activó, sin volver a verificar ni
    *    duplicar — cubre reintentos del cliente (ej. la app se cerró justo
    *    después de comprar, antes de recibir la respuesta, y reintenta).
+   *    2026-09-22, corrección de un bug real de seguridad encontrado en
+   *    auditoría: `purchaseToken` es único GLOBALMENTE, no por usuario — este
+   *    atajo debe confirmar que la fila encontrada es del MISMO usuario que
+   *    hizo esta request antes de devolver su plan, igual que
+   *    `verificarPertenencia` hace de forma consistente en sync/service.ts.
+   *    Sin este chequeo, un token repetido entre dos usuarios (filtrado,
+   *    reintento con la cuenta equivocada) le devolvería a uno el plan del
+   *    otro.
    * 3. Recién ahí se verifica contra Google (`verificador`, inyectable —
    *    ver googlePlay.ts). Si Google dice que no es válida, error 402.
    * 4. Se desactivan los planes activos anteriores del usuario (no se
@@ -49,6 +57,9 @@ export const servicioBilling = {
 
     const yaProcesada = await repositorioPlanes.buscarPlanDeUsuarioPorTokenDeCompra(purchaseToken)
     if (yaProcesada) {
+      if (yaProcesada.usuarioId !== usuarioId) {
+        throw new ErrorBilling('Esta compra ya fue registrada con otra cuenta.', 409)
+      }
       return aPlanPublico(yaProcesada.plan)
     }
 

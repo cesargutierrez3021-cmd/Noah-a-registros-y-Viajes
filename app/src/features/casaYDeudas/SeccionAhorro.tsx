@@ -72,6 +72,16 @@ export function SeccionAhorro() {
     const frecuencia = aportesEdicionFrecuencia[metaId] ?? 'mensual'
     await actualizarAportePlaneado(metaId, texto && Number.isFinite(monto) && monto > 0 ? { monto, frecuencia } : null)
     void sincronizarAhorroPendiente()
+    // 2026-09-22, corrección de un bug real encontrado en auditoría: a diferencia de
+    // manejarAbonar/manejarActualizarFecha (que sí limpian su edición local al guardar), esto
+    // nunca limpiaba — el campo se quedaba mostrando el texto crudo que se escribió en vez de
+    // reflejar el valor real ya guardado.
+    setAportesEdicionMonto((actuales) => ({ ...actuales, [metaId]: '' }))
+    setAportesEdicionFrecuencia((actuales) => {
+      const siguiente = { ...actuales }
+      delete siguiente[metaId]
+      return siguiente
+    })
   }
 
   async function manejarAbonar(metaId: string) {

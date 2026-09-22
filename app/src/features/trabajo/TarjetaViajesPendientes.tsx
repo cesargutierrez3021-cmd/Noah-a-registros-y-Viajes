@@ -48,6 +48,13 @@ export function TarjetaViajesPendientes() {
       delete siguiente[viajeId]
       return siguiente
     })
+    // 2026-09-22, corrección de un bug real encontrado en auditoría: esto limpiaba el monto y
+    // el km editados, pero no la plataforma editada — quedaba guardada en memoria sin usarse.
+    setPlataformasPendientes((prev) => {
+      const siguiente = { ...prev }
+      delete siguiente[viajeId]
+      return siguiente
+    })
     void sincronizarViajesPendientes()
     void sincronizarJornadasPendientes()
   }

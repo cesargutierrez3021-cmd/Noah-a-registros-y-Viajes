@@ -45,6 +45,16 @@ export const repositorioSync = {
       distanciaReportadaPlataforma: viaje.distanciaReportadaPlataforma,
       ingreso: viaje.ingreso,
       ingresoPendiente: viaje.ingresoPendiente,
+      // 2026-09-22 (comentario agregado en auditoría, sin cambiar el comportamiento):
+      // `localidad`/`zona` son los campos originales, de antes de que existiera la
+      // separación inicio/fin (ver la migración 20260914090000_viaje_zonas_inicio_fin).
+      // Se siguen escribiendo A PROPÓSITO junto con los nuevos — el cliente todavía lee
+      // `localidad`/`zona` como último fallback (ver `SeccionViajesYJornada.tsx`,
+      // `(v.localidadInicio ?? v.zonaInicio ?? v.localidad ?? v.zona)`) para viajes
+      // sincronizados antes de ese cambio, que solo tienen el par viejo. Quitar la
+      // escritura de acá dejaría esos viajes viejos sin ese dato en futuras
+      // actualizaciones — no es duplicación por descuido, es compatibilidad hacia atrás
+      // deliberada mientras exista algún viaje sincronizado sin el par nuevo.
       localidad: viaje.localidad,
       zona: viaje.zona,
       localidadInicio: viaje.localidadInicio ?? viaje.localidad,

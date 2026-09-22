@@ -3,17 +3,12 @@ import type { CuotaProgramada, Deuda, FrecuenciaCuota } from '../deudas/types'
 import type { MetaAhorro } from '../ahorro/types'
 import type { ItemMantenimiento } from '../mantenimiento/types'
 import { tarifaDiariaItem } from '../mantenimiento/reglas'
-import { fechaNegocioISO } from '../../lib/fechas'
+import { fechaNegocioISO, ultimoDiaDelMes } from '../../lib/fechas'
 import type { DesgloseMetaBaseDiaria, ResultadoMetaDiaria } from './types'
-
-/** Días reales del mes [año, mes 0-indexado] — 28/29/30/31, nunca un promedio fijo. */
-function diasEnMes(año: number, mes: number): number {
-  return new Date(año, mes + 1, 0).getDate()
-}
 
 /** Cuántas veces cae el día de semana `diaObjetivo` (0=domingo..6=sábado, igual que Date.getDay()) dentro del mes [año, mes]. */
 function ocurrenciasDiaSemanaEnMes(año: number, mes: number, diaObjetivo: number): number {
-  const dias = diasEnMes(año, mes)
+  const dias = ultimoDiaDelMes(año, mes)
   let cuenta = 0
   for (let d = 1; d <= dias; d++) {
     if (new Date(año, mes, d).getDay() === diaObjetivo) cuenta++
@@ -50,7 +45,7 @@ function ocurrenciasCuotaEnMes(cuota: CuotaProgramada, año: number, mes: number
 function ocurrenciasFrecuenciaEnMes(frecuencia: FrecuenciaCuota, año: number, mes: number): number {
   if (frecuencia === 'mensual') return 1
   if (frecuencia === 'quincenal') return 2
-  return Math.floor(diasEnMes(año, mes) / 7)
+  return Math.floor(ultimoDiaDelMes(año, mes) / 7)
 }
 
 /**
@@ -73,7 +68,7 @@ export function calcularMetaBaseDiaria(input: {
   const ahora = input.ahora ?? new Date()
   const año = ahora.getFullYear()
   const mes = ahora.getMonth()
-  const diasDelMesActual = diasEnMes(año, mes)
+  const diasDelMesActual = ultimoDiaDelMes(año, mes)
 
   const totalHogarMes = input.conceptosFijosActivos.reduce((acc, c) => acc + c.montoEsperado, 0)
   const hogar = totalHogarMes / diasDelMesActual

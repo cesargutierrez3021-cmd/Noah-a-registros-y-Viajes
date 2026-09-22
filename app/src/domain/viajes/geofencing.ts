@@ -27,12 +27,16 @@ export interface Zona {
   poligono: PuntoGPS[][]
 }
 
-/** Zonas activas por defecto: las 20 localidades de Bogotá (D-7). */
-export const ZONAS_LOCALIDADES: Zona[] = ZONAS_BOGOTA
+/**
+ * Zonas activas por defecto: las 20 localidades de Bogotá (D-7). 2026-09-22 (limpieza de
+ * auditoría): sin usar fuera de este archivo, ya no exportada — `obtenerLocalidad`/
+ * `obtenerZona` son el API real que sí se consume afuera.
+ */
+const ZONAS_LOCALIDADES: Zona[] = ZONAS_BOGOTA
 
 /** Zonas comerciales/personalizadas se agregan aquí sin contaminar la capa oficial. */
 export const ZONAS_CUSTOM: Zona[] = []
-export const ZONAS: Zona[] = ZONAS_LOCALIDADES
+const ZONAS: Zona[] = ZONAS_LOCALIDADES
 
 /**
  * Ray casting: determina si un punto está dentro de un anillo simple.

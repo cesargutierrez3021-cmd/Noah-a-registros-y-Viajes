@@ -35,6 +35,16 @@ function verificarPertenencia(usuarioId: string, existente: { usuarioId: string 
   }
 }
 
+/**
+ * 2026-09-22 (limpieza de auditoría, D-18): esta detección estaba copiada
+ * literal 3 veces (sincronizarAbonoDeuda, sincronizarAbonoAhorro,
+ * sincronizarGastoHogar) — factorizada acá, mismo motivo que
+ * `verificarPertenencia` arriba.
+ */
+function esViolacionDeFK(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
+}
+
 export const servicioSync = {
   /**
    * Reglas, en orden:
@@ -108,8 +118,7 @@ export const servicioSync = {
     try {
       await repositorioSync.guardarAbonoDeuda(usuarioId, abono)
     } catch (err) {
-      const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
-      if (esViolacionDeFK) {
+      if (esViolacionDeFK(err)) {
         throw new ErrorSync('La deuda de este abono todavía no está sincronizada. Reintentá en un momento.', 409)
       }
       throw err
@@ -130,8 +139,7 @@ export const servicioSync = {
     try {
       await repositorioSync.guardarAbonoAhorro(usuarioId, abono)
     } catch (err) {
-      const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
-      if (esViolacionDeFK) {
+      if (esViolacionDeFK(err)) {
         throw new ErrorSync('La meta de este abono todavía no está sincronizada. Reintentá en un momento.', 409)
       }
       throw err
@@ -159,8 +167,7 @@ export const servicioSync = {
     try {
       await repositorioSync.guardarGastoHogar(usuarioId, gasto)
     } catch (err) {
-      const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
-      if (esViolacionDeFK) {
+      if (esViolacionDeFK(err)) {
         throw new ErrorSync('El concepto fijo de este gasto todavía no está sincronizado. Reintentá en un momento.', 409)
       }
       throw err

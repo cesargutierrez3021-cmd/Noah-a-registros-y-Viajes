@@ -31,6 +31,7 @@ model Usuario {
   abonosAhorro   AbonoAhorro[]
   conceptosFijos ConceptoFijo[]
   gastosHogar    GastoHogar[]
+  consultasIA    ConsultaIA[]
 
   @@map("usuarios")
 }
@@ -240,9 +241,11 @@ model Deuda {
   nombre             String
   saldoInicial       Float     @map("saldo_inicial")
   saldoActual        Float     @map("saldo_actual")
-  /// { monto: number, frecuencia: 'semanal'|'quincenal'|'mensual' } o null. Json en vez de columnas
+  /// { monto: number, frecuencia: 'semanal'|'quincenal'|'mensual', diaDelMes?, diasDelMes?,
+  /// diaDeLaSemana? } o null (2026-09-22, comentario actualizado: solo el ancla que
+  /// corresponde a `frecuencia` viene con valor, ver sync/schemas.ts). Json en vez de columnas
   /// separadas porque es opcional como bloque completo, no campo por campo (D-8: no hay razón
-  /// técnica para partirlo en dos columnas nullable en vez de un solo objeto).
+  /// técnica para partirlo en columnas nullable en vez de un solo objeto).
   cuotaProgramada    Json?     @map("cuota_programada")
   /// 2026-09-15, pedido explícito del usuario: fecha real de vencimiento, puesta a mano por el
   /// conductor (antes solo existía `cuotaProgramada`, opcional, sin ancla de fecha real) — ver
@@ -372,4 +375,22 @@ model GastoHogar {
   @@index([usuarioId])
   @@index([conceptoFijoId])
   @@map("gastos_hogar")
+}
+
+/// 2026-09-22, corrección de un bug real encontrado en auditoría: `Plan.limiteConsultasIA` se
+/// definía, se persistía y se mostraba en el catálogo de planes, pero no existía ningún
+/// contador real — un usuario gratis podía consultar a la IA sin tope (más allá del límite
+/// genérico por IP compartido entre todos, ver http/rateLimit.ts). Un registro append-only
+/// (nunca se edita/borra) por cada consulta que de verdad toca el proveedor de IA pago —
+/// `/ai/analisis` y `/ai/conversacion`, NO `/ai/intent` (reglas locales, sin modelo pago, ver
+/// modules/ai/routes.ts). Contar filas del mes actual es más simple y a prueba de fallos que un
+/// contador mutable con reset mensual (no hay que programar ningún job que lo resetee).
+model ConsultaIA {
+  id        String   @id @default(uuid())
+  usuarioId String   @map("usuario_id")
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  fechaISO  DateTime @default(now()) @map("fecha")
+
+  @@index([usuarioId, fechaISO])
+  @@map("consultas_ia")
 }

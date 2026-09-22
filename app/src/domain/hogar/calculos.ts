@@ -1,4 +1,5 @@
 import type { ConceptoFijo, GastoHogar } from './types'
+import { ultimoDiaDelMes } from '../../lib/fechas'
 
 /**
  * "Los gastos fijos se autogeneran cada período sin que el usuario los
@@ -25,10 +26,14 @@ export interface GastoFijoPendienteConfirmar {
   monto: number
 }
 
-/** diaDelMes puede ser mayor a los días que tiene el mes (ej. 31 en febrero) — se recorta al último día real de ese mes. */
-export function fechaParaPeriodo(anio: number, mesIndiceCero: number, diaDelMes: number): Date {
-  const ultimoDiaDelMes = new Date(anio, mesIndiceCero + 1, 0).getDate()
-  const dia = Math.min(diaDelMes, ultimoDiaDelMes)
+/**
+ * diaDelMes puede ser mayor a los días que tiene el mes (ej. 31 en febrero) — se recorta al
+ * último día real de ese mes. 2026-09-22 (limpieza de auditoría): sin usar fuera de este
+ * archivo — ya no exportada — y con la fórmula del último día del mes movida a lib/fechas.ts
+ * (D-18, estaba copiada en 3 archivos distintos).
+ */
+function fechaParaPeriodo(anio: number, mesIndiceCero: number, diaDelMes: number): Date {
+  const dia = Math.min(diaDelMes, ultimoDiaDelMes(anio, mesIndiceCero))
   return new Date(anio, mesIndiceCero, dia)
 }
 

@@ -1,8 +1,9 @@
 import type { Viaje } from '../viajes/types'
 import type { Jornada } from '../jornada/types'
 import type { Gasto } from '../gastos/types'
+import { totalGastosEnRango } from '../gastos/calculos'
 import type { Bono } from '../bonos/types'
-import { minutosDelDiaLocalBogota } from '../../lib/fechas'
+import { minutosDelDiaLocalBogota, fechaNegocioISO } from '../../lib/fechas'
 import type {
   CostoPorKm,
   DesglosePor,
@@ -46,18 +47,28 @@ export function calcularResumen(viajes: Viaje[], bonos: Bono[] = []): ResumenVia
   }
 }
 
+/**
+ * 2026-09-22, corrección de un bug real encontrado en auditoría: estas tres
+ * funciones cortaban el string ISO crudo (siempre UTC), no el día de negocio
+ * de Bogotá que sí usa correctamente `franjaHoraria` más abajo en este mismo
+ * archivo. Como Bogotá es UTC-5 fijo, cualquier viaje que arranca entre las
+ * 7pm y la medianoche caía, por el slice, en el día calendario UTC
+ * SIGUIENTE — un viaje de la noche (horario real de trabajo de un conductor)
+ * podía no contar como "de hoy" en el resumen que busca `SeccionPulso.tsx`/
+ * `MiaBurbuja.tsx` con la clave `fechaNegocioISO()`.
+ */
 function claveDia(fechaISO: string): string {
-  return fechaISO.slice(0, 10) // YYYY-MM-DD
+  return fechaNegocioISO(new Date(fechaISO)) // YYYY-MM-DD, día de negocio Bogotá
 }
 
 function claveMes(fechaISO: string): string {
-  return fechaISO.slice(0, 7) // YYYY-MM
+  return claveDia(fechaISO).slice(0, 7) // YYYY-MM
 }
 
-/** Semana ISO-8601 (lunes a domingo), formato '2026-W37'. */
+/** Semana ISO-8601 (lunes a domingo) del día de negocio de Bogotá, formato '2026-W37'. */
 function claveSemana(fechaISO: string): string {
-  const fecha = new Date(fechaISO)
-  const copia = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()))
+  const [year, month, day] = claveDia(fechaISO).split('-').map(Number)
+  const copia = new Date(Date.UTC(year, month - 1, day))
   const diaSemanaISO = copia.getUTCDay() || 7
   copia.setUTCDate(copia.getUTCDate() + 4 - diaSemanaISO)
   const inicioAño = new Date(Date.UTC(copia.getUTCFullYear(), 0, 1))
@@ -142,8 +153,12 @@ function desglosePorZonaGenerico(viajes: Viaje[], zonaDe: (v: Viaje) => string |
  * salen de `obtenerZonaCustom()` (geofencing.ts), que consulta
  * `ZONAS_CUSTOM`, un array vacío a propósito ("zonas comerciales se agregan
  * acá sin contaminar la capa oficial", pero nunca se llegó a cargar
- * ninguna) — esos 3 campos son SIEMPRE `null` en cualquier viaje real, de
- * GPS o manual. El dato real de dónde recogiste/dejaste sale de
+ * ninguna) — esos 3 campos son SIEMPRE `null` en cualquier viaje capturado
+ * por GPS. (2026-09-22, corrección de este mismo comentario: los viajes
+ * MANUALES sí pueden traer `zona` con un valor real — `crearViajeManual`,
+ * repository.ts, lo asigna directo del selector de zona que elige el
+ * conductor; el fallback de abajo sigue siendo el orden correcto de todas
+ * formas, `localidadInicio`/`localidadFin` primero.) El dato real de dónde recogiste/dejaste sale de
  * `obtenerLocalidad()` (las 20 localidades oficiales de Bogotá), guardado en
  * `localidadInicio`/`localidadFin` — antes de este fix, esta estadística
  * mostraba "Sin zona detectada" el 100% del tiempo, para cualquier
@@ -327,9 +342,7 @@ export function calcularDineroEnEspera(tiempo: TiempoJornada, rentabilidad: Rent
  * listas.
  */
 export function calcularCostoPorKm(gastos: Gasto[], viajes: Viaje[], desdeISO: string, hastaISO: string): CostoPorKm {
-  const gastoTotal = gastos
-    .filter((g) => g.fechaISO >= desdeISO && g.fechaISO < hastaISO)
-    .reduce((acc, g) => acc + g.monto, 0)
+  const gastoTotal = totalGastosEnRango(gastos, desdeISO, hastaISO)
 
   const kmTotales = soloFinalizados(viajes)
     .filter((v) => v.inicioISO >= desdeISO && v.inicioISO < hastaISO)

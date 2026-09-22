@@ -1,12 +1,7 @@
+import type { ResultadoSincronizacion } from '../../lib/autoSync'
 import { haySesion } from '../../lib/api'
 import { repositorioHogar } from './repository'
 import { subirConceptoFijo, subirGastoHogar } from './api'
-
-export interface ResultadoSincronizacion {
-  intentados: number
-  sincronizados: number
-  primerError: string | null
-}
 
 /**
  * Mismo patrón exacto que domain/deudas/sync.ts (Deuda/AbonoDeuda): dos

@@ -1,12 +1,7 @@
+import type { ResultadoSincronizacion } from '../../lib/autoSync'
 import { haySesion } from '../../lib/api'
 import { repositorioDeudas } from './repository'
 import { subirAbonoDeuda, subirDeuda } from './api'
-
-export interface ResultadoSincronizacion {
-  intentados: number
-  sincronizados: number
-  primerError: string | null
-}
 
 /**
  * A diferencia de gastos/mantenimiento (una sola cola), acá hay DOS: deudas

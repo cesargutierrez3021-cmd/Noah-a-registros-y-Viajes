@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 /**
  * 2026-09-15, pedido explícito del usuario: "todo lo que esté en ajustes
@@ -28,6 +28,18 @@ export function SeccionDesplegable({
   onToggle: () => void
   children: ReactNode
 }) {
+  // 2026-09-22, corrección de un bug real de batería/RAM encontrado en auditoría: el "cerrado"
+  // de acá arriba era solo CSS (grid-template-rows 0fr) — React seguía montando `children`
+  // siempre, sin importar si la sección estaba abierta. En Ajustes eso significaba renderizar
+  // 5 gráficos pesados (anillos, cristal 3D, prisma) apenas se abría la pantalla, aunque el
+  // conductor nunca hubiera tocado esa sección. Ahora se monta recién la primera vez que se
+  // abre, y sigue montado después (no se vuelve a desmontar al cerrar) para no perder la
+  // animación de cierre ni el estado interno si se vuelve a abrir.
+  const [yaSeMostro, setYaSeMostro] = useState(abierta)
+  useEffect(() => {
+    if (abierta) setYaSeMostro(true)
+  }, [abierta])
+
   return (
     <section className="seccion-desplegable">
       <button type="button" className="seccion-desplegable__cabecera" onClick={onToggle} aria-expanded={abierta}>
@@ -38,7 +50,7 @@ export function SeccionDesplegable({
       </button>
       <div className={`acordeon-resumen__panel${abierta ? ' acordeon-resumen__panel--abierto' : ''}`}>
         <div className="acordeon-resumen__panel-interior">
-          <div className="seccion-desplegable__contenido">{children}</div>
+          <div className="seccion-desplegable__contenido">{yaSeMostro ? children : null}</div>
         </div>
       </div>
     </section>

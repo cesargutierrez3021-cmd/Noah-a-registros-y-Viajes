@@ -2,8 +2,15 @@ import type { Aviso } from './types'
 import type { EstadoAlerta } from '../mantenimiento/types'
 import type { Deuda } from '../deudas/types'
 import type { ConceptoFijo } from '../hogar/types'
+import { ultimoDiaDelMes } from '../../lib/fechas'
 
-/** Mismo margen que usa domain/mantenimiento/reglas.ts para deudas y gastos fijos — "próximo a vencer" dentro de esta cantidad de días. */
+/**
+ * 2026-09-22 (corrección de comentario desactualizado, auditoría): esto decía
+ * "mismo margen que domain/mantenimiento/reglas.ts", pero ese archivo usa 15
+ * días, no 3 — son dos ventanas DISTINTAS a propósito (un mantenimiento
+ * necesita más antelación para planearlo/comprar el repuesto; un pago de
+ * deuda o de hogar es un aviso de corto plazo), nunca fueron el mismo valor.
+ */
 const MARGEN_AVISO_DIAS = 3
 
 const MS_POR_DIA = 1000 * 60 * 60 * 24
@@ -32,15 +39,14 @@ export function calcularAvisosMantenimiento(alertas: EstadoAlerta[]): Aviso[] {
 
 /** Próxima fecha (a partir de `ahora`, inclusive) en que cae el día `dia` del mes — recorta al último día real si el mes es más corto. Reutilizada por deudas y por Hogar (D-18: una sola función "próximo día del mes", no dos). */
 function proximoDiaDelMes(ahora: Date, dia: number): Date {
-  const diaTope = (año: number, mes: number) => new Date(año, mes + 1, 0).getDate()
   let año = ahora.getFullYear()
   let mes = ahora.getMonth()
-  let d = Math.min(dia, diaTope(año, mes))
+  let d = Math.min(dia, ultimoDiaDelMes(año, mes))
   let candidata = new Date(año, mes, d)
   if (candidata.getTime() < new Date(año, mes, ahora.getDate()).getTime()) {
     mes += 1
     if (mes > 11) { mes = 0; año += 1 }
-    d = Math.min(dia, diaTope(año, mes))
+    d = Math.min(dia, ultimoDiaDelMes(año, mes))
     candidata = new Date(año, mes, d)
   }
   return candidata

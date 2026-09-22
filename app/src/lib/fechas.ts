@@ -1,5 +1,16 @@
 const ZONA_HORARIA_NEGOCIO = 'America/Bogota'
 
+/**
+ * 2026-09-22 (limpieza de auditoría, D-18): la fórmula de "último día del mes"
+ * (`new Date(año, mes+1, 0).getDate()`) estaba copiada literal en 3 archivos
+ * distintos (avisos/calculos.ts, metaDiaria/calculos.ts, hogar/calculos.ts) en
+ * vez de vivir acá, que es donde el proyecto centraliza matemática de fechas.
+ * `mesIndiceCero` = 0-11, igual que `Date.getMonth()`.
+ */
+export function ultimoDiaDelMes(año: number, mesIndiceCero: number): number {
+  return new Date(año, mesIndiceCero + 1, 0).getDate()
+}
+
 export function fechaNegocioISO(fecha: Date = new Date()): string {
   const partes = new Intl.DateTimeFormat('en-CA', {
     timeZone: ZONA_HORARIA_NEGOCIO, year: 'numeric', month: '2-digit', day: '2-digit',

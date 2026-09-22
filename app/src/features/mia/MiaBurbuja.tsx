@@ -18,10 +18,14 @@ import { agruparPorPeriodo, calcularResumen, desglosePorZona, desglosePorFranjaH
  * esto es 100% la misma lógica que tenía ConversacionScreen.tsx, solo
  * empaquetada como panel expandible en vez de pantalla completa.
  *
- * A propósito sin animación/tema todavía — un círculo con "MIA" y un panel
- * que se abre/cierra, usando las mismas clases genéricas de siempre. El
- * aspecto final (posición exacta, ícono, colores) es la parte visual del
- * Bloque 4, pendiente hasta que se elija el tema.
+ * Un círculo con "MIA" y un panel que se abre/cierra, usando las mismas
+ * clases genéricas de siempre (`.pantalla`, `.tarjeta-viaje`, `.texto-mute`,
+ * el `<button>` sin clase propia). 2026-09-22, corrección de un comentario
+ * desactualizado: esto decía "sin tema todavía, pendiente hasta que se
+ * elija" — el sistema de temas (Verde/Oro/Papel) ya existe hace varias
+ * rondas y este componente lo hereda automático a través de esas mismas
+ * clases genéricas y las variables CSS del `<button>` global
+ * (design/tokens.css), sin necesitar nada propio.
  */
 
 function claveDiaDeHoy(): string {

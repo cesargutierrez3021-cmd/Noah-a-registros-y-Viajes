@@ -14,24 +14,24 @@ import { repositorioPlanes } from './modules/plans/repository.js'
 /**
  * Punto de entrada del backend MIA.
  *
- * Estado real (no inventar que todo ya funciona):
+ * Estado real (no inventar que todo ya funciona; corregido 2026-09-22 tras encontrar
+ * en auditoría que varias líneas de abajo describían un estado ya superado):
  *   - modules/auth   → Fase 7 HECHA (registro, login, refresco de sesión, JWT propio — D-5)
  *   - modules/plans  → Fase 7 HECHA lo básico (plan gratis por defecto). Fase 11 agregó
  *                      el catálogo de planes pagos (PLANES_BASE) — la validación de
  *                      compra en sí vive en modules/billing/.
- *   - modules/billing → Fase 11 EN CURSO: rutas y servicio escritos, pero el verificador
- *                      real contra Google Play NO existe (stub que lanza 503 a propósito
- *                      — ver modules/billing/googlePlay.ts y "Estado real de Fase 11").
- *   - modules/sync    → Fase 13 EN CURSO: POST /sync/viajes, /sync/jornadas y
- *                      /sync/mantenimiento/registros (push, un recurso por
- *                      request, dedupe por id + verificación de pertenencia —
- *                      ver "Estado real de Fase 13"). Los ítems de
- *                      mantenimiento (configuración editable/borrable) siguen
- *                      sin sincronizar a propósito — ver modules/sync/types.ts.
- *   - modules/ai      → Fase 8 y 9 HECHAS con salvedades (Intent Router + proxy de IA).
- *                        Fase 10 (voz + conversación continua, POST /ai/conversacion) EN
- *                        CURSO — ver "Estado real de Fase 10" en PLAN-MAESTRO.
- *                        El proveedor de IA real sigue sin decidirse — ver PLAN-MAESTRO.
+ *   - modules/billing → el verificador real contra Google Play SÍ existe (JWT Bearer
+ *                      RFC 7523, intercambio OAuth2, Android Publisher API v3 — ver
+ *                      modules/billing/googlePlay.ts). El 503 solo ocurre si falta
+ *                      configurar GOOGLE_SERVICE_ACCOUNT_JSON, no es un stub permanente.
+ *   - modules/sync    → cubre 11 recursos (viajes, jornadas, mantenimiento, gastos,
+ *                      bonos, deudas+abonos, metas de ahorro+abonos, conceptos fijos
+ *                      de hogar+gastos de hogar) con push + dedupe por id +
+ *                      verificación de pertenencia, más restauración completa
+ *                      (GET /sync/todo) al iniciar sesión o registrarse.
+ *   - modules/ai      → el proveedor de IA real ya está integrado (OpenAI, chat
+ *                      completions — ver modules/ai/proveedorIA.ts). El 503 solo
+ *                      ocurre si falta configurar OPENAI_API_KEY.
  *   - Fase 12 (seguridad): rate limiting propio (http/rateLimit.ts), helmet, CORS y
  *                        trust proxy agregados acá abajo — ver "Estado real de Fase 12".
  *

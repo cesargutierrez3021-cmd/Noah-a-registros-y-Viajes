@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Jornada } from './types'
 import { repositorioJornadas } from './repository'
+import { fechaNegocioISO } from '../../lib/fechas'
 
 /**
  * Fase 13 (continuación): este store ahora delega toda la persistencia en
@@ -10,14 +11,19 @@ import { repositorioJornadas } from './repository'
  * sin tocarlo.
  */
 
-function esHoyLocal(iso: string): boolean {
-  const fecha = new Date(iso)
-  const hoy = new Date()
-  return (
-    fecha.getFullYear() === hoy.getFullYear() &&
-    fecha.getMonth() === hoy.getMonth() &&
-    fecha.getDate() === hoy.getDate()
-  )
+/**
+ * 2026-09-22, corrección de un bug real encontrado en auditoría: esto comparaba
+ * año/mes/día en hora LOCAL del teléfono (medianoche a medianoche), no en el día
+ * de negocio de Bogotá que usa el resto de la app (`fechaNegocioISO`, lib/fechas.ts).
+ * Un conductor que trabaja pasada la medianoche (turno nocturno, muy común) hacía
+ * que, apenas cambiaba el día calendario del celular, `jornadaAbierta()` dejara de
+ * encontrar la jornada real como "abierta" aunque siguiera corriendo — no se le
+ * podían seguir agregando viajes, los gestos de la burbuja para terminarla/pausarla
+ * dejaban de funcionar en silencio, y se podía abrir una segunda jornada duplicada
+ * mientras la real quedaba abandonada para siempre.
+ */
+function esHoyBogota(iso: string): boolean {
+  return fechaNegocioISO(new Date(iso)) === fechaNegocioISO()
 }
 
 interface EstadoJornada {
@@ -47,7 +53,7 @@ export const useJornada = create<EstadoJornada>((set, get) => ({
     set({ jornadas })
   },
 
-  jornadaAbierta: () => get().jornadas.find((j) => j.finISO === null && esHoyLocal(j.inicioISO)),
+  jornadaAbierta: () => get().jornadas.find((j) => j.finISO === null && esHoyBogota(j.inicioISO)),
 
   iniciarJornada: async () => {
     if (get().jornadaAbierta()) return
