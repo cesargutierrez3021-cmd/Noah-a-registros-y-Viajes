@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useDeudas } from '../../domain/deudas/store'
 import { sincronizarDeudasPendientes } from '../../domain/deudas/sync'
 import type { FrecuenciaCuota } from '../../domain/deudas/types'
-import { proximaFechaCuotaDeuda } from '../../domain/avisos/calculos'
 import { CampoMonto } from '../../components/CampoMonto'
 
 const FRECUENCIAS: { valor: FrecuenciaCuota; etiqueta: string }[] = [
@@ -112,30 +111,39 @@ export function SeccionDeudas() {
   /**
    * 2026-09-17, pedido explícito del usuario: "botoncito de si se cumplió
    * con la cuota... hoy es 5, se vence hoy y la cuota eran 500... que yo le
-   * despiche paga y él ya suma que se pagó y se descontó" — reusa
-   * `proximaFechaCuotaDeuda` (domain/avisos/calculos.ts, ya calcula la
-   * próxima fecha real de la cuota, D-18) y el `abonar` que ya existe: este
-   * botón es solo un atajo de un toque con el monto YA conocido de la
-   * cuota, no un flujo nuevo — el usuario dijo que "el cuadrito de abono
-   * está perfecto", así que ese sigue intacto al lado.
+   * despiche paga y él ya suma que se pagó y se descontó" — reusa el
+   * `abonar` que ya existe: este botón es solo un atajo de un toque con el
+   * monto YA conocido de la cuota, no un flujo nuevo — el usuario dijo que
+   * "el cuadrito de abono está perfecto", así que ese sigue intacto al lado.
    *
-   * Bug real encontrado verificando esta misma ronda: sin la segunda
-   * condición, el botón seguía apareciendo DESPUÉS de pagar la cuota de
-   * hoy (`proximaFechaCuotaDeuda` solo proyecta la fecha teórica según el
-   * día del mes/semana, no sabe si ya se abonó) — tocarlo dos veces
-   * habría descontado la cuota dos veces. Se considera "ya cubierta" si
-   * existe un abono fechado desde `proxima` en adelante (mismo criterio
-   * que usa Hogar para no repetir un gasto fijo ya confirmado este
-   * período, D-18) — al pasar al siguiente ciclo, `proxima` avanza sola
-   * y el abono viejo deja de cubrirla, así que el botón reaparece solo.
+   * 2026-09-23, corrección de un bug real reportado por el usuario ("el
+   * botón de pagar creo que solo se me activa en la fecha de vencimiento...
+   * siempre tiene que estar ahí, por si quiero pagar antes"): antes exigía
+   * `proximaFechaCuotaDeuda(deuda) <= ahora` para aparecer — ya no. El botón
+   * aparece siempre que la deuda tenga cuota programada.
+   *
+   * Eso rompe el guard viejo de "no pagar dos veces": comparaba abonos
+   * contra `proxima` (la fecha TEÓRICA de la cuota) — si se paga ANTES de
+   * esa fecha, el abono queda con fecha anterior a `proxima`, así que ese
+   * chequeo nunca lo reconocería como "ya cubierto" y dejaría pagar de
+   * nuevo. Reemplazado por una ventana de enfriamiento: si el abono MÁS
+   * RECIENTE de esta deuda es más nuevo que la duración de un período
+   * completo (30/15/7 días según la frecuencia), se considera ya cubierto
+   * este ciclo — funciona igual de bien si se paga antes, justo a tiempo, o
+   * tarde, sin depender de ninguna fecha teórica.
    */
-  function cuotaVencidaODeHoy(deudaId: string): boolean {
-    const deuda = deudas.find((d) => d.id === deudaId)
-    if (!deuda?.cuotaProgramada) return false
-    const proxima = proximaFechaCuotaDeuda(deuda)
-    if (proxima === null || proxima.getTime() > Date.now()) return false
-    const yaCubierta = abonos.some((a) => a.deudaId === deudaId && new Date(a.fechaISO).getTime() >= proxima.getTime())
-    return !yaCubierta
+  function duracionPeriodoMs(frecuencia: FrecuenciaCuota): number {
+    const DIA_MS = 86_400_000
+    if (frecuencia === 'mensual') return 30 * DIA_MS
+    if (frecuencia === 'quincenal') return 15 * DIA_MS
+    return 7 * DIA_MS
+  }
+
+  function cuotaYaCubiertaEsteCiclo(deudaId: string, frecuencia: FrecuenciaCuota): boolean {
+    const abonosDeuda = abonos.filter((a) => a.deudaId === deudaId)
+    if (abonosDeuda.length === 0) return false
+    const masRecienteMs = Math.max(...abonosDeuda.map((a) => new Date(a.fechaISO).getTime()))
+    return Date.now() - masRecienteMs < duracionPeriodoMs(frecuencia)
   }
 
   async function manejarPagarCuota(deudaId: string) {
@@ -250,7 +258,7 @@ export function SeccionDeudas() {
             <span className="texto-mute">
               {d.fechaLimiteISO ? `Vence: ${new Date(d.fechaLimiteISO).toLocaleDateString('es-CO')}` : 'Sin fecha límite puesta — no te va a avisar'}
             </span>
-            {cuotaVencidaODeHoy(d.id) && (
+            {d.cuotaProgramada && !cuotaYaCubiertaEsteCiclo(d.id, d.cuotaProgramada.frecuencia) && (
               <button type="button" onClick={() => void manejarPagarCuota(d.id)}>
                 ✓ Pagar cuota de ${d.cuotaProgramada!.monto.toLocaleString('es-CO')}
               </button>

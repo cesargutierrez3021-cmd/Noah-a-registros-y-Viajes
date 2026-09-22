@@ -1,5 +1,4 @@
 import type { ConceptoFijo, GastoHogar } from './types'
-import { ultimoDiaDelMes } from '../../lib/fechas'
 
 /**
  * "Los gastos fijos se autogeneran cada período sin que el usuario los
@@ -14,27 +13,23 @@ import { ultimoDiaDelMes } from '../../lib/fechas'
  * vencimiento el 25 ya contaba en Balance desde el día 1. Ahora esta
  * función solo CALCULA cuáles conceptos están pendientes de CONFIRMAR (no
  * los crea, no toca el repositorio — D-10, eso sigue siendo trabajo de
- * `store.ts`), y un concepto entra a la lista solo cuando su `diaDelMes` de
- * ESTE mes calendario ya llegó o pasó. El usuario confirma con un botón
- * (`confirmarGastoFijo` en store.ts) — recién ahí se crea el `GastoHogar`
- * de verdad, fechado al momento de la confirmación (no al `diaDelMes`
- * teórico: el dato real es "cuándo se pagó de verdad", no "cuándo tocaba").
+ * `store.ts`). El usuario confirma con un botón (`confirmarGastoFijo` en
+ * store.ts) — recién ahí se crea el `GastoHogar` de verdad, fechado al
+ * momento de la confirmación (no al `diaDelMes` teórico: el dato real es
+ * "cuándo se pagó de verdad", no "cuándo tocaba").
+ *
+ * 2026-09-23, corrección de un bug real reportado por el usuario ("el botón
+ * de pagar siempre tiene que estar ahí, por si quiero pagar antes"): antes,
+ * un concepto solo entraba a la lista cuando su `diaDelMes` de este mes ya
+ * había llegado o pasado — no se podía confirmar/pagar por adelantado. Ese
+ * gate se sacó: el único guard real contra pagar dos veces el mismo período
+ * es `yaGeneradoEstePeriodo` (abajo), que no depende para nada de la fecha
+ * teórica — ya alcanza solo.
  */
 export interface GastoFijoPendienteConfirmar {
   conceptoFijoId: string
   nombre: string
   monto: number
-}
-
-/**
- * diaDelMes puede ser mayor a los días que tiene el mes (ej. 31 en febrero) — se recorta al
- * último día real de ese mes. 2026-09-22 (limpieza de auditoría): sin usar fuera de este
- * archivo — ya no exportada — y con la fórmula del último día del mes movida a lib/fechas.ts
- * (D-18, estaba copiada en 3 archivos distintos).
- */
-function fechaParaPeriodo(anio: number, mesIndiceCero: number, diaDelMes: number): Date {
-  const dia = Math.min(diaDelMes, ultimoDiaDelMes(anio, mesIndiceCero))
-  return new Date(anio, mesIndiceCero, dia)
 }
 
 export function calcularGastosFijosPendientesDeConfirmar(
@@ -56,10 +51,6 @@ export function calcularGastosFijosPendientesDeConfirmar(
       return fecha.getFullYear() === anio && fecha.getMonth() === mes
     })
     if (yaGeneradoEstePeriodo) continue
-
-    // Todavía no llega la fecha programada de este mes — no se muestra como
-    // pendiente hasta entonces (mismo pedido: "cuando llegue la fecha").
-    if (ahora.getTime() < fechaParaPeriodo(anio, mes, concepto.diaDelMes).getTime()) continue
 
     pendientes.push({ conceptoFijoId: concepto.id, nombre: concepto.nombre, monto: concepto.montoEsperado })
   }

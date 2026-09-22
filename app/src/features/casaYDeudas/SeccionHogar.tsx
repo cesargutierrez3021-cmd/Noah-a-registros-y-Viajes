@@ -103,7 +103,7 @@ export function SeccionHogar() {
   return (
     <>
       <p className="texto-mute" style={{ marginBottom: 16 }}>
-        Los gastos fijos (arriendo, servicios) se cargan una sola vez — cada mes, cuando llega la fecha, confirmás con un toque que ya se pagó.
+        Los gastos fijos (arriendo, servicios) se cargan una sola vez — cada mes confirmás con un toque que ya se pagó (podés hacerlo antes de la fecha si querés adelantarte).
       </p>
 
       {/* 2026-09-17, pedido explícito del usuario: "botoncito de chulo... hoy es 5, se vence hoy y la cuota eran 500... que yo le despiche paga y él ya suma que se pagó" — ver domain/hogar/calculos.ts, calcularGastosFijosPendientesDeConfirmar. */}

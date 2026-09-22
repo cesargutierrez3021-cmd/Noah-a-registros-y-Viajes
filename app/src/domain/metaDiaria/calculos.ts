@@ -41,6 +41,23 @@ function ocurrenciasCuotaEnMes(cuota: CuotaProgramada, año: number, mes: number
   return 4
 }
 
+/**
+ * 2026-09-23, corrección de un bug real reportado por el usuario: una Deuda SIN cuota fija
+ * programada, con solo fecha límite puesta, quedaba completamente afuera de este cálculo —
+ * `calcularMetaBaseDiaria` de abajo descartaba entera cualquier deuda sin `cuotaProgramada`
+ * ("cuando pongo una deuda que no tiene cuota fija... no me suma la cuota... a veces coge, a
+ * veces no"). Acá se prorratea el saldo pendiente entre los días que quedan hasta la fecha
+ * límite: mismo saldo, mientras menos días falten, más alto el aporte diario — empuja a pagar
+ * a tiempo en vez de esconder la obligación hasta el último momento. El resultado se expresa
+ * como un "total del mes" (se multiplica por `diasDelMesActual`) para encajar en el mismo
+ * patrón que el resto de la función (total del mes ÷ días del mes = tarifa diaria) — al
+ * dividir de vuelta más abajo, el resultado neto es exactamente `saldoActual / diasRestantes`.
+ */
+function montoMensualDeDeudaSinCuota(saldoActual: number, fechaLimiteISO: string, ahora: Date, diasDelMesActual: number): number {
+  const diasRestantes = Math.max(1, Math.ceil((new Date(fechaLimiteISO).getTime() - ahora.getTime()) / 86_400_000))
+  return (saldoActual / diasRestantes) * diasDelMesActual
+}
+
 /** Mismo criterio que `ocurrenciasCuotaEnMes`, pero para el aporte planeado de Ahorro — sin ancla de día (ver domain/ahorro/types.ts, AportePlaneado): "las semanas que alcancen en el mes", sin fijar cuál día de la semana. */
 function ocurrenciasFrecuenciaEnMes(frecuencia: FrecuenciaCuota, año: number, mes: number): number {
   if (frecuencia === 'mensual') return 1
@@ -74,8 +91,12 @@ export function calcularMetaBaseDiaria(input: {
   const hogar = totalHogarMes / diasDelMesActual
 
   const totalDeudasMes = input.deudasActivas.reduce((acc, d) => {
-    if (!d.cuotaProgramada) return acc
-    return acc + d.cuotaProgramada.monto * ocurrenciasCuotaEnMes(d.cuotaProgramada, año, mes)
+    if (d.cuotaProgramada) return acc + d.cuotaProgramada.monto * ocurrenciasCuotaEnMes(d.cuotaProgramada, año, mes)
+    if (d.fechaLimiteISO) return acc + montoMensualDeDeudaSinCuota(d.saldoActual, d.fechaLimiteISO, ahora, diasDelMesActual)
+    // Ni cuota fija ni fecha límite: no hay ninguna referencia temporal real de la que
+    // partir para prorratear — sigue sin contar acá (es honesto, no hay forma de saber
+    // cuándo hace falta ese dinero).
+    return acc
   }, 0)
   const deudas = totalDeudasMes / diasDelMesActual
 
