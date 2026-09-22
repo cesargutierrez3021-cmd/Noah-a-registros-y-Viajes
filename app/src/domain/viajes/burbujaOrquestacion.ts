@@ -21,6 +21,12 @@ import { useJornada } from '../jornada/store'
  *   Sigue siendo editable a mano: al completar el ingreso de un viaje que
  *   quedó pendiente (ver `pausarParaIngreso` abajo), `completarIngreso`
  *   acepta cambiar la plataforma antes de guardar.
+ * - accion "recogida" (2026-09-22, pedido explícito del usuario): segundo
+ *   toque del nuevo ciclo de 3 (ver el comentario largo en burbuja.ts) —
+ *   marca dónde se recogió al pasajero de verdad, reusando el mismo
+ *   `marcarRecogida()` que ya usaba el botón de la pantalla (SeccionViajesYJornada.tsx).
+ *   `crearViajeDesdeCiere` (repository.ts) usa este punto, no el primero del
+ *   recorrido, para resolver la "zona de inicio" del viaje.
  * - accion "terminar": para el GPS en el momento exacto del toque y GUARDA
  *   el viaje de una — `pausarParaIngreso()` — con `ingresoPendiente: true`
  *   porque el monto no se puede escribir desde la burbuja. La pantalla de
@@ -53,6 +59,8 @@ export function registrarEscuchaBurbuja(): void {
     const estado = useViajes.getState()
     if (datos.accion === 'iniciar') {
       if (!estado.viajeEnCurso) void estado.iniciarViaje(estado.plataformaPreferida ?? 'Particular')
+    } else if (datos.accion === 'recogida') {
+      if (estado.viajeEnCurso && !estado.viajeEnCurso.puntoDeRecogidaISO) estado.marcarRecogida()
     } else if (datos.accion === 'terminar') {
       if (estado.viajeEnCurso) void estado.pausarParaIngreso()
     } else if (datos.accion === 'abrirVoz') {

@@ -64,6 +64,27 @@ export const repositorioViajes: RepositorioViajes = new RepositorioViajesLocal()
  * Construye un Viaje completo a partir de lo que entrega el plugin nativo de GPS,
  * calculando la distancia real en un único lugar (ver distancia.ts).
  */
+/**
+ * 2026-09-22, pedido explícito del usuario: el primer punto del recorrido es
+ * el momento de ACEPTAR el servicio (toque 1 de la burbuja), no donde se
+ * recoge al pasajero — puede haber varias cuadras de diferencia. Si se marcó
+ * el punto de recogida (`puntoDeRecogidaISO`, toque 2 del nuevo ciclo de la
+ * burbuja — ver burbujaOrquestacion.ts — o el botón equivalente en la app),
+ * la "zona de inicio" del viaje se resuelve desde AHÍ, no desde el primer
+ * punto absoluto. Mismo criterio de corte que ya usa `calcularDistanciaReal`
+ * (distancia.ts) para separar kmHastaRecoger/kmConPasajero — reutilizado acá,
+ * no reinventado (D-18). Sin punto de recogida marcado (viaje corto sin ese
+ * toque, o viaje viejo de antes de este cambio), cae al primer punto del
+ * recorrido, como siempre.
+ */
+function resolverPuntoDeInicio(input: CierreViajeInput): typeof input.recorrido[number] | null {
+  if (input.puntoDeRecogidaISO) {
+    const puntoRecogida = input.recorrido.find((p) => p.timestampISO >= input.puntoDeRecogidaISO!)
+    if (puntoRecogida) return puntoRecogida
+  }
+  return input.recorrido[0] ?? null
+}
+
 export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje {
   // Fase 5 (D-7, resuelto): se resuelve contra el último punto del recorrido
   // (dónde terminó el viaje), no el primero — es el dato más útil para
@@ -75,7 +96,7 @@ export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje
   // (agrupación más amplia, ej. para tarifas) como dos capas separadas.
   // Si esa distinción se vuelve necesaria, se resuelve con un segundo array
   // de polígonos en geofencing.ts en vez de tocar esto de nuevo.
-  const puntoInicio = input.recorrido[0] ?? null
+  const puntoInicio = resolverPuntoDeInicio(input)
   const puntoFin = input.recorrido[input.recorrido.length - 1] ?? null
   const localidadInicio = puntoInicio ? obtenerLocalidad(puntoInicio) : null
   const localidadFin = puntoFin ? obtenerLocalidad(puntoFin) : null

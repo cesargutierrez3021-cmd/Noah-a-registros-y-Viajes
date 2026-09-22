@@ -10,8 +10,15 @@ export interface AccionBurbuja {
    * misma sesión, ronda posterior): mantener la burbuja presionada 2s termina
    * la jornada (y la burbuja se cierra sola, del lado nativo); doble-tap
    * pausa/reanuda — ver BurbujaService.kt y burbujaOrquestacion.ts.
+   *
+   * 'recogida' (2026-09-22, pedido explícito del usuario): antes un solo toque
+   * alternaba iniciar/terminar, y la "zona de inicio" del viaje se resolvía en
+   * el momento de aceptar el servicio (toque 1) — que casi nunca es donde se
+   * recoge al pasajero de verdad. Ahora son 3 toques: iniciar (arranca GPS/km
+   * igual que siempre) → recogida (acá se marca dónde se recogió al pasajero,
+   * ver `marcarRecogida` en store.ts) → terminar. Ver BurbujaService.kt.
    */
-  accion: 'iniciar' | 'terminar' | 'cerrar' | 'abrirVoz' | 'terminarJornada' | 'alternarPausaJornada'
+  accion: 'iniciar' | 'recogida' | 'terminar' | 'cerrar' | 'abrirVoz' | 'terminarJornada' | 'alternarPausaJornada'
   km?: number
   inicioMs?: number
   finMs?: number

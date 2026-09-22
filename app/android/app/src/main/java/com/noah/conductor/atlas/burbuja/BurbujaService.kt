@@ -86,6 +86,10 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private var tarjetaActiva = true
     private var estilo = "marea"
     private var enViaje = false
+    // 2026-09-22, pedido explícito del usuario: el ciclo de toques pasa de 2
+    // (iniciar/terminar) a 3 (iniciar/recogida/terminar) — ver accionTapPendiente
+    // más abajo y el comentario largo en burbuja.ts / burbujaOrquestacion.ts.
+    private var pasajeroRecogido = false
     private var inicioViajeMs = 0L
     private var kmAcumulados = 0.0
     private var viajesContados = 0
@@ -178,7 +182,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     private fun iniciarViaje(anunciar: Boolean) {
         if (enViaje) return
-        enViaje = true; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
+        enViaje = true; pasajeroRecogido = false; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
         // Viaje nuevo, punto de referencia nuevo — si se dejara el de un viaje anterior,
         // el primer punto de este viaje calcularía distancia contra un lugar viejo.
         ultimoLatNativo = null; ultimoLngNativo = null; ultimoTimestampNativoMs = 0L
@@ -303,11 +307,26 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
             BurbujaPlugin.instanciaActiva?.notificarAccion("terminarJornada")
             stopSelf()
         }
-        // El tap simple (iniciar/terminar un VIAJE) se retrasa UMBRAL_DOBLE_TAP_MS para poder
-        // saber si viene un segundo toque atrás (doble-tap = pausar/reanudar la JORNADA, algo
-        // completamente distinto) — sin este retraso no hay forma de distinguir los dos gestos.
+        // El tap simple (iniciar/recogida/terminar de un VIAJE) se retrasa UMBRAL_DOBLE_TAP_MS
+        // para poder saber si viene un segundo toque atrás (doble-tap = pausar/reanudar la
+        // JORNADA, algo completamente distinto) — sin este retraso no hay forma de distinguir
+        // los dos gestos.
+        //
+        // 2026-09-22, pedido explícito del usuario: antes eran 2 toques (iniciar/terminar) — el
+        // primero se usaba como "zona de inicio" del viaje, pero en realidad es el momento de
+        // ACEPTAR el servicio, no donde se recoge al pasajero. Ahora son 3: iniciar (arranca
+        // GPS/km igual que siempre) → recogida (acá sí se marca la zona de inicio real, ver
+        // `marcarRecogida` en domain/viajes/store.ts vía burbujaOrquestacion.ts) → terminar.
         val accionTapPendiente = Runnable {
-            if (enViaje) finalizarViaje(true) else { iniciarViaje(true); BurbujaPlugin.instanciaActiva?.notificarAccion("iniciar") }
+            when {
+                !enViaje -> { iniciarViaje(true); BurbujaPlugin.instanciaActiva?.notificarAccion("iniciar") }
+                !pasajeroRecogido -> {
+                    pasajeroRecogido = true
+                    hablar("Pasajero recogido")
+                    BurbujaPlugin.instanciaActiva?.notificarAccion("recogida")
+                }
+                else -> finalizarViaje(true)
+            }
         }
         contenedor.setOnTouchListener { _, evento ->
             when (evento.action) {

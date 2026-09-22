@@ -23,7 +23,17 @@ export function AvisoBanner() {
   const { items: itemsMantenimiento, cargar: cargarMantenimiento, alertas } = useMantenimiento()
   const { deudas, cargar: cargarDeudas } = useDeudas()
   const { conceptos, cargar: cargarHogar } = useHogar()
-  const [descartado, setDescartado] = useState<string | null>(null)
+  /**
+   * 2026-09-22, corrección de un bug real reportado por el usuario ("por más
+   * que le dé X no quita"): esto era un solo id (`string | null`), no un
+   * conjunto. Con 2+ avisos activos a la vez (típico: una deuda vence Y un
+   * mantenimiento vence el mismo día), descartar el segundo aviso PISABA el
+   * id del primero — el primero, ya descartado, volvía a aparecer. El
+   * conductor veía el banner "no cerrarse nunca" porque en realidad iba
+   * ciclando entre los avisos que ya había cerrado. Ahora se guardan TODOS
+   * los ids descartados en esta sesión.
+   */
+  const [descartados, setDescartados] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     void cargarViajes()
@@ -51,7 +61,7 @@ export function AvisoBanner() {
 
   // El más urgente primero (vencido antes que próximo), y no se vuelve a mostrar el mismo una vez descartado en esta sesión.
   const ordenados = [...avisos].sort((a, b) => (a.severidad === b.severidad ? 0 : a.severidad === 'vencido' ? -1 : 1))
-  const principal = ordenados.find((a) => a.id !== descartado)
+  const principal = ordenados.find((a) => !descartados.has(a.id))
   if (!principal) return null
 
   return (
@@ -84,7 +94,7 @@ export function AvisoBanner() {
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
-          setDescartado(principal.id)
+          setDescartados((prev) => new Set(prev).add(principal.id))
         }}
         style={{ background: 'transparent', border: 'none', color: '#141310', fontWeight: 700, flex: 'none' }}
       >
