@@ -64,9 +64,14 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         private const val UMBRAL_DOBLE_TAP_MS = 300L
         private const val INTERVALO_RELOJ_MS = 1000L
         private const val PRECISION_MAXIMA_M = 35f
-        private const val VELOCIDAD_MINIMA_MS = 0.42
         private const val VELOCIDAD_MAXIMA_MS = 55.0
-        private const val INTERVALO_MAXIMO_S = 30.0
+        // 2026-09-22: ver el comentario largo en domain/viajes/gps.ts (mismo criterio,
+        // espejado acá para que el km que se ve EN VIVO en la burbuja — que no depende del
+        // WebView, ver actualizarKmDesdeGps() — coincida con el que se guarda al final del
+        // viaje. Antes era 30s; con el ancla ahora congelada (no reinicio en cada tick
+        // rechazado) hace falta más margen para que el tráfico lento sostenido tenga tiempo
+        // de cruzar el umbral antes de que se lo trate como un corte real.
+        private const val DT_REINICIO_S = 120.0
     }
 
     private lateinit var windowManager: WindowManager
@@ -84,9 +89,19 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private var inicioViajeMs = 0L
     private var kmAcumulados = 0.0
     private var viajesContados = 0
-    // Último punto GPS aceptado por `actualizarKmDesdeGps()` (nativo, ver comentario ahí).
+    // 2026-09-22, pedido explícito del usuario ("la aplicación no debería consumir tanto
+    // recurso"): bug real — el ValueAnimator de la órbita (ver crearBurbuja()) nunca se
+    // guardaba en ningún lado, así que nadie podía cancelarlo. Con repeatCount = INFINITE eso
+    // significa que sigue tickeando (Choreographer, cada frame) PARA SIEMPRE, incluso después
+    // de que el servicio se destruye y la vista se saca del WindowManager — un conductor que
+    // trabaja 8-10 horas tenía esa animación corriendo de fondo todo ese tiempo sin ningún
+    // motivo. Ahora se guarda la referencia para poder cancelarla en onDestroy().
+    private var animadorOrbita: ValueAnimator? = null
+    // Ancla GPS vigente de `actualizarKmDesdeGps()` (nativo, ver comentario ahí) — solo avanza
+    // cuando un punto se acepta de verdad, mismo criterio que domain/viajes/gps.ts.
     private var ultimoLatNativo: Double? = null
     private var ultimoLngNativo: Double? = null
+    private var ultimaPrecisionNativa: Float = 0f
     private var ultimoTimestampNativoMs: Long = 0L
     private var tts: TextToSpeech? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -152,6 +167,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     override fun onDestroy() {
         activo = false
         if (instanciaActiva === this) instanciaActiva = null
+        animadorOrbita?.cancel(); animadorOrbita = null
         handler.removeCallbacksAndMessages(null); tts?.stop(); tts?.shutdown()
         getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", false).apply()
         vistaManija?.let { runCatching { windowManager.removeView(it) } }
@@ -209,26 +225,39 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         if (!enViaje) return
         if (precisionMetros <= 0f || precisionMetros > PRECISION_MAXIMA_M) return
 
-        val latAnterior = ultimoLatNativo
-        val lngAnterior = ultimoLngNativo
-        val timestampAnterior = ultimoTimestampNativoMs
+        val latAncla = ultimoLatNativo
+        val lngAncla = ultimoLngNativo
 
-        if (latAnterior == null || lngAnterior == null) {
-            ultimoLatNativo = lat; ultimoLngNativo = lng; ultimoTimestampNativoMs = timestampMs
+        if (latAncla == null || lngAncla == null) {
+            ultimoLatNativo = lat; ultimoLngNativo = lng; ultimaPrecisionNativa = precisionMetros; ultimoTimestampNativoMs = timestampMs
             return
         }
 
-        val distanciaM = distanciaHaversineM(latAnterior, lngAnterior, lat, lng)
-        val dtS = (timestampMs - timestampAnterior) / 1000.0
-        val velocidadMs = if (dtS > 0) distanciaM / dtS else Double.MAX_VALUE
-        val umbralMinimoM = kotlin.math.max(8.0, (precisionMetros + 10) * 0.5)
-        val esValido = dtS > 0.0 && dtS <= INTERVALO_MAXIMO_S && velocidadMs <= VELOCIDAD_MAXIMA_MS && distanciaM >= umbralMinimoM
+        val distanciaM = distanciaHaversineM(latAncla, lngAncla, lat, lng)
+        val dtS = (timestampMs - ultimoTimestampNativoMs) / 1000.0
+        if (dtS <= 0.0) return
 
-        // "anterior" avanza siempre que la precisión alcance, sea válido o no el movimiento en
-        // sí — mismo criterio que `puntoValido()`/`anterior` en domain/viajes/gps.ts.
-        ultimoLatNativo = lat; ultimoLngNativo = lng; ultimoTimestampNativoMs = timestampMs
-        if (!esValido) return
+        if (dtS > DT_REINICIO_S) {
+            // Corte real (no tráfico lento) — reinicia el ancla sin acreditar distancia.
+            ultimoLatNativo = lat; ultimoLngNativo = lng; ultimaPrecisionNativa = precisionMetros; ultimoTimestampNativoMs = timestampMs
+            return
+        }
 
+        val velocidadMs = distanciaM / dtS
+        if (velocidadMs > VELOCIDAD_MAXIMA_MS) {
+            // Salto de un solo punto imposible (rebote de señal) — se descarta entero, el ancla NO avanza.
+            return
+        }
+
+        val umbralMinimoM = kotlin.math.max(8.0, (ultimaPrecisionNativa + precisionMetros + 10) * 0.5)
+        if (distanciaM < umbralMinimoM) {
+            // Movimiento ambiguo (ruido parado vs. avance lento real) — el ancla queda IGUAL
+            // para que el desplazamiento se acumule tick a tick hasta cruzar el umbral, mismo
+            // criterio que domain/viajes/gps.ts (ver el comentario largo ahí).
+            return
+        }
+
+        ultimoLatNativo = lat; ultimoLngNativo = lng; ultimaPrecisionNativa = precisionMetros; ultimoTimestampNativoMs = timestampMs
         kmAcumulados += distanciaM / 1000.0
         actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
     }
@@ -324,7 +353,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
             }
         }
         windowManager.addView(contenedor, params); vistaBurbuja = contenedor
-        ValueAnimator.ofFloat(0f, 360f).apply { duration = 9000; repeatCount = ValueAnimator.INFINITE; addUpdateListener { (contenedor.getChildAt(0) as? OrbitaView)?.angulo = it.animatedValue as Float; contenedor.getChildAt(0).invalidate() }; start() }
+        animadorOrbita = ValueAnimator.ofFloat(0f, 360f).apply { duration = 9000; repeatCount = ValueAnimator.INFINITE; addUpdateListener { (contenedor.getChildAt(0) as? OrbitaView)?.angulo = it.animatedValue as Float; contenedor.getChildAt(0).invalidate() }; start() }
     }
 
     /**
@@ -384,7 +413,11 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private fun tipoVentana() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
     private fun actualizarTextos(km: String, tiempo: String) { if (::etiquetaTiempo.isInitialized) { etiquetaTiempo.text = tiempo.ifBlank { "0m" }.replace(Regex("\\s+\\d{2}s"), ""); etiquetaKm.text = "Km ${km.ifBlank { "0" }}"; etiquetaViajes.text = "$viajesContados viaje${if (viajesContados == 1) "" else "s"}" } }
     private fun formatearTiempo(ms: Long): String { val totalMinutos = (ms / 60000).coerceAtLeast(0); val horas = totalMinutos / 60; val minutos = totalMinutos % 60; return if (horas > 0) "%dh %02dm".format(horas, minutos) else "${minutos}m" }
-    private fun formatearKm(km: Double): String = kotlin.math.round(km).toInt().toString()
+    // 2026-09-22, pedido explícito del usuario (bug real): antes redondeaba a km entero
+    // (round().toInt()) — cualquier viaje de pocos cientos de metros se veía "en 0" toda la
+    // ruta, dando la impresión de que la burbuja no estaba contando nada. Con 1 decimal, igual
+    // que el lado JS (ver actualizarBurbuja en domain/viajes/store.ts), se ve avanzar de verdad.
+    private fun formatearKm(km: Double): String = "%.1f".format(km)
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
     private fun dp(v: Float): Int = (v * resources.displayMetrics.density).toInt()
 

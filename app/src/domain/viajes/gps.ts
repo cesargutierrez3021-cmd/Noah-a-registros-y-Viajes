@@ -34,15 +34,58 @@ export interface SeguidorGPS {
  * realista) demostró que esa teoría estaba MAL: con el filtro viejo el
  * cálculo da 101-106% de la distancia real incluso en el peor caso (trancón
  * total, sin ningún tramo rápido); con el filtro aflojado, sobrecuenta hasta
- * 326% en ese mismo escenario (el "anterior" sigue avanzando con cada punto
- * de precisión aceptable aunque no sume distancia — el filtro no pierde
- * movimiento real, solo lo agrupa hasta que hay suficiente desplazamiento
- * neto). Revertido — el problema real de "kilometraje en cero" está en otro
- * lado (ver `domain/viajes/store.ts`, `recorridoDefinitivo`, y el resto de
- * la investigación en PLAN-MAESTRO). No tocar este número sin volver a
- * correr esa simulación primero.
+ * 326% en ese mismo escenario. El número en sí (35m) no se tocó.
+ *
+ * 2026-09-22, pedido explícito del usuario (octava vez reportado — "cuando
+ * escucho el viaje en la burbuja, muchos viajes no contabiliza el
+ * kilometraje... a veces se anda muy lento, a veces medio, a veces a alta
+ * velocidad... no hagas saltos porque cuando contabiliza, contabiliza mal"):
+ * revisando la simulación de la ronda anterior con más cuidado, el filtro
+ * SÍ tenía un bug real para tráfico lento/pesado sostenido (muy común en un
+ * viaje de Uber en Bogotá). La función de abajo, `procesarPuntoCrudo`,
+ * avanzaba el "ancla" (el punto contra el que se mide el próximo) a
+ * CUALQUIER punto de precisión aceptable, sin importar POR QUÉ se había
+ * rechazado el anterior:
+ *   - rechazado por distancia insuficiente (tráfico lento: cada tick de
+ *     ~5s mueve menos que el umbral) → el ancla igual saltaba al punto
+ *     rechazado, así que el próximo tick se medía desde ahí, nunca desde el
+ *     punto donde arrancó el tramo lento. Resultado: si CADA tick individual
+ *     queda por debajo del umbral (típico en trancón, aunque el conductor sí
+ *     avanzó varios metros en total), esos metros no se recuperan NUNCA — se
+ *     pierden tick a tick, para siempre. Eso explica viajes reales con
+ *     kilometraje en cero o muy por debajo de lo real.
+ *   - rechazado por velocidad imposible (un solo punto con rebote de señal,
+ *     "salto") → el ancla igual saltaba a ese punto corrupto, así que el
+ *     PRÓXIMO punto real se medía contra una posición basura en vez de
+ *     contra la última posición confiable — de ahí los "uno o dos kilómetros
+ *     de más" que reportó el usuario cuando la velocidad variaba.
+ *
+ * La corrección: el ancla ahora SOLO avanza cuando un punto se acepta de
+ * verdad. Si se rechaza por distancia insuficiente, el ancla queda
+ * CONGELADA — así el desplazamiento lento se va acumulando tick a tick
+ * contra el mismo punto de referencia hasta cruzar el umbral, y ahí sí se
+ * acredita de una vez (sin perder nada, sin zigzaguear). Si se rechaza por
+ * velocidad imposible, el punto se descarta por completo (ni se acredita ni
+ * se vuelve ancla) para no corromper la referencia del próximo punto. Como
+ * el ancla puede quedar congelada mucho tiempo con esto, se agrega un tope
+ * de `DT_REINICIO_S` (2 minutos): si pasó más que eso sin que ningún punto
+ * cruce el umbral, es una señal de que hubo un corte real (app suspendida,
+ * GPS apagado, parada larga) y no tráfico lento — ahí sí se reinicia el
+ * ancla al punto actual SIN acreditar distancia, para no arrastrar un ancla
+ * arbitrariamente vieja.
  */
 const PRECISION_MAXIMA_M = 35
+const VELOCIDAD_MAXIMA_MS = 55
+const DT_REINICIO_S = 120
+const DISTANCIA_MINIMA_BASE_M = 8
+
+/** Ancla interna del filtro — a diferencia de `PuntoGPS` (lo que se guarda en el recorrido del viaje), necesita la precisión para calcular el próximo umbral. */
+interface AnclaGPS {
+  lat: number
+  lng: number
+  timestampMs: number
+  precisionMetros: number
+}
 
 function puntoCrudoAPuntoGPS(punto: PuntoGpsCrudo): PuntoGPS {
   return {
@@ -52,43 +95,61 @@ function puntoCrudoAPuntoGPS(punto: PuntoGpsCrudo): PuntoGPS {
   }
 }
 
-function puntoValido(punto: PuntoGpsCrudo, anterior: PuntoGPS | null): boolean {
-  if (!Number.isFinite(punto.lat) || !Number.isFinite(punto.lng)) return false
-  if (punto.precisionMetros <= 0 || punto.precisionMetros > PRECISION_MAXIMA_M) return false
-  if (!anterior) return true
-  const a = anterior
+function puntoCrudoAAncla(punto: PuntoGpsCrudo): AnclaGPS {
+  return { lat: punto.lat, lng: punto.lng, timestampMs: punto.timestampMs, precisionMetros: punto.precisionMetros }
+}
+
+function distanciaM(a: AnclaGPS, punto: PuntoGpsCrudo): number {
   const R = 6371000
   const dLat = (punto.lat - a.lat) * Math.PI / 180
   const dLng = (punto.lng - a.lng) * Math.PI / 180
   const lat1 = a.lat * Math.PI / 180
   const lat2 = punto.lat * Math.PI / 180
   const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2
-  const distanciaM = R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1-h))
-  const dt = Math.max(0.001, (punto.timestampMs - Date.parse(a.timestampISO))/1000)
-  const velocidad = distanciaM / dt
-  if (dt > 30) return false
-  if (velocidad > 55) return false
-  if (distanciaM < Math.max(8, (punto.precisionMetros + 10) * 0.5)) return false
-  return true
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1-h))
 }
 
 /**
- * Procesa UN punto crudo contra el "anterior" vigente — misma lógica que
- * antes vivía inline en la suscripción en vivo (`iniciarSeguimientoNativo`),
- * ahora compartida (D-18) con `filtrarRecorridoValido` de abajo, que aplica
- * el mismo criterio sobre una traza completa ya capturada (recuperación de
+ * Procesa UN punto crudo contra el "ancla" vigente — misma lógica que antes
+ * vivía inline en la suscripción en vivo (`iniciarSeguimientoNativo`), ahora
+ * compartida (D-18) con `filtrarRecorridoValido` de abajo, que aplica el
+ * mismo criterio sobre una traza completa ya capturada (recuperación de
  * `obtenerTrazaPersistida()`), no solo en vivo punto a punto.
  */
 function procesarPuntoCrudo(
   punto: PuntoGpsCrudo,
-  anterior: PuntoGPS | null,
-): { anteriorSiguiente: PuntoGPS | null; puntoValidoListo: PuntoGPS | null } {
-  if (!puntoValido(punto, anterior)) {
-    const anteriorSiguiente = punto.precisionMetros > 0 && punto.precisionMetros <= PRECISION_MAXIMA_M ? puntoCrudoAPuntoGPS(punto) : anterior
-    return { anteriorSiguiente, puntoValidoListo: null }
+  ancla: AnclaGPS | null,
+): { anclaSiguiente: AnclaGPS | null; puntoValidoListo: PuntoGPS | null } {
+  if (!Number.isFinite(punto.lat) || !Number.isFinite(punto.lng)) return { anclaSiguiente: ancla, puntoValidoListo: null }
+  if (punto.precisionMetros <= 0 || punto.precisionMetros > PRECISION_MAXIMA_M) return { anclaSiguiente: ancla, puntoValidoListo: null }
+
+  if (!ancla) {
+    return { anclaSiguiente: puntoCrudoAAncla(punto), puntoValidoListo: puntoCrudoAPuntoGPS(punto) }
   }
-  const listo = puntoCrudoAPuntoGPS(punto)
-  return { anteriorSiguiente: listo, puntoValidoListo: listo }
+
+  const dM = distanciaM(ancla, punto)
+  const dt = (punto.timestampMs - ancla.timestampMs) / 1000
+  if (dt <= 0) return { anclaSiguiente: ancla, puntoValidoListo: null }
+
+  if (dt > DT_REINICIO_S) {
+    // Corte real (no tráfico lento: ya se le dio hasta 2 minutos para acumular) — reinicia sin acreditar.
+    return { anclaSiguiente: puntoCrudoAAncla(punto), puntoValidoListo: null }
+  }
+
+  const velocidad = dM / dt
+  if (velocidad > VELOCIDAD_MAXIMA_MS) {
+    // Salto de un solo punto imposible (rebote de señal) — se descarta entero, el ancla NO avanza.
+    return { anclaSiguiente: ancla, puntoValidoListo: null }
+  }
+
+  const umbral = Math.max(DISTANCIA_MINIMA_BASE_M, (ancla.precisionMetros + punto.precisionMetros + 10) * 0.5)
+  if (dM < umbral) {
+    // Movimiento ambiguo (ruido parado vs. avance lento real) — el ancla queda IGUAL para que
+    // el desplazamiento se siga acumulando contra el mismo punto en el próximo tick.
+    return { anclaSiguiente: ancla, puntoValidoListo: null }
+  }
+
+  return { anclaSiguiente: puntoCrudoAAncla(punto), puntoValidoListo: puntoCrudoAPuntoGPS(punto) }
 }
 
 /**
@@ -101,11 +162,11 @@ function procesarPuntoCrudo(
  * ver el comentario largo en store.ts, `recorridoDefinitivo`).
  */
 export function filtrarRecorridoValido(puntos: PuntoGpsCrudo[]): PuntoGPS[] {
-  let anterior: PuntoGPS | null = null
+  let ancla: AnclaGPS | null = null
   const validos: PuntoGPS[] = []
   for (const punto of puntos) {
-    const { anteriorSiguiente, puntoValidoListo } = procesarPuntoCrudo(punto, anterior)
-    anterior = anteriorSiguiente
+    const { anclaSiguiente, puntoValidoListo } = procesarPuntoCrudo(punto, ancla)
+    ancla = anclaSiguiente
     if (puntoValidoListo) validos.push(puntoValidoListo)
   }
   return validos
@@ -114,10 +175,10 @@ export function filtrarRecorridoValido(puntos: PuntoGpsCrudo[]): PuntoGPS[] {
 async function iniciarSeguimientoNativo(onPunto: (p: PuntoGPS) => void): Promise<SeguidorGPS> {
   // Primero la suscripción, después arrancar el servicio: así no se pierde
   // ningún punto emitido justo al arrancar.
-  let anterior: PuntoGPS | null = null
+  let ancla: AnclaGPS | null = null
   const suscripcion = await suscribirsePuntosGps((punto) => {
-    const { anteriorSiguiente, puntoValidoListo } = procesarPuntoCrudo(punto, anterior)
-    anterior = anteriorSiguiente
+    const { anclaSiguiente, puntoValidoListo } = procesarPuntoCrudo(punto, ancla)
+    ancla = anclaSiguiente
     if (puntoValidoListo) onPunto(puntoValidoListo)
   })
 

@@ -66,6 +66,14 @@ interface EstadoViajes {
   finalizarViaje: (params: {
     ingreso: number
     distanciaReportadaPlataforma: number | null
+    /**
+     * 2026-09-22, pedido explícito del usuario ("cuando yo vaya a poner el
+     * dinero... también me editar los kilómetros por si hay algún error"):
+     * si viene con valor, reemplaza el km medido por GPS — para corregir a
+     * mano un recorrido que el GPS midió mal. `undefined`/`null` = usar el
+     * km real medido, sin tocarlo (caso normal).
+     */
+    kmManual?: number | null
   }) => Promise<Viaje | null>
   /**
    * 2026-09-16 — completa el ingreso de un viaje que quedó pendiente (ver
@@ -73,7 +81,7 @@ interface EstadoViajes {
    * resuelve por separado, en cualquier orden — no hay un solo "el viaje
    * pendiente", son todos los que tengan `ingresoPendiente: true`.
    */
-  completarIngreso: (viajeId: string, ingreso: number, plataforma: Plataforma) => Promise<void>
+  completarIngreso: (viajeId: string, ingreso: number, plataforma: Plataforma, kmManual?: number | null) => Promise<void>
   /** Bloque 2, ítem 4 — "agregar viaje manual". No toca `viajeEnCurso` ni el
    *  GPS para nada: es un camino totalmente aparte para cargar un viaje que
    *  ya pasó y no se registró en su momento. */
@@ -87,7 +95,7 @@ function generarId(): string {
 // Vive fuera del store porque no es "estado" para renderizar, es un recurso activo.
 let seguidorActivo: SeguidorGPS | null = null
 const CLAVE_ACTIVO = 'mia:viaje-en-curso'
-function calcularKmLocal(puntos: PuntoGPS[]): number { return calcularDistanciaReal({ plataforma:'Particular', inicioISO:'', finISO:'', recorrido:puntos, puntoDeRecogidaISO:null, distanciaReportadaPlataforma:null, ingreso:0, ingresoPendiente:false }).kmTotalesReales }
+export function calcularKmLocal(puntos: PuntoGPS[]): number { return calcularDistanciaReal({ plataforma:'Particular', inicioISO:'', finISO:'', recorrido:puntos, puntoDeRecogidaISO:null, distanciaReportadaPlataforma:null, ingreso:0, ingresoPendiente:false }).kmTotalesReales }
 function guardarActivo(v: ViajeEnCurso | null){ if(v) localStorage.setItem(CLAVE_ACTIVO, JSON.stringify(v)); else localStorage.removeItem(CLAVE_ACTIVO) }
 
 /**
@@ -134,6 +142,18 @@ async function recorridoDefinitivo(recorridoEnVivo: PuntoGPS[]): Promise<PuntoGP
   } catch {
     return recorridoEnVivo
   }
+}
+
+/**
+ * 2026-09-22, pedido explícito del usuario: corrección manual de km al
+ * completar el ingreso — mismo criterio de `crearViajeManual` (repository.ts,
+ * D-18: no se reparte a mano entre "hasta recoger"/"con pasajero", todo va a
+ * kmConPasajero) para no inventar una lógica de reparto que no se puede
+ * reconstruir después de que el GPS ya midió mal.
+ */
+function conKmManual(viaje: Viaje, kmManual: number | null | undefined): Viaje {
+  if (kmManual == null || !Number.isFinite(kmManual) || kmManual < 0) return viaje
+  return { ...viaje, distancia: { kmHastaRecoger: 0, kmConPasajero: kmManual, kmTotalesReales: kmManual } }
 }
 
 const CLAVE_PLATAFORMA_PREFERIDA = 'mia:plataformaPreferida'
@@ -260,7 +280,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     void resolverZonaSiHizoFalta(viaje.id, recorrido)
   },
 
-  finalizarViaje: async ({ ingreso, distanciaReportadaPlataforma }) => {
+  finalizarViaje: async ({ ingreso, distanciaReportadaPlataforma, kmManual }) => {
     const enCurso = get().viajeEnCurso
     if (!enCurso) return null
 
@@ -268,7 +288,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     seguidorActivo = null
 
     const recorrido = await recorridoDefinitivo(enCurso.recorrido)
-    const viaje = crearViajeDesdeCiere(enCurso.id, {
+    const viaje = conKmManual(crearViajeDesdeCiere(enCurso.id, {
       plataforma: enCurso.plataforma,
       inicioISO: enCurso.inicioISO,
       finISO: new Date().toISOString(),
@@ -277,7 +297,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
       distanciaReportadaPlataforma,
       ingreso,
       ingresoPendiente: false,
-    })
+    }), kmManual)
 
     await repositorioViajes.guardar(viaje)
     set({ viajes: [viaje, ...get().viajes], viajeEnCurso: null })
@@ -289,7 +309,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     return viaje
   },
 
-  completarIngreso: async (viajeId, ingreso, plataforma) => {
+  completarIngreso: async (viajeId, ingreso, plataforma, kmManual) => {
     const viaje = get().viajes.find((v) => v.id === viajeId)
     if (!viaje) return
     // 2026-09-15, pedido explícito del usuario: la burbuja arranca el viaje
@@ -297,7 +317,7 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
     // porque no hay forma de preguntarla con un solo toque — acá, al
     // completar el ingreso con la app abierta, sí se puede corregir si ese
     // viaje puntual fue de otra plataforma.
-    const actualizado: Viaje = { ...viaje, ingreso, plataforma, ingresoPendiente: false, pendienteDeSync: true }
+    const actualizado: Viaje = conKmManual({ ...viaje, ingreso, plataforma, ingresoPendiente: false, pendienteDeSync: true }, kmManual)
     await repositorioViajes.guardar(actualizado)
     set({ viajes: get().viajes.map((v) => (v.id === viajeId ? actualizado : v)) })
   },

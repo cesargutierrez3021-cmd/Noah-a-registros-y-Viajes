@@ -23,6 +23,7 @@ export function TarjetaViajesPendientes() {
 
   const [ingresosPendientes, setIngresosPendientes] = useState<Record<string, string>>({})
   const [plataformasPendientes, setPlataformasPendientes] = useState<Record<string, Plataforma>>({})
+  const [kmPendientes, setKmPendientes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void cargar()
@@ -33,9 +34,16 @@ export function TarjetaViajesPendientes() {
   async function manejarCompletarIngreso(viajeId: string, plataformaOriginal: Plataforma) {
     const monto = Number(ingresosPendientes[viajeId]) || 0
     const plataforma = plataformasPendientes[viajeId] ?? plataformaOriginal
-    await completarIngreso(viajeId, monto, plataforma)
+    const kmTexto = kmPendientes[viajeId]?.trim()
+    const kmManual = kmTexto ? Number(kmTexto) : null
+    await completarIngreso(viajeId, monto, plataforma, kmManual)
     await agregarViajeAJornadaAbierta(viajeId)
     setIngresosPendientes((prev) => {
+      const siguiente = { ...prev }
+      delete siguiente[viajeId]
+      return siguiente
+    })
+    setKmPendientes((prev) => {
       const siguiente = { ...prev }
       delete siguiente[viajeId]
       return siguiente
@@ -76,6 +84,17 @@ export function TarjetaViajesPendientes() {
             value={ingresosPendientes[v.id] ?? ''}
             onChange={(e) => setIngresosPendientes((prev) => ({ ...prev, [v.id]: e.target.value }))}
           />
+          <label className="texto-mute">
+            Km (opcional, corrige si el GPS midió mal)
+            <input
+              type="number"
+              step="0.1"
+              placeholder={`${v.distancia.kmTotalesReales.toFixed(1)} km medidos por GPS`}
+              value={kmPendientes[v.id] ?? ''}
+              onChange={(e) => setKmPendientes((prev) => ({ ...prev, [v.id]: e.target.value }))}
+              style={{ display: 'block', width: '100%' }}
+            />
+          </label>
           <button type="button" onClick={() => void manejarCompletarIngreso(v.id, v.plataforma)}>Guardar viaje</button>
         </div>
       ))}

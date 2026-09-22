@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useViajes } from '../../domain/viajes/store'
+import { useViajes, calcularKmLocal } from '../../domain/viajes/store'
 import { useJornada } from '../../domain/jornada/store'
 import { useBonos } from '../../domain/bonos/store'
 import { sincronizarViajesPendientes } from '../../domain/viajes/sync'
@@ -40,6 +40,7 @@ export function SeccionViajesYJornada() {
   const { agregarBono, cargar: cargarBonos } = useBonos()
 
   const [ingreso, setIngreso] = useState('')
+  const [kmCorregido, setKmCorregido] = useState('')
   const [diaHistorial, setDiaHistorial] = useState(() => fechaNegocioISO())
   const [montoBono, setMontoBono] = useState('')
 
@@ -50,9 +51,11 @@ export function SeccionViajesYJornada() {
   }, [cargar, cargarJornadas, cargarBonos])
 
   async function manejarFinalizar() {
-    const viaje = await finalizarViaje({ ingreso: Number(ingreso) || 0, distanciaReportadaPlataforma: null })
+    const kmManual = kmCorregido.trim() ? Number(kmCorregido) : null
+    const viaje = await finalizarViaje({ ingreso: Number(ingreso) || 0, distanciaReportadaPlataforma: null, kmManual })
     if (viaje) await agregarViajeAJornadaAbierta(viaje.id)
     setIngreso('')
+    setKmCorregido('')
     void sincronizarViajesPendientes()
     void sincronizarJornadasPendientes()
   }
@@ -108,6 +111,17 @@ export function SeccionViajesYJornada() {
             <button type="button" onClick={marcarRecogida}>Marcar recogida del pasajero</button>
           )}
           <input type="number" placeholder="Ingreso del viaje" value={ingreso} onChange={(e) => setIngreso(e.target.value)} />
+          <label className="texto-mute">
+            Km (opcional, corrige si el GPS midió mal)
+            <input
+              type="number"
+              step="0.1"
+              placeholder={`${calcularKmLocal(viajeEnCurso.recorrido).toFixed(1)} km medidos por GPS`}
+              value={kmCorregido}
+              onChange={(e) => setKmCorregido(e.target.value)}
+              style={{ display: 'block', width: '100%' }}
+            />
+          </label>
           <button type="button" onClick={() => void manejarFinalizar()}>Finalizar viaje</button>
         </div>
       )}

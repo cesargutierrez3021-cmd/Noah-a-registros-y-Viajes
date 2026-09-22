@@ -189,6 +189,11 @@ class GpsTrackingPlugin : Plugin(), GpsTrackingService.GpsLocationListener {
     @PluginMethod
     fun getPersistedTrack(call: PluginCall) {
         val r = JSObject()
+        // 2026-09-22: si el servicio sigue vivo, puede tener hasta PUNTOS_POR_LOTE-1 puntos en
+        // memoria sin escribir a disco todavía (ver el comentario de `instanciaActiva` en
+        // GpsTrackingService.kt) — se fuerza el flush ANTES de leer, para no perder justo los
+        // últimos puntos del viaje que se está cerrando.
+        GpsTrackingService.instanciaActiva?.persistirCacheSiHaceFalta()
         // El servicio puede estar vivo aunque el WebView haya muerto; consultamos su prefs directamente.
         val prefs = context.getSharedPreferences("mia-gps", android.content.Context.MODE_PRIVATE)
         r.put("pointsJson", prefs.getString("puntos", "[]"))
@@ -198,6 +203,10 @@ class GpsTrackingPlugin : Plugin(), GpsTrackingService.GpsLocationListener {
     @PluginMethod
     fun clearPersistedTrack(call: PluginCall) {
         context.getSharedPreferences("mia-gps", android.content.Context.MODE_PRIVATE).edit().remove("puntos").apply()
+        // Si el servicio sigue vivo (p. ej. el STOP todavía no se procesó), también hay que
+        // vaciar su caché en memoria — si no, un punto que llegue tarde revive la traza del
+        // viaje que se acaba de cerrar justo cuando arranca el siguiente.
+        GpsTrackingService.instanciaActiva?.limpiarPuntosPersistidos()
         call.resolve()
     }
 
