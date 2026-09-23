@@ -113,6 +113,12 @@ export const useJornada = create<EstadoJornada>((set, get) => ({
   agregarViajeAJornadaAbierta: async (viajeId) => {
     const abierta = get().jornadaAbierta()
     if (!abierta) return
+    // 2026-09-24, corrección de un bug real: ahora un viaje recuperado de la cola de la burbuja
+    // se vincula a la jornada apenas se recupera (ver domain/viajes/burbujaOrquestacion.ts), y
+    // TarjetaViajesPendientes.tsx también lo vincula al completar el ingreso — sin este chequeo,
+    // el mismo id quedaba duplicado dentro de `viajesIds`. Duplicarlo no rompía el cálculo de
+    // tiempo trabajado (que filtra por `includes`, no por cantidad), pero sí dejaba el dato sucio.
+    if (abierta.viajesIds.includes(viajeId)) return
     const actualizada: Jornada = {
       ...abierta,
       viajesIds: [...abierta.viajesIds, viajeId],

@@ -275,6 +275,21 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         // pasa, no tiene sentido dejar crecer la cola sin límite.
         while (cola.length() > 50) cola.remove(0)
         prefs.edit().putString("viajes_pendientes", cola.toString()).apply()
+
+        // 2026-09-24, pedido explícito del usuario (bug real: "seis viajes... todos me marcó
+        // 44.4 exactos, todos igual"). El total de km de este viaje ya NO sale de `puntosDelViaje`
+        // (el lado JS ahora usa directo el `km` de arriba, ver `recuperarViajesPendientesDeBurbuja`
+        // en domain/viajes/store.ts) — `puntosDelViaje` solo sigue sirviendo para resolver la zona
+        // de recogida/destino. Pero sin esta limpieza, `todosLosPuntos` (la bolsa de
+        // `GpsTrackingService`) seguía creciendo SIN separarse entre un viaje de la burbuja y el
+        // siguiente — nada la reiniciaba mientras el GPS seguía corriendo sin cortes entre viajes
+        // (`asegurarGpsActivo()` es un no-op si el servicio ya está vivo, así que nunca releía de
+        // disco). Cada viaje nuevo dependía por completo de que el recorte por fecha/hora de
+        // arriba separara bien una bolsa cada vez más grande y compartida — frágil, y la causa más
+        // probable de que varios viajes terminaran calculando sobre puntos que no eran solo suyos.
+        // Limpiarla acá, apenas se encola CADA viaje, hace que el próximo arranque de una bolsa
+        // vacía de verdad — nunca vuelve a compartir puntos con el viaje anterior.
+        GpsTrackingService.instanciaActiva?.limpiarPuntosPersistidos()
     }
 
     /**

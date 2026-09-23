@@ -1,4 +1,4 @@
-import { useViajes } from './store'
+import { useViajes, registrarAlRecuperarViajesPendientes } from './store'
 import { suscribirseAccionesBurbuja } from './burbuja'
 import { useConversacion } from '../conversacion/store'
 import { useJornada } from '../jornada/store'
@@ -54,6 +54,31 @@ import { useJornada } from '../jornada/store'
  *   el servicio) — por eso manda "alternar" sin más, y acá se decide
  *   pausar o reanudar según el estado real.
  */
+/**
+ * 2026-09-24, pedido explícito del usuario (bug real: "la jornada solo marcó el tiempo de la
+ * jornada general, pero no el tiempo de los viajes" — llevaba horas trabajando por la burbuja sin
+ * abrir la app, y al entrar "tiempo real trabajado" seguía en cero). Causa: un viaje que la
+ * burbuja cierra sola queda `ingresoPendiente: true` — antes solo se vinculaba a la jornada
+ * abierta (`agregarViajeAJornadaAbierta`, lo que hace que `calcularTiempoJornada` lo cuente) en el
+ * momento en que el conductor completaba el ingreso a mano, potencialmente horas después. Mientras
+ * tanto, ese viaje existía en `viajes` pero no en `jornada.viajesIds` — invisible para el tiempo
+ * trabajado, el dinero por hora y el dinero en espera, aunque ya hubiera pasado de verdad.
+ *
+ * Acá se vincula apenas se recupera, sin esperar al ingreso — `registrarAlRecuperarViajesPendientes`
+ * (domain/viajes/store.ts) es un hook genérico que ese store expone SIN conocer `domain/jornada`
+ * (D-10: "este store SOLO conoce viajes"), y acá, que sí puede cruzar dominios, se conecta con la
+ * jornada abierta. Se registra una sola vez desde App.tsx, igual que `registrarEscuchaBurbuja`.
+ */
+export function registrarVinculoDeJornadaAlRecuperarViajes(): void {
+  registrarAlRecuperarViajesPendientes((viajesRecuperados) => {
+    const jornada = useJornada.getState().jornadaAbierta()
+    if (!jornada) return
+    for (const viaje of viajesRecuperados) {
+      void useJornada.getState().agregarViajeAJornadaAbierta(viaje.id)
+    }
+  })
+}
+
 export function registrarEscuchaBurbuja(): void {
   void suscribirseAccionesBurbuja((datos) => {
     const estado = useViajes.getState()
