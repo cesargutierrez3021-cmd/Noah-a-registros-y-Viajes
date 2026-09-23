@@ -149,22 +149,25 @@ class BurbujaPlugin : Plugin() {
         call.resolve()
     }
 
+    /**
+     * 2026-09-23, pedido explícito del usuario (bug real): reemplaza a `viajePendiente()`
+     * (borrada — quedaba un solo viaje en un slot fijo de SharedPreferences, y cada viaje nuevo
+     * pisaba al anterior; además nunca tuvo un consumidor del lado JS, confirmado con grep).
+     * Ahora BurbujaService.kt encola cada viaje que cierra sola en `viajes_pendientes` (ver
+     * `encolarViajePendiente()` ahí) — esto solo expone esa cola completa tal cual.
+     */
     @PluginMethod
-    fun viajePendiente(call: PluginCall) {
+    fun viajesPendientes(call: PluginCall) {
         val prefs = context.getSharedPreferences("mia-burbuja", android.content.Context.MODE_PRIVATE)
-        val inicio = prefs.getLong("viaje_inicio", 0L)
-        if (inicio == 0L) { call.resolve(JSObject()); return }
         val r = JSObject()
-        r.put("km", prefs.getFloat("viaje_km", 0f).toDouble())
-        r.put("inicioMs", inicio)
-        r.put("finMs", prefs.getLong("viaje_fin", inicio))
-        r.put("tiempoMs", prefs.getLong("viaje_tiempo", 0L))
+        r.put("viajesJson", prefs.getString("viajes_pendientes", "[]"))
         call.resolve(r)
     }
 
+    /** Reemplaza a `limpiarViajePendiente()` — antes hacía `.edit().clear()` sobre TODO "mia-burbuja" (borraba también los colores de apariencia guardados); ahora solo borra la cola. */
     @PluginMethod
-    fun limpiarViajePendiente(call: PluginCall) {
-        context.getSharedPreferences("mia-burbuja", android.content.Context.MODE_PRIVATE).edit().clear().apply()
+    fun limpiarViajesPendientes(call: PluginCall) {
+        context.getSharedPreferences("mia-burbuja", android.content.Context.MODE_PRIVATE).edit().remove("viajes_pendientes").apply()
         call.resolve()
     }
 }
