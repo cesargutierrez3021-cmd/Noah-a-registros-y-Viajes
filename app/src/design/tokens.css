@@ -1029,6 +1029,28 @@ textarea:focus {
   padding: 34px 22px;
   gap: 8px;
 }
+/*
+  2026-09-23, pedido explícito del usuario ("si yo pongo dos metas, me
+  aparecen dos alcancías o solo una... tiene que poderse poner hasta tres
+  ahorros, para que aparezcan tres alcancías"): un frasco por meta, en fila
+  — `.balance-ahorro` sigue siendo el marco/fondo/borde de siempre, acá solo
+  se pasa de columna (1 frasco) a fila con wrap (N frascos, cada uno un
+  `.balance-ahorro__item` con su propio svg/texto/chispas).
+*/
+.balance-ahorro-grupo {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 18px;
+}
+.balance-ahorro__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
 .balance-ahorro__vacio-icono {
   font-size: 2.6rem;
   opacity: 0.7;

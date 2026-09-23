@@ -11,6 +11,8 @@ import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
 import { useViajes } from '../../domain/viajes/store'
 import { PLATAFORMAS_DISPONIBLES } from '../../domain/viajes/types'
 import { useMetaDiaria } from '../../domain/metaDiaria/store'
+import { useAuth } from '../../domain/auth/store'
+import { borrarHistorialLocal } from '../../domain/restauracion/borrarHistorial'
 import { CampoMonto } from '../../components/CampoMonto'
 import { AnillosOrbitales } from '../../components/graficos/AnillosOrbitales'
 import { Cristal3D } from '../../components/graficos/Cristal3D'
@@ -42,7 +44,7 @@ const INGRESO_MUESTRA = 5_800_000
  * cuando sea. Reusa el mismo store/lista que OnboardingScreen (D-18): no
  * hay una segunda fuente de temas disponibles.
  */
-type SeccionAjustes = 'vehiculo' | 'plataforma' | 'tema' | 'estadisticas' | 'metaDiaria'
+type SeccionAjustes = 'vehiculo' | 'plataforma' | 'tema' | 'estadisticas' | 'metaDiaria' | 'datos'
 
 export function AjustesScreen() {
   const { tema, elegirTema } = useTema()
@@ -50,9 +52,21 @@ export function AjustesScreen() {
   const { tipoVehiculo, elegirVehiculo } = useVehiculo()
   const { plataformaPreferida, elegirPlataformaPreferida } = useViajes()
   const { presupuestoGasolinaMensual, cargar: cargarMetaDiaria, actualizarPresupuestoGasolina } = useMetaDiaria()
+  const { autenticado } = useAuth()
   const animado = tema !== 'papel'
 
   const [gasolinaTexto, setGasolinaTexto] = useState('')
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false)
+  const [borrando, setBorrando] = useState(false)
+  const [borradoListo, setBorradoListo] = useState(false)
+
+  async function manejarBorrarHistorial() {
+    setBorrando(true)
+    await borrarHistorialLocal()
+    setBorrando(false)
+    setConfirmandoBorrado(false)
+    setBorradoListo(true)
+  }
 
   useEffect(() => {
     cargarMetaDiaria()
@@ -211,6 +225,45 @@ export function AjustesScreen() {
             </div>
           ))}
         </div>
+      </SeccionDesplegable>
+
+      <SeccionDesplegable titulo="Datos" abierta={seccionAbierta === 'datos'} onToggle={() => alternar('datos')}>
+        <p className="texto-mute" style={{ marginBottom: 16 }}>
+          Borra el historial de viajes, jornadas, gastos, deudas, hogar, ahorro, mantenimiento y bonos guardado en este teléfono — para
+          empezar de cero, por ejemplo si tienes datos de prueba mezclados con los reales. No borra tus preferencias (tema, vehículo,
+          plataforma preferida, cuenta) ni te impide seguir guardando cosas nuevas después.
+        </p>
+
+        {autenticado() && (
+          <p className="texto-mute" style={{ marginBottom: 16, color: '#f0c987' }}>
+            Tienes cuenta creada: esto borra los datos de ESTE teléfono, pero todavía no existe forma de borrarlos también de la nube — si
+            más adelante cierras sesión y vuelves a entrar (o reinstalas la app e inicias sesión), estos mismos datos pueden volver a
+            aparecer desde la nube.
+          </p>
+        )}
+
+        {borradoListo ? (
+          <p className="texto-mute" style={{ color: '#4caf50' }}>Listo — el historial quedó en cero. Puedes seguir usando la app normal.</p>
+        ) : confirmandoBorrado ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>
+              ¿Seguro? Esto borra TODOS los viajes, jornadas, gastos, deudas, hogar, ahorro, mantenimiento y bonos guardados hasta ahora en
+              este teléfono. No se puede deshacer.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={() => void manejarBorrarHistorial()} disabled={borrando} style={{ color: '#ff6b6b' }}>
+                {borrando ? 'Borrando…' : 'Sí, borrar todo'}
+              </button>
+              <button type="button" onClick={() => setConfirmandoBorrado(false)} disabled={borrando}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmandoBorrado(true)} style={{ color: '#ff6b6b' }}>
+            Borrar historial
+          </button>
+        )}
       </SeccionDesplegable>
 
       <Link to="/" style={{ display: 'inline-block', marginTop: 24 }}>

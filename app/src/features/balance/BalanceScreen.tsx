@@ -60,7 +60,7 @@ export function BalanceScreen() {
   const { gastos, cargar: cargarGastos } = useGastos()
   const { deudas, abonos: abonosDeuda, cargar: cargarDeudas } = useDeudas()
   const { gastos: gastosHogar, cargar: cargarHogar } = useHogar()
-  const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
+  const { metas: metasAhorro, abonos: abonosAhorro, cargar: cargarAhorro } = useAhorro()
   const { bonos, cargar: cargarBonos } = useBonos()
   const { registros: registrosMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
   const { autenticado } = useAuth()
@@ -117,7 +117,6 @@ export function BalanceScreen() {
   // anillo/placa es su propio medidor "% de mi ingreso", no una porción de
   // una torta — ver AnillosOrbitales.tsx/Prisma.tsx/Cristal3D.tsx, ninguno
   // de los 3 estilos depende de que las porciones sumen 100).
-  const librePositivo = Math.max(balance.balanceNeto, 0)
   const ingresos = balance.ingresosTotales
   function porcentajeDeIngreso(monto: number): number {
     return ingresos > 0 ? Math.max(0, Math.min(100, (monto / ingresos) * 100)) : 0
@@ -136,6 +135,24 @@ export function BalanceScreen() {
   // `deudaPendienteTotal` sigue intacto en el resto de la pantalla (el
   // acordeón "Deudas" de abajo, que el usuario dijo que está bien así).
   const totalAbonadoDeudas = abonosDeuda.reduce((acc, a) => acc + a.monto, 0)
+  // 2026-09-23, corrección de un bug real reportado por el usuario ("me está diciendo que tengo
+  // 108%... se me duplicó el dinero"): "Ahorro" usaba `balance.ahorroTotal` (STOCK — el saldo
+  // actual guardado, incluye TODO lo ahorrado desde siempre) mientras "Deudas" ya usaba un FLUJO
+  // (`totalAbonadoDeudas`, arriba). Mismo criterio que esa corrección de 2026-09-17: acá también
+  // pasa a ser el total de verdad ABONADO (`AbonoAhorro`, useAhorro().abonos — mismo patrón que
+  // AbonoDeuda), no el saldo acumulado.
+  const totalAportadoAhorro = abonosAhorro.reduce((acc, a) => acc + a.monto, 0)
+  // 2026-09-23, misma corrección: "Libre" venía de `balance.balanceNeto` (ingresos - gastos
+  // operativos - gastos de hogar), que a propósito NO resta la deuda abonada, el ahorro aportado,
+  // ni el mantenimiento del vehículo — correcto para el concepto general de "Balance neto" (ver
+  // domain/balance/calculos.ts, esa resta sigue vigente ahí, se usa en la fila de estadísticas de
+  // arriba). Pero ACÁ, en la gráfica de 5 categorías, esas 3 cosas SÍ tienen su propia porción
+  // (Deudas/Ahorro/Vehículo) — si "Libre" no las resta, esa plata queda contada dos veces (una en
+  // su propia porción, otra de nuevo en "Libre") y el reparto suma más de 100% del ingreso, ej. el
+  // caso real del usuario: 79% libre + 21% deudas + 8% ahorro = 108%. Acá "Libre" pasa a ser el
+  // residuo de verdad: lo que entró menos TODO lo que ya se contó en las otras 4 porciones de esta
+  // misma gráfica.
+  const librePositivo = Math.max(0, ingresos - balance.gastosDeHogar - gastosVehiculoTotal - totalAbonadoDeudas - totalAportadoAhorro)
   // 2026-09-15, el usuario mandó la referencia exacta de color para
   // Hogar/Deudas/Ahorro/Libre (paquete "prism-crystal-orbit-package",
   // ORIGINAL_COMPONENTS.tsx: C.green/coral/lilac/sky). "Vehículo" (2026-09-16,
@@ -151,7 +168,7 @@ export function BalanceScreen() {
   const itemsDistribucion: ItemDistribucion[] = [
     { clave: 'hogar', etiqueta: 'Hogar', monto: balance.gastosDeHogar, color: '#55e3a0', porcentaje: porcentajeDeIngreso(balance.gastosDeHogar) },
     { clave: 'deudas', etiqueta: 'Deudas', monto: totalAbonadoDeudas, color: '#ff9d83', porcentaje: porcentajeDeIngreso(totalAbonadoDeudas) },
-    { clave: 'ahorro', etiqueta: 'Ahorro', monto: balance.ahorroTotal, color: '#b7a4ff', porcentaje: porcentajeDeIngreso(balance.ahorroTotal) },
+    { clave: 'ahorro', etiqueta: 'Ahorro', monto: totalAportadoAhorro, color: '#b7a4ff', porcentaje: porcentajeDeIngreso(totalAportadoAhorro) },
     { clave: 'libre', etiqueta: 'Libre', monto: librePositivo, color: '#78c8ff', porcentaje: porcentajeDeIngreso(librePositivo) },
     { clave: 'vehiculo', etiqueta: 'Vehículo', monto: gastosVehiculoTotal, color: '#f0c987', porcentaje: porcentajeDeIngreso(gastosVehiculoTotal) },
   ]
