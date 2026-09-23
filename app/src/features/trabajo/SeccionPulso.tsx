@@ -88,7 +88,7 @@ function claveDiaDeHoy(): string {
  */
 export function SeccionPulso() {
   const { viajes, viajeEnCurso } = useViajes()
-  const { jornadaAbierta, iniciarJornada, terminarJornada, pausarJornada, reanudarJornada } = useJornada()
+  const { jornadas, jornadaAbierta, iniciarJornada, terminarJornada, pausarJornada, reanudarJornada } = useJornada()
   const { gastos } = useGastos()
   const { conceptos: conceptosHogar, cargar: cargarHogar } = useHogar()
   const { deudas, cargar: cargarDeudas } = useDeudas()
@@ -140,16 +140,12 @@ export function SeccionPulso() {
       presupuestoGasolinaMensual,
     })
 
-    const finalizados = viajes.filter((v) => v.estado === 'finalizado')
-    const primerViajeISO = finalizados.reduce<string | null>(
-      (acc, v) => (acc === null || v.inicioISO < acc ? v.inicioISO : acc),
-      null,
-    )
+    const diasConJornadaClave = new Set(jornadas.map((j) => fechaNegocioISO(new Date(j.inicioISO))))
     const ingresosPorDiaClave = new Map(porDia.map((p) => [p.clave, p.resumen.ingresos]))
-    const clavesDiasAnteriores = generarClavesDiasAnteriores(primerViajeISO)
+    const clavesDiasAnteriores = generarClavesDiasAnteriores(diasConJornadaClave)
 
     return calcularMetaDiaria(metaBase.total, ingresosPorDiaClave, clavesDiasAnteriores, resumenHoy.ingresos, capacidadDiariaRealista)
-  }, [porDia, conceptosHogar, deudas, metasAhorro, itemsMantenimiento, presupuestoGasolinaMensual, viajes, resumenHoy.ingresos])
+  }, [porDia, conceptosHogar, deudas, metasAhorro, itemsMantenimiento, presupuestoGasolinaMensual, jornadas, resumenHoy.ingresos])
 
   const tiempo = useMemo(() => (jornada ? calcularTiempoJornada(jornada, viajes) : null), [jornada, viajes])
   const rentabilidad = useMemo(() => (jornada ? calcularRentabilidadPorHora(jornada, viajes) : null), [jornada, viajes])

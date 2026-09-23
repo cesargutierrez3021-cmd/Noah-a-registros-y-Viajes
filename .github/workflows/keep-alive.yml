@@ -7,6 +7,14 @@ name: keep-alive
 # a GET /salud (que ahora también hace un SELECT 1, ver server/src/index.ts) mantiene despiertas
 # las dos capas sin costo (gratis dentro del límite de minutos de GitHub Actions) y sin tocar
 # el plan de Render/Neon del usuario.
+#
+# 2026-09-23, mismo día, corrección: el usuario reportó que login/crear cuenta seguían
+# tardando 1-2 minutos. Revisando el historial real de ejecuciones se encontró que el ping
+# SÍ corre, pero cuando Render y Neon están dormidos los dos al tiempo (ej. tras varias horas
+# sin tráfico nocturno), despertar ambos puede tardar más de 60s — el propio ping fallaba por
+# timeout, sin lograr su objetivo. Subir el límite acá no arregla la latencia del primer
+# request real del usuario (eso lo cubre el pre-warm en CuentaScreen.tsx), pero evita que el
+# ping periódico se corte justo cuando más falta hace.
 on:
   schedule:
     - cron: '*/10 * * * *'
@@ -17,4 +25,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Pegarle a /salud del backend
-        run: curl -sS --max-time 60 -o /dev/null -w "HTTP %{http_code}\n" https://mia-backend-kqms.onrender.com/salud
+        run: curl -sS --max-time 120 -o /dev/null -w "HTTP %{http_code}\n" https://mia-backend-kqms.onrender.com/salud

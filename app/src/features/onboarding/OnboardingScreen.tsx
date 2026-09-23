@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { solicitarNotificaciones, solicitarUbicacion, solicitarIgnorarOptimizacionBateria, solicitarBurbuja, solicitarMicrofono } from '../../domain/onboarding/permisos'
 import { useOnboarding } from '../../domain/onboarding/store'
 import { useTema, previsualizarTema } from '../../domain/tema/store'
@@ -7,6 +7,7 @@ import type { Tema } from '../../domain/tema/types'
 import { useVehiculo } from '../../domain/vehiculo/store'
 import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
 import { useAuth } from '../../domain/auth/store'
+import { precalentarBackend } from '../../lib/api'
 
 type Paso = 'bienvenida' | 'notificaciones' | 'ubicacion' | 'bateria' | 'burbuja' | 'microfono' | 'tema' | 'vehiculo' | 'cuenta'
 
@@ -212,6 +213,23 @@ function PasoCuenta() {
   const [modo, setModo] = useState<'login' | 'registro'>('registro')
   const [email, setEmail] = useState('')
   const [contrasena, setContrasena] = useState('')
+  const [tardandoMucho, setTardandoMucho] = useState(false)
+
+  // 2026-09-23, pedido explícito del usuario ("login/crear cuenta tarda 1-2 minutos"): este paso
+  // suele ser la PRIMERA vez que el conductor le pega al backend — mismo criterio que
+  // CuentaScreen.tsx (lib/api.ts, precalentarBackend()).
+  useEffect(() => {
+    precalentarBackend()
+  }, [])
+
+  useEffect(() => {
+    if (!cargando) {
+      setTardandoMucho(false)
+      return
+    }
+    const temporizador = setTimeout(() => setTardandoMucho(true), 4000)
+    return () => clearTimeout(temporizador)
+  }, [cargando])
 
   async function manejarEnviar(evento: React.FormEvent) {
     evento.preventDefault()
@@ -238,7 +256,13 @@ function PasoCuenta() {
           required
         />
         <button type="submit" disabled={cargando}>
-          {cargando ? 'Un momento…' : modo === 'login' ? 'Entrar' : 'Crear cuenta'}
+          {cargando
+            ? tardandoMucho
+              ? 'Despertando el servidor, puede tardar hasta 1 minuto…'
+              : 'Un momento…'
+            : modo === 'login'
+              ? 'Entrar'
+              : 'Crear cuenta'}
         </button>
       </form>
 

@@ -295,21 +295,25 @@ export function calcularTiempoJornada(jornada: Jornada, viajes: Viaje[]): Tiempo
  *
  * 2026-09-15, pedido explícito del usuario: con UN SOLO viaje no hay
  * suficiente historial para proyectar una tarifa por hora real — dividir
- * "$26.000 en 10 minutos" da $156.000/hora, un número inflado que solo
- * extrapola un único dato, no algo que el conductor de verdad se está
- * haciendo. El propio usuario confirmó el punto de corte con su ejemplo: con
- * 2-3 viajes ("dos horas... me dice 60 mil, dice 30 mil por hora") la
- * división SÍ es la cuenta correcta — eso no se toca. Con 0 o 1 viaje
- * finalizado, se muestra el ingreso real tal cual, sin dividir — "porque no
- * hay registros" (sus palabras) para proyectar nada todavía.
+ * "$26.000 en 10 minutos" da $156.000/hora, un número inflado. La solución de
+ * ese momento fue no dividir nada con 0 o 1 viaje finalizado (mostrar el
+ * ingreso real tal cual).
+ *
+ * 2026-09-23, corrección de un bug real reportado por el usuario ("dinero que
+ * se va en espera" mostraba $134.000 en vez de ~$25.000, con 3 horas de
+ * trabajo y $75.000 ganados): esa "solución" del punto anterior era peor que
+ * el problema — con 1 solo viaje finalizado, el ingreso TOTAL se usaba tal
+ * cual como si fuera la tarifa POR HORA (sin dividir entre nada), y
+ * `calcularDineroEnEspera` multiplicaba eso por las horas muertas. El propio
+ * usuario lo aclaró: "así se haya cerrado solo un viaje, él debe calcular es
+ * cuánto me demoré en ese viaje" — la cuenta correcta siempre es dividir
+ * entre el tiempo trabajado REAL (`tiempoTrabajadoMs`, ver
+ * `calcularTiempoJornada`), tenga 1 viaje o 20. Con 1 viaje de 3 horas y
+ * $75.000, eso da $25.000/hora — el caso límite ya no existe.
  */
 export function calcularRentabilidadPorHora(jornada: Jornada, viajes: Viaje[]): RentabilidadPorHora {
   const viajesFinalizadosDeLaJornada = viajes.filter((v) => jornada.viajesIds.includes(v.id) && v.estado === 'finalizado')
   const ingresos = viajesFinalizadosDeLaJornada.reduce((acc, v) => acc + v.ingreso, 0)
-
-  if (viajesFinalizadosDeLaJornada.length < 2) {
-    return { ingresoPorHoraTrabajada: ingresos, ingresoPorHoraConEspera: ingresos }
-  }
 
   const tiempo = calcularTiempoJornada(jornada, viajes)
   const horasTrabajadas = tiempo.tiempoTrabajadoMs / UNA_HORA_MS

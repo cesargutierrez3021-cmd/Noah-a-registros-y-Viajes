@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domain/auth/store'
+import { precalentarBackend } from '../../lib/api'
 
 /**
  * Pantalla de cuenta: login y registro en una sola pantalla con un toggle,
@@ -36,7 +37,27 @@ export function CuentaScreen() {
   const [codigo, setCodigo] = useState('')
   const [contrasenaNueva, setContrasenaNueva] = useState('')
   const [avisoRecuperacion, setAvisoRecuperacion] = useState<string | null>(null)
+  const [tardandoMucho, setTardandoMucho] = useState(false)
   const navegar = useNavigate()
+
+  // 2026-09-23, pedido explícito del usuario ("login/crear cuenta tarda 1-2 minutos"): dispara el
+  // despertar del backend apenas se abre esta pantalla, no cuando ya se tocó "Entrar" — ver
+  // lib/api.ts, precalentarBackend().
+  useEffect(() => {
+    precalentarBackend()
+  }, [])
+
+  // Si `cargando` sigue en true pasados unos segundos, el motivo casi siempre es que Render/Neon
+  // (plan free) estaban dormidos y están despertando — se lo dice al conductor en vez de dejarlo
+  // mirando un botón congelado sin explicación.
+  useEffect(() => {
+    if (!cargando) {
+      setTardandoMucho(false)
+      return
+    }
+    const temporizador = setTimeout(() => setTardandoMucho(true), 4000)
+    return () => clearTimeout(temporizador)
+  }, [cargando])
 
   async function manejarEnviar(evento: React.FormEvent) {
     evento.preventDefault()
@@ -148,7 +169,9 @@ export function CuentaScreen() {
 
         <button type="submit" disabled={cargando}>
           {cargando
-            ? 'Un momento…'
+            ? tardandoMucho
+              ? 'Despertando el servidor, puede tardar hasta 1 minuto…'
+              : 'Un momento…'
             : modo === 'login'
               ? 'Entrar'
               : modo === 'registro'

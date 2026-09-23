@@ -4,6 +4,8 @@ import { useConversacion } from '../../domain/conversacion/store'
 import { pedirPermisoVoz } from '../../domain/conversacion/voz'
 import type { ContextoConversacionEnvio } from '../../domain/conversacion/api'
 import { useViajes } from '../../domain/viajes/store'
+import { useJornada } from '../../domain/jornada/store'
+import { fechaNegocioISO } from '../../lib/fechas'
 import { useBonos } from '../../domain/bonos/store'
 import { useMantenimiento } from '../../domain/mantenimiento/store'
 import { useHogar } from '../../domain/hogar/store'
@@ -56,6 +58,7 @@ export function MiaBurbuja() {
     probarVoz,
   } = useConversacion()
   const { viajes, cargar: cargarViajes } = useViajes()
+  const { jornadas, cargar: cargarJornadas } = useJornada()
   const { bonos, cargar: cargarBonos } = useBonos()
   const { items: itemsMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
   const { conceptos: conceptosHogar, cargar: cargarHogar } = useHogar()
@@ -84,13 +87,14 @@ export function MiaBurbuja() {
   useEffect(() => {
     if (!abierta) return
     void cargarViajes()
+    void cargarJornadas()
     void cargarBonos()
     cargarMantenimiento()
     void cargarHogar()
     void cargarDeudas()
     void cargarAhorro()
     cargarMetaDiaria()
-  }, [abierta, cargarViajes, cargarBonos, cargarMantenimiento, cargarHogar, cargarDeudas, cargarAhorro, cargarMetaDiaria])
+  }, [abierta, cargarViajes, cargarJornadas, cargarBonos, cargarMantenimiento, cargarHogar, cargarDeudas, cargarAhorro, cargarMetaDiaria])
 
   useEffect(() => {
     if (!abierta) return
@@ -212,13 +216,9 @@ export function MiaBurbuja() {
     })
     if (metaBase.total <= 0) return undefined
 
-    const finalizados = viajes.filter((v) => v.estado === 'finalizado')
-    const primerViajeISO = finalizados.reduce<string | null>(
-      (acc, v) => (acc === null || v.inicioISO < acc ? v.inicioISO : acc),
-      null,
-    )
+    const diasConJornadaClave = new Set(jornadas.map((j) => fechaNegocioISO(new Date(j.inicioISO))))
     const ingresosPorDiaClave = new Map(porDia.map((p) => [p.clave, p.resumen.ingresos]))
-    const clavesDiasAnteriores = generarClavesDiasAnteriores(primerViajeISO)
+    const clavesDiasAnteriores = generarClavesDiasAnteriores(diasConJornadaClave)
     const resultado = calcularMetaDiaria(metaBase.total, ingresosPorDiaClave, clavesDiasAnteriores, ingresoHoy, capacidadDiariaRealista)
 
     return {
