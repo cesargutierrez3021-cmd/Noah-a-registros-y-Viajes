@@ -171,6 +171,11 @@ const esquemaPreguntaConversacion = z.object({
  * conversación (no un historial permanente — eso sigue sin existir, ver D-11 en
  * PLAN-MAESTRO). Sin probarse en este entorno, mismo límite que el resto del módulo ai
  * (sin red para correr TypeScript real aquí).
+ *
+ * 2026-09-23: el límite de consultas por plan ya NO se verifica acá — se movió adentro de
+ * `procesarTurnoConversacion` (conversacion.ts), envolviendo solo la llamada real al
+ * proveedor de IA, para que una pregunta resuelta por una regla local (gratis, la mayoría de
+ * los casos) no espere a Postgres/Neon sin necesidad (ver el comentario largo en ese archivo).
  */
 rutasAI.post(
   '/conversacion',
@@ -178,9 +183,7 @@ rutasAI.post(
   limitadorAI,
   async(async (req: Request, res: Response) => {
     const { texto, contexto, profundidad } = esquemaPreguntaConversacion.parse(req.body)
-    await verificarLimiteConsultasIA(req.usuarioId!)
-    const resultado = await procesarTurnoConversacion(texto, contexto, profundidad)
-    await registrarConsultaIA(req.usuarioId!)
+    const resultado = await procesarTurnoConversacion(texto, contexto, req.usuarioId!, profundidad)
     res.json(resultado)
   }),
 )

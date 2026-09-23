@@ -4,6 +4,7 @@ import { clasificadorSinImplementar } from './clasificadorIA.js'
 import type { ClasificadorIntentIA } from './clasificadorIA.js'
 import { proveedorSinImplementar, ErrorProveedorIASinConfigurar } from './proveedorIA.js'
 import type { ProveedorIA } from './proveedorIA.js'
+import { verificarLimiteConsultasIA, registrarConsultaIA } from './limite.js'
 import type { ContextoConversacion, ProfundidadAnalisis, ResultadoConversacion, TurnoConversacion } from './types.js'
 
 /**
@@ -43,13 +44,25 @@ const RESPUESTA_SIN_RECONOCER = 'No te entendí bien esa pregunta. Preguntame de
  *    devolvió sin respuesta), se pasa al proxy de IA (Fase 9), agregando los
  *    turnos previos de esta conversación a la pregunta para que el modelo
  *    pueda resolver referencias tipo "¿y ayer?" sin que el cliente repita todo.
+ *
+ * 2026-09-23, pedido explícito del usuario ("se queda pensando demasiado"): el límite de
+ * consultas por plan (`verificarLimiteConsultasIA`/`registrarConsultaIA`, limite.ts) vive
+ * ACÁ ahora, envolviendo solo la llamada real al proveedor de IA — antes routes.ts lo hacía
+ * incondicionalmente alrededor de TODA la función, así que una pregunta resuelta por una
+ * regla local (gratis, en memoria, la mayoría de los casos tras esta sesión) igual esperaba
+ * 3-4 consultas reales a Postgres/Neon antes de responder, sin necesidad: ese límite existe
+ * para cubrir el costo del proveedor pago (ver el comentario de limite.ts), no para reglas
+ * que no cuestan nada. Ahora una pregunta resuelta por regla no toca la base de datos.
  */
 export async function procesarTurnoConversacion(
   texto: string,
   contexto: ContextoConversacion | undefined,
+  usuarioId: string,
   profundidad: ProfundidadAnalisis = 'normal',
   clasificadorIA: ClasificadorIntentIA = clasificadorSinImplementar,
   proveedorIA: ProveedorIA = proveedorSinImplementar,
+  verificarLimite: (usuarioId: string) => Promise<void> = verificarLimiteConsultasIA,
+  registrarConsulta: (usuarioId: string) => Promise<void> = registrarConsultaIA,
 ): Promise<ResultadoConversacion> {
   const resultadoIntent = await resolverIntencion(texto, contexto, clasificadorIA)
 
@@ -65,7 +78,9 @@ export async function procesarTurnoConversacion(
   const preguntaConHistorial = armarPreguntaConTurnosPrevios(texto, contexto?.turnosPrevios)
 
   try {
+    await verificarLimite(usuarioId)
     const resultadoAnalisis = await generarAnalisis(preguntaConHistorial, contexto, profundidad, proveedorIA)
+    await registrarConsulta(usuarioId)
     return {
       intencion: null,
       respuesta: resultadoAnalisis.respuesta,
