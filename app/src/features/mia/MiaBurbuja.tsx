@@ -1,4 +1,3 @@
-import { fechaNegocioISO } from '../../lib/fechas'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useConversacion } from '../../domain/conversacion/store'
@@ -35,7 +34,7 @@ import { proximaFechaCuotaDeuda } from '../../domain/avisos/calculos'
  */
 
 function claveDiaDeHoy(): string {
-  return fechaNegocioISO()
+  return new Date().toISOString().slice(0, 10)
 }
 
 export function MiaBurbuja() {

@@ -65,19 +65,6 @@ export interface ContextoResumen {
   kmTotales: number
   ingresos: number
   cantidadViajes: number
-  gastos?: number
-  neto?: number
-  ingresoPorKm?: number
-  ingresoPorHora?: number
-}
-
-export interface ContextoTrabajoDetallado {
-  plataforma?: string
-  zona?: string
-  hora?: number
-  ingresoPorKm?: number
-  ingresoPorHora?: number
-  km?: number
 }
 
 /**

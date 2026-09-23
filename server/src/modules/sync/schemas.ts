@@ -21,10 +21,6 @@ export const esquemaViajeSync = z.object({
   ingresoPendiente: z.boolean().optional().default(false),
   localidad: z.string().nullable(),
   zona: z.string().nullable(),
-  localidadInicio: z.string().nullable().optional(),
-  zonaInicio: z.string().nullable().optional(),
-  localidadFin: z.string().nullable().optional(),
-  zonaFin: z.string().nullable().optional(),
 })
 
 export const esquemaJornadaSync = z.object({

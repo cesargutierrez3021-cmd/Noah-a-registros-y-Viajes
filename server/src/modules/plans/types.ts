@@ -27,7 +27,7 @@ export interface PlanBase {
  */
 export const PLANES_BASE: PlanBase[] = [
   { clave: CLAVE_PLAN_GRATIS, nombre: 'Gratis', limiteConsultasIA: 20, productIdGooglePlay: null },
-  { clave: CLAVE_PLAN_PRO_MENSUAL, nombre: 'Pro mensual', limiteConsultasIA: 300, productIdGooglePlay: 'mia_pro_mensual' },
+  { clave: CLAVE_PLAN_PRO_MENSUAL, nombre: 'Pro mensual', limiteConsultasIA: null, productIdGooglePlay: 'mia_pro_mensual' },
 ]
 
 export interface PlanPublico {

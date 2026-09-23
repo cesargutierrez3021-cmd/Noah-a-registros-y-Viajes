@@ -57,10 +57,6 @@ export const repositorioSync = {
       // deliberada mientras exista algún viaje sincronizado sin el par nuevo.
       localidad: viaje.localidad,
       zona: viaje.zona,
-      localidadInicio: viaje.localidadInicio ?? viaje.localidad,
-      zonaInicio: viaje.zonaInicio ?? viaje.zona,
-      localidadFin: viaje.localidadFin ?? viaje.localidad,
-      zonaFin: viaje.zonaFin ?? viaje.zona,
     }
 
     await prisma.viaje.upsert({

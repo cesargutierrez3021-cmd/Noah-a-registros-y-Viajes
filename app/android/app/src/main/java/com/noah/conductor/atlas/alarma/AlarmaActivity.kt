@@ -61,7 +61,7 @@ class AlarmaActivity : AppCompatActivity() {
             )
         }
 
-        val titulo = intent.getStringExtra("titulo") ?: "MIA"
+        val titulo = intent.getStringExtra("titulo") ?: "NOAH"
         val detalle = intent.getStringExtra("detalle") ?: ""
         val vozId = intent.getStringExtra("vozId") ?: "voz_1"
         val tipo = intent.getStringExtra("tipo") ?: "recordatorio"
@@ -79,7 +79,7 @@ class AlarmaActivity : AppCompatActivity() {
         }
 
         val kicker = TextView(this).apply {
-            text = "MIA  ·  AVISO"
+            text = "NOAH  ·  AVISO"
             setTextColor(Color.parseColor("#67E8F9"))
             textSize = 12f
             letterSpacing = 0.3f
@@ -88,7 +88,7 @@ class AlarmaActivity : AppCompatActivity() {
         val personaje = ImageView(this).apply {
             setImageResource(R.mipmap.ic_launcher_round)
             scaleType = ImageView.ScaleType.CENTER_CROP
-            contentDescription = "Icono de MIA"
+            contentDescription = "Icono de NOAH"
             layoutParams = LinearLayout.LayoutParams(dp(132), dp(132)).apply { gravity = Gravity.CENTER; bottomMargin = dp(12) }
         }
         animadorEscalaX = ObjectAnimator.ofFloat(personaje, "scaleX", 0.97f, 1.03f).apply { duration = 1100; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE; start() }
