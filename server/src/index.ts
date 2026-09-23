@@ -10,6 +10,7 @@ import { rutasBilling } from './modules/billing/routes.js'
 import { rutasSync } from './modules/sync/routes.js'
 import { manejadorDeErrores } from './http/errorHandler.js'
 import { repositorioPlanes } from './modules/plans/repository.js'
+import { prisma } from './lib/prisma.js'
 
 /**
  * Punto de entrada del backend MIA.
@@ -68,7 +69,18 @@ app.use(cors({ origin: env.corsOrigenes }))
 // número y el porqué, no se sube "por si acaso" sin motivo.
 app.use(express.json({ limit: '512kb' }))
 
-app.get('/salud', (_req: Request, res: Response) => {
+/**
+ * 2026-09-23, pedido explícito del usuario ("se queda pensando demasiado" al hablar con
+ * MIA): dos capas duermen por inactividad — Render (el propio proceso, plan free) Y Neon
+ * (la base de datos, también plan free, con auto-suspend propio no documentado antes acá).
+ * Antes esta ruta no tocaba la base de datos, así que un ping periódico a `/salud` despertaba
+ * Render pero NO evitaba que Neon se durmiera aparte — la primera consulta real después
+ * seguía pagando el cold-start de la base. `SELECT 1` es la consulta más barata posible,
+ * solo para mantener viva la conexión/cómputo de Neon; no compite en costo con nada real.
+ * Ver `.github/workflows/keep-alive.yml` (pega acá cada 10 min, gratis en GitHub Actions).
+ */
+app.get('/salud', async (_req: Request, res: Response) => {
+  await prisma.$queryRaw`SELECT 1`
   res.json({ estado: 'ok' })
 })
 
