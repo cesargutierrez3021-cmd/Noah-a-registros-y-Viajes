@@ -20,6 +20,7 @@ import {
   calcularTiempoJornada,
 } from '../../domain/estadisticas/calculos'
 import { calcularMetaBaseDiaria, calcularMetaDiaria, generarClavesDiasAnteriores } from '../../domain/metaDiaria/calculos'
+import { costoRealizadoEnRango } from '../../domain/mantenimiento/reglas'
 import type { Gasto } from '../../domain/gastos/types'
 import type { Viaje } from '../../domain/viajes/types'
 import { SeccionMantenimiento } from './SeccionMantenimiento'
@@ -94,7 +95,7 @@ export function SeccionPulso() {
   const { deudas, cargar: cargarDeudas } = useDeudas()
   const { metas: metasAhorro, cargar: cargarAhorro } = useAhorro()
   const { bonos, cargar: cargarBonos } = useBonos()
-  const { items: itemsMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
+  const { items: itemsMantenimiento, registros: registrosMantenimiento, cargar: cargarMantenimiento } = useMantenimiento()
   const { presupuestoGasolinaMensual, cargar: cargarMetaDiaria } = useMetaDiaria()
 
   const [vista, setVista] = useState<VistaLectura>('recortadas')
@@ -159,7 +160,14 @@ export function SeccionPulso() {
     () => calcularCostoPorKm(gastos.filter((g) => g.categoria === 'gasolina'), viajes, desdeHoy, hastaHoy),
     [gastos, viajes, desdeHoy, hastaHoy],
   )
-  const mantenimientoHoy = useMemo(() => sumaCategoria(gastos, 'mantenimiento', desdeHoy, hastaHoy), [gastos, desdeHoy, hastaHoy])
+  // 2026-09-23, corrección de un bug real reportado por el usuario ("cuando yo lo pongo en
+  // mantenimiento y le doy realizado hoy... no me lo está calculando"): antes esto solo sumaba
+  // gastos de categoría "mantenimiento" cargados a mano en "Gastos de jornada" — un mantenimiento
+  // marcado "realizado" HOY con su costo real (RegistroMantenimiento.costo) no se sumaba acá.
+  const mantenimientoHoy = useMemo(
+    () => sumaCategoria(gastos, 'mantenimiento', desdeHoy, hastaHoy) + costoRealizadoEnRango(registrosMantenimiento, desdeHoy, hastaHoy),
+    [gastos, registrosMantenimiento, desdeHoy, hastaHoy],
+  )
 
   // --- Vista "Resumen" ---
   const rango = limitesDe(periodo)
@@ -172,7 +180,9 @@ export function SeccionPulso() {
     [bonos, rango.desde, rango.hasta],
   )
   const resumenPeriodo = useMemo(() => calcularResumen(viajesDelPeriodo, bonosDelPeriodo), [viajesDelPeriodo, bonosDelPeriodo])
-  const gastoTotalPeriodo = sumaTotalGastos(gastos, rango.desde, rango.hasta)
+  // 2026-09-23, misma corrección de arriba: "Gastos totales de moto" y "Neto del período" tampoco
+  // contaban el costo real de un mantenimiento marcado "realizado" dentro del rango.
+  const gastoTotalPeriodo = sumaTotalGastos(gastos, rango.desde, rango.hasta) + costoRealizadoEnRango(registrosMantenimiento, rango.desde, rango.hasta)
   const netoPeriodo = resumenPeriodo.ingresos - gastoTotalPeriodo
   const historial = useMemo(() => agruparPorPeriodo(viajes, 'dia', bonos).slice(0, 5), [viajes, bonos])
 
@@ -382,9 +392,11 @@ export function SeccionPulso() {
             <div className="tt-resumen-fila">
               <span className="tt-resumen-fila__nombre">
                 Mantenimiento
-                <span className="tt-resumen-fila__nota">recordatorios en la sección de abajo</span>
+                <span className="tt-resumen-fila__nota">cargado a mano + marcado "realizado" con costo</span>
               </span>
-              <span>{formatoPesos(sumaCategoria(gastos, 'mantenimiento', rango.desde, rango.hasta))}</span>
+              <span>
+                {formatoPesos(sumaCategoria(gastos, 'mantenimiento', rango.desde, rango.hasta) + costoRealizadoEnRango(registrosMantenimiento, rango.desde, rango.hasta))}
+              </span>
             </div>
             <div className="tt-resumen-fila">
               <span className="tt-resumen-fila__nombre">

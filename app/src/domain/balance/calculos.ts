@@ -4,6 +4,7 @@ import type { Deuda } from '../deudas/types'
 import type { GastoHogar } from '../hogar/types'
 import type { MetaAhorro } from '../ahorro/types'
 import type { Bono } from '../bonos/types'
+import type { RegistroMantenimiento } from '../mantenimiento/types'
 import { calcularResumen } from '../estadisticas/calculos'
 
 /**
@@ -20,7 +21,15 @@ import { calcularResumen } from '../estadisticas/calculos'
  */
 export interface BalanceGeneral {
   ingresosTotales: number
-  /** domain/gastos — gasolina, aceite, llantas, mantenimiento, etc. (gastos del vehículo/trabajo). */
+  /**
+   * domain/gastos (gasolina, aceite, llantas, mantenimiento cargado a mano, etc.) MÁS el costo
+   * real de cada `RegistroMantenimiento` con `costo` cargado (mantenimiento marcado "realizado"
+   * desde la sección de Mantenimiento, no desde "Gastos de jornada") — gastos del vehículo/trabajo,
+   * sin importar por cuál de las dos pantallas entraron. 2026-09-23, corrección de un bug real
+   * reportado por el usuario: antes esto SOLO sumaba `gastos` — un mantenimiento marcado
+   * "realizado" con su costo real no aparecía acá, ni en `balanceNeto`, ni en el acordeón "Gastos
+   * de la moto" ni en "Lectura del día" (que reutilizan este número o el mismo criterio).
+   */
   gastosOperativos: number
   /** domain/hogar — únicos + fijos autogenerados (arriendo, servicios, etc.). */
   gastosDeHogar: number
@@ -52,9 +61,11 @@ export function calcularBalanceGeneral(
   gastosDeHogar: GastoHogar[],
   metasAhorro: MetaAhorro[] = [],
   bonos: Bono[] = [],
+  registrosMantenimiento: RegistroMantenimiento[] = [],
 ): BalanceGeneral {
   const ingresosTotales = calcularResumen(viajes, bonos).ingresos
-  const gastosOperativos = gastos.reduce((acc, g) => acc + g.monto, 0)
+  const costoMantenimientoRealizado = registrosMantenimiento.reduce((acc, r) => acc + (r.costo ?? 0), 0)
+  const gastosOperativos = gastos.reduce((acc, g) => acc + g.monto, 0) + costoMantenimientoRealizado
   const totalGastosHogar = gastosDeHogar.reduce((acc, g) => acc + g.monto, 0)
   const deudaPendienteTotal = deudas.reduce((acc, d) => acc + Math.max(d.saldoActual, 0), 0)
   const ahorroTotal = metasAhorro.reduce((acc, m) => acc + Math.max(m.saldoActual, 0), 0)
