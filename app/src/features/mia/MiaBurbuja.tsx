@@ -47,6 +47,13 @@ export function MiaBurbuja() {
     reiniciarConversacion,
     aperturaConVozSolicitada,
     limpiarSolicitudApertura,
+    vozElegida,
+    tono,
+    vocesDisponibles,
+    cargarVocesDisponibles,
+    elegirVoz,
+    elegirTono,
+    probarVoz,
   } = useConversacion()
   const { viajes, cargar: cargarViajes } = useViajes()
   const { bonos, cargar: cargarBonos } = useBonos()
@@ -91,6 +98,11 @@ export function MiaBurbuja() {
       .then(setPermisoListo)
       .catch(() => setPermisoListo(false))
   }, [abierta])
+
+  useEffect(() => {
+    if (!abierta) return
+    void cargarVocesDisponibles()
+  }, [abierta, cargarVocesDisponibles])
 
   // Termina el flujo que empezó el primer efecto de arriba: una vez el
   // panel está abierto, el permiso de micrófono está listo y hay sesión
@@ -296,6 +308,35 @@ export function MiaBurbuja() {
                 {turnos.length > 0 && (
                   <button type="button" onClick={reiniciarConversacion}>Nueva conversación</button>
                 )}
+              </div>
+
+              {/* 2026-09-23, pedido explícito del usuario: "no me gusta ese tono de voz" —
+                  elegir otra voz instalada en el teléfono (si el motor tiene más de una en
+                  español) y/o ajustar el tono (pitch), que siempre funciona sin importar
+                  cuántas voces haya instaladas. */}
+              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span className="texto-mute" style={{ fontSize: '0.78rem' }}>Voz de MIA</span>
+                {vocesDisponibles.length > 0 && (
+                  <select value={vozElegida ?? ''} onChange={(e) => elegirVoz(e.target.value || null)}>
+                    <option value="">Voz por defecto del teléfono</option>
+                    {vocesDisponibles.map((v) => (
+                      <option key={v.name} value={v.name}>{v.name}</option>
+                    ))}
+                  </select>
+                )}
+                <label className="texto-mute" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.78rem' }}>
+                  Tono
+                  <input
+                    type="range"
+                    min={0.6}
+                    max={1.6}
+                    step={0.1}
+                    value={tono}
+                    onChange={(e) => elegirTono(Number(e.target.value))}
+                    style={{ flex: 1 }}
+                  />
+                </label>
+                <button type="button" onClick={() => void probarVoz()} disabled={!permisoListo}>Probar voz</button>
               </div>
             </>
           )}

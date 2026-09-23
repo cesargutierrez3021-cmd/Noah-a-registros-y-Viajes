@@ -26,6 +26,33 @@ export interface SuscripcionVoz {
   detener: () => void
 }
 
+/** Mismo shape que `SpeechSynthesisVoice` del plugin nativo y de la Web Speech API — reexportado acá para que el resto del dominio no tenga que importar del paquete del plugin directo. */
+export interface VozDisponible {
+  name: string
+  lang: string
+}
+
+/**
+ * 2026-09-23, pedido explícito del usuario ("no me gusta ese tono de voz"): lista las voces
+ * en español que el motor de texto a voz del teléfono tiene instaladas, para que el
+ * conductor pueda elegir otra distinta a la que venía por defecto. Filtra por idioma acá
+ * (no en la UI) porque el motor nativo suele traer decenas de voces de otros idiomas que no
+ * aplican para esta app. Puede devolver una lista de un solo elemento (o vacía) si el
+ * teléfono solo tiene una voz en español instalada — la UI debe manejar ese caso mostrando
+ * el ajuste de tono (pitch) como alternativa, no asumir que siempre hay para elegir.
+ */
+export async function listarVocesDisponibles(prefijoIdioma = 'es'): Promise<VozDisponible[]> {
+  if (esAndroidNativo()) {
+    const { TextToSpeech } = await import('@capacitor-community/text-to-speech')
+    const { voices } = await TextToSpeech.getSupportedVoices()
+    return voices.filter((v) => v.lang.toLowerCase().startsWith(prefijoIdioma)).map((v) => ({ name: v.name, lang: v.lang }))
+  }
+
+  if (!('speechSynthesis' in window)) return []
+  const voces = window.speechSynthesis.getVoices()
+  return voces.filter((v) => v.lang.toLowerCase().startsWith(prefijoIdioma)).map((v) => ({ name: v.name, lang: v.lang }))
+}
+
 function esAndroidNativo(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
 }
@@ -116,11 +143,27 @@ function escucharUnaFraseWeb(idioma: string): Promise<string> {
   })
 }
 
+export interface OpcionesHablar {
+  idioma?: string
+  /** Nombre de la voz (`VozDisponible.name`, ver `listarVocesDisponibles`) — null/undefined = la voz por defecto del motor. */
+  vozNombre?: string | null
+  /** 0.5-2.0, 1.0 = normal. 2026-09-23, pedido explícito del usuario: alternativa a elegir voz cuando el teléfono solo tiene una instalada en español — igual cambia cómo suena. */
+  tono?: number
+}
+
 /** Lee `texto` en voz alta. Resuelve cuando termina de hablar. */
-export async function hablar(texto: string, idioma = 'es-CO'): Promise<void> {
+export async function hablar(texto: string, opciones: OpcionesHablar = {}): Promise<void> {
+  const { idioma = 'es-CO', vozNombre = null, tono = 1.0 } = opciones
+
   if (esAndroidNativo()) {
     const { TextToSpeech } = await import('@capacitor-community/text-to-speech')
-    await TextToSpeech.speak({ text: texto, lang: idioma, rate: 1.0, pitch: 1.0, volume: 1.0 })
+    let indiceVoz: number | undefined
+    if (vozNombre) {
+      const { voices } = await TextToSpeech.getSupportedVoices()
+      const indice = voices.findIndex((v) => v.name === vozNombre)
+      if (indice >= 0) indiceVoz = indice
+    }
+    await TextToSpeech.speak({ text: texto, lang: idioma, rate: 1.0, pitch: tono, volume: 1.0, voice: indiceVoz })
     return
   }
 
@@ -131,6 +174,11 @@ export async function hablar(texto: string, idioma = 'es-CO'): Promise<void> {
   return new Promise((resolve, reject) => {
     const enunciado = new SpeechSynthesisUtterance(texto)
     enunciado.lang = idioma
+    enunciado.pitch = tono
+    if (vozNombre) {
+      const voz = window.speechSynthesis.getVoices().find((v) => v.name === vozNombre)
+      if (voz) enunciado.voice = voz
+    }
     enunciado.onend = () => resolve()
     enunciado.onerror = () => reject(new Error('No se pudo reproducir la respuesta en voz.'))
     window.speechSynthesis.speak(enunciado)
