@@ -146,6 +146,16 @@ function formatearKm(km: number): string {
   return km.toLocaleString('es-CO', { maximumFractionDigits: 1 })
 }
 
+/**
+ * 2026-09-23, pedido explícito del usuario: con `style: 'currency'` esto devolvía algo como
+ * "$3.900.000" — texto correcto para MOSTRAR en pantalla, pero el sintetizador de voz del
+ * teléfono lee el símbolo "$" como "dólares" (no hay forma de decirle al TTS "esto es en
+ * pesos colombianos" sin agregarlo como palabra, y el usuario tampoco quiere que lo diga:
+ * "nada de decir dólares... tampoco... pesos colombianos"). Estas respuestas son solo para
+ * hablar (ver respuestas.ts, nunca se muestran en pantalla) — un número agrupado sin símbolo
+ * ("3.900.000") es justo lo que el TTS en español necesita para decir "tres millones
+ * novecientos mil" de forma natural, sin ninguna palabra de moneda de por medio.
+ */
 function formatearDinero(valor: number): string {
-  return valor.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+  return Math.round(valor).toLocaleString('es-CO', { maximumFractionDigits: 0 })
 }
