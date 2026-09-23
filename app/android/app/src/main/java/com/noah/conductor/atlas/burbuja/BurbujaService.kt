@@ -194,9 +194,33 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         // Viaje nuevo, punto de referencia nuevo — si se dejara el de un viaje anterior,
         // el primer punto de este viaje calcularía distancia contra un lugar viejo.
         ultimoLatNativo = null; ultimoLngNativo = null; ultimoTimestampNativoMs = 0L
+        asegurarGpsActivo()
         handler.removeCallbacks(reloj); handler.post(reloj)
         if (anunciar) hablar("Viaje iniciado")
         actualizarTextos("0.0", "0m")
+    }
+
+    /**
+     * 2026-09-23, pedido explícito del usuario (bug real: "ya la burbujita no volvió a marcar el
+     * kilómetro, aunque iniciara el viaje"). Causa: `GpsTrackingService` (el foreground service
+     * que de verdad captura el GPS) y `BurbujaService` son DOS servicios separados con su propia
+     * resiliencia — Android (u optimizaciones de batería del fabricante, Xiaomi/Samsung/Huawei/
+     * Oppo, ya documentadas en `GpsTrackingPlugin.kt`) puede matar el de GPS sin matar el de la
+     * burbuja, que sigue viva y respondiendo a los toques con normalidad. Antes, arrancar un
+     * viaje NATIVAMENTE (un tap en la burbuja, sin la app abierta) solo reseteaba el estado
+     * propio de `BurbujaService` — nunca se aseguraba de que `GpsTrackingService` siguiera vivo,
+     * eso dependía por completo de que el lado JS (`domain/viajes/store.ts`, `iniciarViaje`)
+     * corriera para volver a pedirlo, algo que nunca pasa con la app cerrada. Ahora, cada vez
+     * que arranca un viaje por la burbuja, se le pide directo a `GpsTrackingService` que arranque
+     * — si ya está vivo, `startTracking()` ahí (`GpsTrackingService.kt`) es un no-op inmediato
+     * (`if (callback != null) return`); si murió, esto lo revive antes de que el conductor
+     * empiece a manejar, en vez de quedar contando cero en silencio.
+     */
+    private fun asegurarGpsActivo() {
+        val intent = Intent(this, GpsTrackingService::class.java).apply { action = GpsTrackingService.ACTION_START }
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+        }
     }
 
     private fun finalizarViaje(anunciar: Boolean) {
