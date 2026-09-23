@@ -156,6 +156,32 @@ async function recorridoDefinitivo(recorridoEnVivo: PuntoGPS[]): Promise<PuntoGP
  * que ya usa `pausarParaIngreso` para un viaje cerrado con la app abierta, D-18: no se inventa
  * una segunda forma de construir un Viaje.
  */
+/**
+ * 2026-09-24, pedido explícito del usuario, dos partes en el mismo hilo ("por qué me marcó los
+ * seis viajes con el mismo kilometraje... antes de hacer algo"):
+ *
+ * 1. Acá se descartaba el km que la burbuja YA calculó bien en vivo (`ViajePendienteNativo.km`,
+ *    `kmAcumulados` en BurbujaService.kt — se resetea a 0 en cada "iniciar viaje" y solo suma
+ *    con el GPS real de ESE viaje, el mismo número que el usuario confirmó que se veía bien en
+ *    la burbuja) y en su lugar se recalculaba la distancia DE CERO acá, a partir de
+ *    `puntosJson` — una traza de puntos GPS crudos separada, recortada por rango de fecha/hora
+ *    del lado nativo contra una sola bolsa de puntos que NO se limpia entre viajes de la
+ *    burbuja (ver el comentario en `BurbujaService.encolarViajePendiente`, Kotlin). Ese segundo
+ *    cálculo, redundante, fue el que terminó dándole a los 6 viajes el mismo total. Ahora se usa
+ *    directo el km nativo (`conKmManual`, mismo camino que ya existía para la corrección manual
+ *    del conductor, D-18) — `puntosJson` se sigue usando solo para resolver la zona de
+ *    recogida/destino, no para el total de kilómetros.
+ * 2. Cada viaje recuperado se expone vía `alRecuperarViajesPendientes` (abajo) — este store NO
+ *    conoce `domain/jornada` (ver el comentario de la interfaz más arriba: "SOLO conoce viajes"),
+ *    así que la vinculación real con la jornada abierta vive en
+ *    `domain/viajes/burbujaOrquestacion.ts`, que sí puede cruzar dominios (D-10).
+ */
+type CallbackViajesRecuperados = (viajes: Viaje[]) => void
+let alRecuperarViajesPendientes: CallbackViajesRecuperados | null = null
+export function registrarAlRecuperarViajesPendientes(callback: CallbackViajesRecuperados): void {
+  alRecuperarViajesPendientes = callback
+}
+
 async function recuperarViajesPendientesDeBurbuja(): Promise<Viaje[]> {
   if (!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android')) return []
   try {
@@ -168,7 +194,7 @@ async function recuperarViajesPendientesDeBurbuja(): Promise<Viaje[]> {
       try { crudos = JSON.parse(p.puntosJson) as PuntoGpsCrudo[] } catch { crudos = [] }
       const recorrido = filtrarRecorridoValido(crudos)
 
-      const viaje = crearViajeDesdeCiere(generarId(), {
+      const viajeConGps = crearViajeDesdeCiere(generarId(), {
         plataforma: useViajes.getState().plataformaPreferida ?? 'Particular',
         inicioISO: new Date(p.inicioMs).toISOString(),
         finISO: new Date(p.finMs).toISOString(),
@@ -178,11 +204,13 @@ async function recuperarViajesPendientesDeBurbuja(): Promise<Viaje[]> {
         ingreso: 0,
         ingresoPendiente: true,
       })
+      const viaje = conKmManual(viajeConGps, p.km)
       await repositorioViajes.guardar(viaje)
       viajesCreados.push(viaje)
     }
 
     await limpiarViajesPendientesNativos()
+    alRecuperarViajesPendientes?.(viajesCreados)
     return viajesCreados
   } catch {
     return []
@@ -207,18 +235,28 @@ function leerPlataformaPreferida(): Plataforma | null {
   return (PLATAFORMAS_DISPONIBLES as string[]).includes(crudo ?? '') ? (crudo as Plataforma) : null
 }
 
-export const useViajes = create<EstadoViajes>((set, get) => ({
-  viajes: [],
-  viajeEnCurso: null,
-  cargando: false,
-  errorGPS: null,
-  plataformaPreferida: leerPlataformaPreferida(),
-  elegirPlataformaPreferida: (plataforma) => {
-    localStorage.setItem(CLAVE_PLATAFORMA_PREFERIDA, plataforma)
-    set({ plataformaPreferida: plataforma })
-  },
-
-  cargar: async () => {
+/**
+ * 2026-09-24, corrección de un bug real reportado por el usuario ("modifiqué el kilometraje y el
+ * precio en uno solo, le di guardar a ese solo, y se guardaron automáticamente todos los seis con
+ * los mismos kilómetros y el mismo precio"): media docena de pantallas llaman a
+ * `useViajes().cargar()` cada una por su lado al montarse (`TarjetaViajesPendientes.tsx`,
+ * `SeccionViajesYJornada.tsx`, `SeccionMantenimiento.tsx`, `AvisoBanner.tsx`, etc.) — si dos o
+ * más quedan en vuelo al mismo tiempo (perfectamente normal: todas se montan juntas al abrir el
+ * panel de Trabajo), cada una lee la cola nativa de viajes pendientes (`viajes_pendientes`, ver
+ * `recuperarViajesPendientesDeBurbuja`), la convierte en `Viaje`s NUEVOS con ids nuevos y la
+ * limpia — sin ninguna protección contra que dos llamadas hagan esto A LA VEZ. La que termine de
+ * ÚLTIMA sobrescribe por completo el estado `viajes` con SU PROPIA lectura (hecha con datos de
+ * antes de que la primera llamada guardara nada) — así, una llamada tardía puede reemplazar el
+ * viaje recién editado y guardado por el usuario con una copia repetida y sin editar, todo del
+ * MISMO conjunto de viajes de la burbuja, dando la sensación de "se guardó lo mismo en los seis".
+ * Acá se garantiza que solo hay UNA ejecución real de `cargar()` en vuelo a la vez — las llamadas
+ * que llegan mientras la primera sigue corriendo esperan esa MISMA promesa en vez de arrancar la
+ * suya propia.
+ */
+let cargaViajesEnCurso: Promise<void> | null = null
+function cargarConDeduplicacion(set: (parcial: Partial<EstadoViajes>) => void): Promise<void> {
+  if (cargaViajesEnCurso) return cargaViajesEnCurso
+  cargaViajesEnCurso = (async () => {
     set({ cargando: true })
     const viajes = await repositorioViajes.listar()
     const viajesRecuperados = await recuperarViajesPendientesDeBurbuja()
@@ -245,7 +283,24 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
       }
     } catch { /* recuperación best-effort */ }
     set({ viajes: [...viajesRecuperados.slice().reverse(), ...viajes], viajeEnCurso, cargando: false })
+  })()
+  return cargaViajesEnCurso.finally(() => {
+    cargaViajesEnCurso = null
+  })
+}
+
+export const useViajes = create<EstadoViajes>((set, get) => ({
+  viajes: [],
+  viajeEnCurso: null,
+  cargando: false,
+  errorGPS: null,
+  plataformaPreferida: leerPlataformaPreferida(),
+  elegirPlataformaPreferida: (plataforma) => {
+    localStorage.setItem(CLAVE_PLATAFORMA_PREFERIDA, plataforma)
+    set({ plataformaPreferida: plataforma })
   },
+
+  cargar: () => cargarConDeduplicacion(set),
 
   iniciarViaje: async (plataforma) => {
     if (get().viajeEnCurso) return // ya hay un viaje activo, no se abren dos a la vez

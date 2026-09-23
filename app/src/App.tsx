@@ -22,7 +22,7 @@ import { sincronizarBonosPendientes } from './domain/bonos/sync'
 import { sincronizarDeudasPendientes } from './domain/deudas/sync'
 import { sincronizarHogarPendiente } from './domain/hogar/sync'
 import { sincronizarAhorroPendiente } from './domain/ahorro/sync'
-import { registrarEscuchaBurbuja } from './domain/viajes/burbujaOrquestacion'
+import { registrarEscuchaBurbuja, registrarVinculoDeJornadaAlRecuperarViajes } from './domain/viajes/burbujaOrquestacion'
 import { registrarSincronizacionAutomatica } from './lib/autoSync'
 
 /**
@@ -75,6 +75,7 @@ export function App() {
     registrarSincronizacionAutomatica('hogar', sincronizarHogarPendiente)
     registrarSincronizacionAutomatica('ahorro', sincronizarAhorroPendiente)
     registrarEscuchaBurbuja()
+    registrarVinculoDeJornadaAlRecuperarViajes()
   }, [])
 
   if (!temaYaElegido || !vehiculoYaElegido || !cuentaVista) {
