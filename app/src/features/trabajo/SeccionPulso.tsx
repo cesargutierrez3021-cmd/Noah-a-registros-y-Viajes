@@ -125,6 +125,12 @@ export function SeccionPulso() {
     const kmPromedioDiario =
       porDia.length === 0 ? 0 : porDia.slice(0, 30).reduce((acc, p) => acc + p.resumen.kmTotales, 0) / Math.min(30, porDia.length)
 
+    // 2026-09-23, pedido explícito del usuario: la meta de un solo día nunca debe pedir más de
+    // lo que el conductor realmente produce en promedio — mismo patrón que kmPromedioDiario
+    // arriba (promedio de los últimos 30 días con datos). null sin historial todavía.
+    const capacidadDiariaRealista =
+      porDia.length === 0 ? null : porDia.slice(0, 30).reduce((acc, p) => acc + p.resumen.ingresos, 0) / Math.min(30, porDia.length)
+
     const metaBase = calcularMetaBaseDiaria({
       conceptosFijosActivos: conceptosHogar.filter((c) => c.activo),
       deudasActivas: deudas.filter((d) => d.saldoActual > 0),
@@ -142,7 +148,7 @@ export function SeccionPulso() {
     const ingresosPorDiaClave = new Map(porDia.map((p) => [p.clave, p.resumen.ingresos]))
     const clavesDiasAnteriores = generarClavesDiasAnteriores(primerViajeISO)
 
-    return calcularMetaDiaria(metaBase.total, ingresosPorDiaClave, clavesDiasAnteriores, resumenHoy.ingresos)
+    return calcularMetaDiaria(metaBase.total, ingresosPorDiaClave, clavesDiasAnteriores, resumenHoy.ingresos, capacidadDiariaRealista)
   }, [porDia, conceptosHogar, deudas, metasAhorro, itemsMantenimiento, presupuestoGasolinaMensual, viajes, resumenHoy.ingresos])
 
   const tiempo = useMemo(() => (jornada ? calcularTiempoJornada(jornada, viajes) : null), [jornada, viajes])
@@ -232,6 +238,13 @@ export function SeccionPulso() {
               {Math.round(metaDiaria.progresoPorcentaje)}% cubierto
               {metaDiaria.deficitAcumulado > 0 && ` · incluye ${formatoPesos(metaDiaria.deficitAcumulado)} de días anteriores sin cubrir`}
             </span>
+            {/* 2026-09-23, pedido explícito del usuario: no pedir un imposible en un solo día — si la meta se sale de lo que realmente produce en promedio, avisar el hueco real en vez de inflar el número de hoy. */}
+            {metaDiaria.faltanteRealista > 0 && (
+              <span className="tt-meta-diaria__detalle" style={{ display: 'block', color: 'var(--tt-coral)' }}>
+                Con tu ritmo real (~{formatoPesos(metaDiaria.capacidadDiariaRealista ?? 0)}/día) te puede quedar faltando{' '}
+                {formatoPesos(metaDiaria.faltanteRealista)} de esto — considera ir guardando un colchón cuando te va mejor.
+              </span>
+            )}
           </div>
         ) : (
           <span className="tt-estado__detalle" style={{ display: 'block', marginTop: 6, fontSize: '0.72rem' }}>

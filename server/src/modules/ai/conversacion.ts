@@ -2,9 +2,19 @@ import { resolverIntencion } from './router.js'
 import { generarAnalisis } from './analisis.js'
 import { clasificadorSinImplementar } from './clasificadorIA.js'
 import type { ClasificadorIntentIA } from './clasificadorIA.js'
-import { proveedorSinImplementar } from './proveedorIA.js'
+import { proveedorSinImplementar, ErrorProveedorIASinConfigurar } from './proveedorIA.js'
 import type { ProveedorIA } from './proveedorIA.js'
 import type { ContextoConversacion, ProfundidadAnalisis, ResultadoConversacion, TurnoConversacion } from './types.js'
+
+/**
+ * 2026-09-23, pedido explícito del usuario: cuando ninguna regla reconoce la pregunta Y el
+ * proveedor de IA no está configurado en este entorno, no tiene sentido que la voz devuelva un
+ * error de configuración del backend — mejor un mensaje local honesto, igual de "conversacional"
+ * que el resto de las respuestas por reglas, invitando a reformular. Solo aplica a ESTE camino
+ * (voz/conversación) — /ai/analisis (Fase 9, análisis explícito por texto) sigue propagando el
+ * error tal cual, porque ahí el usuario sí está pidiendo específicamente un análisis con IA.
+ */
+const RESPUESTA_SIN_RECONOCER = 'No te entendí bien esa pregunta. Preguntame de otra forma, por ejemplo cuánto llevo hoy, cuánta deuda tengo o cómo voy con mi meta.'
 
 /**
  * Punto de entrada de POST /ai/conversacion (Fase 10). Es la pieza que decide,
@@ -53,13 +63,18 @@ export async function procesarTurnoConversacion(
   }
 
   const preguntaConHistorial = armarPreguntaConTurnosPrevios(texto, contexto?.turnosPrevios)
-  const resultadoAnalisis = await generarAnalisis(preguntaConHistorial, contexto, profundidad, proveedorIA)
 
-  return {
-    intencion: null,
-    respuesta: resultadoAnalisis.respuesta,
-    resueltaPorRegla: false,
-    generadaPorIA: resultadoAnalisis.generadaPorIA,
+  try {
+    const resultadoAnalisis = await generarAnalisis(preguntaConHistorial, contexto, profundidad, proveedorIA)
+    return {
+      intencion: null,
+      respuesta: resultadoAnalisis.respuesta,
+      resueltaPorRegla: false,
+      generadaPorIA: resultadoAnalisis.generadaPorIA,
+    }
+  } catch (error) {
+    if (!(error instanceof ErrorProveedorIASinConfigurar)) throw error
+    return { intencion: null, respuesta: RESPUESTA_SIN_RECONOCER, resueltaPorRegla: false, generadaPorIA: false }
   }
 }
 

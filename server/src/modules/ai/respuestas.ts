@@ -1,4 +1,4 @@
-import type { ContextoDesgloseItem, ContextoIntent, ContextoMantenimientoItem, Intencion } from './types.js'
+import type { ContextoAhorro, ContextoDeudas, ContextoDesgloseItem, ContextoIntent, ContextoMantenimientoItem, ContextoMetaDiaria, Intencion } from './types.js'
 
 /**
  * Arma la respuesta en texto para las intenciones que saben usar `contexto` — punto 3 de
@@ -36,6 +36,10 @@ export function armarRespuesta(intencion: Intencion, contexto?: ContextoIntent):
       if (!contexto?.hoy) return sinDatos('de hoy')
       return `Hoy llevas ${contarViajes(contexto.hoy.cantidadViajes)}.`
 
+    case 'resumen_hoy':
+      if (!contexto?.hoy) return sinDatos('de hoy')
+      return armarRespuestaResumenHoy(contexto.hoy, contexto.metaDiaria)
+
     case 'resumen_semana':
       if (!contexto?.semana) return sinDatos('de esta semana')
       return `Esta semana llevas ${formatearKm(contexto.semana.kmTotales)} km y ${formatearDinero(contexto.semana.ingresos)} en ${contarViajes(contexto.semana.cantidadViajes)}.`
@@ -48,6 +52,15 @@ export function armarRespuesta(intencion: Intencion, contexto?: ContextoIntent):
 
     case 'mejor_horario':
       return armarRespuestaMejorDe(contexto?.porFranja, 'horario', 'en el que mejor te va')
+
+    case 'deudas_estado':
+      return armarRespuestaDeudas(contexto?.deudas)
+
+    case 'ahorro_estado':
+      return armarRespuestaAhorro(contexto?.ahorro)
+
+    case 'meta_diaria_estado':
+      return armarRespuestaMetaDiaria(contexto?.metaDiaria)
 
     default:
       // No debería pasar nunca en la práctica: router.ts solo llama a esta
@@ -75,6 +88,38 @@ function armarRespuestaMantenimiento(items?: ContextoMantenimientoItem[]): strin
   if (vencidos.length > 0) partes.push(`vencido: ${vencidos.map((i) => i.nombre).join(', ')}`)
   if (proximos.length > 0) partes.push(`próximo a vencer: ${proximos.map((i) => i.nombre).join(', ')}`)
   return `Tienes ${partes.join(' — ')}.`
+}
+
+/** 'resumen_hoy' — el ejemplo real del usuario ("cuánto voy hoy") sin especificar qué dato: se le da todo (km + dinero + viajes), más el avance de la meta diaria si vino. */
+function armarRespuestaResumenHoy(hoy: NonNullable<ContextoIntent['hoy']>, metaDiaria?: ContextoMetaDiaria): string {
+  const base = `Hoy llevas ${formatearKm(hoy.kmTotales)} km, ${formatearDinero(hoy.ingresos)} en ${contarViajes(hoy.cantidadViajes)}.`
+  if (!metaDiaria) return base
+  return `${base} Vas ${Math.round(metaDiaria.progresoPorcentaje)}% de tu meta de hoy.`
+}
+
+function armarRespuestaDeudas(deudas?: ContextoDeudas): string {
+  if (!deudas) return sinDatos('de tus deudas')
+  if (deudas.cantidadActivas === 0) return 'No tienes deudas activas registradas.'
+
+  const base = `Tienes ${formatearDinero(deudas.totalPendiente)} pendiente en ${deudas.cantidadActivas} deuda${deudas.cantidadActivas === 1 ? '' : 's'}.`
+  if (!deudas.proximoPago) return base
+
+  const { nombre, monto, diasFaltantes } = deudas.proximoPago
+  const cuando = diasFaltantes <= 0 ? 'hoy' : diasFaltantes === 1 ? 'en 1 día' : `en ${diasFaltantes} días`
+  return `${base} El próximo pago es ${nombre} por ${formatearDinero(monto)}, ${cuando}.`
+}
+
+function armarRespuestaAhorro(ahorro?: ContextoAhorro): string {
+  if (!ahorro) return sinDatos('de tu ahorro')
+  if (ahorro.cantidadMetas === 0) return 'No tienes metas de ahorro activas.'
+  return `Llevas ${formatearDinero(ahorro.totalGuardado)} ahorrados de ${formatearDinero(ahorro.totalObjetivo)} en ${ahorro.cantidadMetas} meta${ahorro.cantidadMetas === 1 ? '' : 's'}.`
+}
+
+function armarRespuestaMetaDiaria(metaDiaria?: ContextoMetaDiaria): string {
+  if (!metaDiaria) return sinDatos('de tu meta diaria')
+  const base = `Tu meta de hoy es ${formatearDinero(metaDiaria.metaDeHoy)} y llevas ${formatearDinero(metaDiaria.ingresoHoy)} — ${Math.round(metaDiaria.progresoPorcentaje)}% cubierto.`
+  if (metaDiaria.faltanteRealista <= 0) return base
+  return `${base} Con tu ritmo real te puede quedar faltando ${formatearDinero(metaDiaria.faltanteRealista)}.`
 }
 
 /**

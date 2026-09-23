@@ -46,6 +46,21 @@ const esquemaContextoDesgloseItem = z.object({
   resumen: esquemaContextoResumen,
 })
 
+// 2026-09-23: mismo shape que ContextoDeudas/ContextoAhorro/ContextoMetaDiaria (server, types.ts) — ver ese archivo para el porqué de cada campo.
+const esquemaContextoProximoPago = z.object({ nombre: z.string(), monto: z.number(), diasFaltantes: z.number() })
+const esquemaContextoDeudas = z.object({
+  totalPendiente: z.number(),
+  cantidadActivas: z.number(),
+  proximoPago: esquemaContextoProximoPago.nullable(),
+})
+const esquemaContextoAhorro = z.object({ totalGuardado: z.number(), totalObjetivo: z.number(), cantidadMetas: z.number() })
+const esquemaContextoMetaDiaria = z.object({
+  metaDeHoy: z.number(),
+  ingresoHoy: z.number(),
+  progresoPorcentaje: z.number(),
+  faltanteRealista: z.number(),
+})
+
 const esquemaContexto = z
   .object({
     hoy: esquemaContextoResumen.optional(),
@@ -53,6 +68,9 @@ const esquemaContexto = z
     mantenimiento: z.array(esquemaContextoMantenimientoItem).optional(),
     porZona: z.array(esquemaContextoDesgloseItem).optional(),
     porFranja: z.array(esquemaContextoDesgloseItem).optional(),
+    deudas: esquemaContextoDeudas.optional(),
+    ahorro: esquemaContextoAhorro.optional(),
+    metaDiaria: esquemaContextoMetaDiaria.optional(),
   })
   .optional()
 

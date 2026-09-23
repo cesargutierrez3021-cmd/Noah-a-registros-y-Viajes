@@ -35,4 +35,19 @@ export interface ResultadoMetaDiaria {
   /** 0-100, ya recortado. Si metaDeHoy es 0 (sin meta configurada todavía), se muestra 100 — no hay nada que cubrir. */
   progresoPorcentaje: number
   cubierta: boolean
+  /**
+   * 2026-09-23, pedido explícito del usuario ("no me puede decir hágase un millón hoy, uno no
+   * se hace eso"): el promedio real de ingresos por día de los últimos 30 días con datos (mismo
+   * criterio que `kmPromedioDiario`, ver SeccionPulso.tsx) — el techo de lo que es realista
+   * pedirle a un solo día. `null` cuando todavía no hay historial suficiente para calcularlo.
+   */
+  capacidadDiariaRealista: number | null
+  /**
+   * Cuánto de `metaDeHoy` se sale de lo que `capacidadDiariaRealista` dice que es realista en un
+   * solo día — 0 si `metaDeHoy` ya cabe dentro de la capacidad real, o si no hay capacidad
+   * calculada todavía. No se resta de `metaDeHoy` ni de `progresoPorcentaje` (esos siguen siendo
+   * el número real, honesto) — es información aparte para avisar del hueco sin inflar la meta
+   * de un solo día a algo imposible.
+   */
+  faltanteRealista: number
 }

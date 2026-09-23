@@ -73,6 +73,26 @@ function ocurrenciasFrecuenciaEnMes(frecuencia: FrecuenciaCuota, año: number, m
  * mes — no un promedio de 30 días fijo, D-10: función pura, recibe todo
  * como parámetro (incluido `ahora`, para poder probarla con una fecha fija).
  */
+/**
+ * Cuánto suman las deudas activas ESTE mes calendario (no dividido en días todavía) — extraída
+ * de `calcularMetaBaseDiaria` para que MIA (voz) pueda responder "cuál es el pago de este mes"
+ * con el mismo número exacto que ya usa la barra de meta diaria, sin recalcularlo aparte (D-18).
+ */
+export function calcularTotalDeudasDelMes(deudasActivas: Deuda[], ahora: Date = new Date()): number {
+  const año = ahora.getFullYear()
+  const mes = ahora.getMonth()
+  const diasDelMesActual = ultimoDiaDelMes(año, mes)
+
+  return deudasActivas.reduce((acc, d) => {
+    if (d.cuotaProgramada) return acc + d.cuotaProgramada.monto * ocurrenciasCuotaEnMes(d.cuotaProgramada, año, mes)
+    if (d.fechaLimiteISO) return acc + montoMensualDeDeudaSinCuota(d.saldoActual, d.fechaLimiteISO, ahora, diasDelMesActual)
+    // Ni cuota fija ni fecha límite: no hay ninguna referencia temporal real de la que
+    // partir para prorratear — sigue sin contar acá (es honesto, no hay forma de saber
+    // cuándo hace falta ese dinero).
+    return acc
+  }, 0)
+}
+
 export function calcularMetaBaseDiaria(input: {
   conceptosFijosActivos: ConceptoFijo[]
   deudasActivas: Deuda[]
@@ -90,15 +110,7 @@ export function calcularMetaBaseDiaria(input: {
   const totalHogarMes = input.conceptosFijosActivos.reduce((acc, c) => acc + c.montoEsperado, 0)
   const hogar = totalHogarMes / diasDelMesActual
 
-  const totalDeudasMes = input.deudasActivas.reduce((acc, d) => {
-    if (d.cuotaProgramada) return acc + d.cuotaProgramada.monto * ocurrenciasCuotaEnMes(d.cuotaProgramada, año, mes)
-    if (d.fechaLimiteISO) return acc + montoMensualDeDeudaSinCuota(d.saldoActual, d.fechaLimiteISO, ahora, diasDelMesActual)
-    // Ni cuota fija ni fecha límite: no hay ninguna referencia temporal real de la que
-    // partir para prorratear — sigue sin contar acá (es honesto, no hay forma de saber
-    // cuándo hace falta ese dinero).
-    return acc
-  }, 0)
-  const deudas = totalDeudasMes / diasDelMesActual
+  const deudas = calcularTotalDeudasDelMes(input.deudasActivas, ahora) / diasDelMesActual
 
   const totalAhorroMes = input.metasAhorroEnProgreso.reduce((acc, m) => {
     if (!m.aportePlaneado) return acc
@@ -148,11 +160,27 @@ export function generarClavesDiasAnteriores(primerViajeISO: string | null, venta
  * los días pasados también (no hay snapshot histórico de la meta día a
  * día) — una aproximación razonable, documentada, no una réplica exacta.
  */
+/**
+ * 2026-09-23, pedido explícito del usuario ("no me puede decir hágase un millón hoy, uno no se
+ * hace eso... por mucho que yo me haga son 310 mil"): antes de este cambio, `metaDeHoy` podía
+ * pedir cualquier número sin techo — honesto en el sentido de "esto es lo que hace falta", pero
+ * inútil como meta de UN día si ya de entrada es más de lo que el conductor puede producir. Acá
+ * no se toca `metaDeHoy` (sigue siendo el número real, el que usa `progresoPorcentaje`) — se
+ * calcula aparte cuánto de eso se sale de lo realista, para que la pantalla pueda mostrar la
+ * verdad completa: "tu meta es X, pero con tu ritmo real vas a quedar corto Y" en vez de fingir
+ * que un solo día puede resolver un hueco que en realidad es de varios días.
+ */
+function calcularFaltanteRealista(metaDeHoy: number, capacidadDiariaRealista: number | null): number {
+  if (capacidadDiariaRealista === null || capacidadDiariaRealista <= 0) return 0
+  return Math.max(0, metaDeHoy - capacidadDiariaRealista)
+}
+
 export function calcularMetaDiaria(
   metaBase: number,
   ingresosPorDiaClave: Map<string, number>,
   clavesDiasAnteriores: string[],
   ingresoHoy: number,
+  capacidadDiariaRealista: number | null = null,
 ): ResultadoMetaDiaria {
   let deficit = 0
   for (const clave of clavesDiasAnteriores) {
@@ -171,5 +199,7 @@ export function calcularMetaDiaria(
     ingresoHoy,
     progresoPorcentaje,
     cubierta: ingresoHoy >= metaDeHoy,
+    capacidadDiariaRealista,
+    faltanteRealista: calcularFaltanteRealista(metaDeHoy, capacidadDiariaRealista),
   }
 }
