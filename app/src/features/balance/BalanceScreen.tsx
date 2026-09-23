@@ -90,20 +90,32 @@ export function BalanceScreen() {
     void cargarMantenimiento()
   }, [cargarViajes, cargarGastos, cargarDeudas, cargarHogar, cargarAhorro, cargarBonos, cargarMantenimiento])
 
-  const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar, metasAhorro, bonos)
+  const balance = calcularBalanceGeneral(viajes, gastos, deudas, gastosHogar, metasAhorro, bonos, registrosMantenimiento)
 
   /**
    * 2026-09-16, pedido explícito del usuario: "falta la gráfica de los
    * gastos de la moto... todo lo que reporto como gastos dentro del panel
    * de trabajo y todo lo de los mantenimientos" — dos fuentes reales
-   * distintas, nunca se pisan: `balance.gastosOperativos` (domain/gastos,
-   * lo cargado a mano en "Gastos de jornada") y el costo real de cada
-   * mantenimiento marcado "realizado" (`RegistroMantenimiento.costo`, ver
-   * TarjetaMantenimiento.tsx — antes siempre se guardaba `null`, sin UI
-   * para cargarlo; ahora hay un campo "Costo real" junto al botón).
+   * distintas, nunca se pisan: lo cargado a mano en "Gastos de jornada" y el
+   * costo real de cada mantenimiento marcado "realizado"
+   * (`RegistroMantenimiento.costo`, ver TarjetaMantenimiento.tsx — antes
+   * siempre se guardaba `null`, sin UI para cargarlo; ahora hay un campo
+   * "Costo real" junto al botón).
+   *
+   * 2026-09-23, corrección de un bug real reportado por el usuario ("cuando
+   * yo lo pongo en mantenimiento... no me lo está calculando"): antes ESTE
+   * archivo era el único lugar que sumaba las dos fuentes — `calcularBalanceGeneral`
+   * (domain/balance/calculos.ts) solo sabía de `gastos`, así que el costo real
+   * de mantenimiento nunca llegaba a `balance.gastosOperativos`/`balanceNeto`
+   * (el stat "Gastos totales" de arriba), ni al acordeón "Gastos de la moto"
+   * de más abajo (su resumen usa `balance.gastosOperativos` directo) — solo
+   * se sumaba acá, a mano, para esta gráfica puntual. Ahora `calcularBalanceGeneral`
+   * ya incluye el costo de mantenimiento realizado en `gastosOperativos`
+   * (D-18, un solo lugar) — `gastosVehiculoTotal` ya no necesita sumarlo de
+   * nuevo (sumarlo acá otra vez lo contaría doble).
    */
   const costoMantenimientoRealizado = registrosMantenimiento.reduce((acc, r) => acc + (r.costo ?? 0), 0)
-  const gastosVehiculoTotal = balance.gastosOperativos + costoMantenimientoRealizado
+  const gastosVehiculoTotal = balance.gastosOperativos
 
   // 2026-09-17 (corrección posterior, misma sesión, pedido explícito del
   // usuario): "ese porcentaje equivale al ingreso... si tengo un ingreso de
@@ -190,7 +202,16 @@ export function BalanceScreen() {
   const gastosHogarAgrupados = agruparPorClave(gastosHogar, (g) => g.nombre, (g) => g.monto)
   const maxGastoHogar = gastosHogarAgrupados[0]?.total ?? 0
 
-  const gastosVehiculoAgrupados = agruparPorClave(gastos, (g) => g.categoria, (g) => g.monto)
+  // 2026-09-23, corrección de un bug real reportado por el usuario: el costo real de un
+  // mantenimiento marcado "realizado" (`costoMantenimientoRealizado`, arriba) no aparecía en esta
+  // lista — solo los gastos cargados a mano desde "Gastos de jornada" (categoría "mantenimiento"
+  // incluida). Se agrega como una fila propia ("Mantenimiento realizado") para que la lista SÍ
+  // sume el mismo total que ya muestra el resumen del acordeón (`balance.gastosOperativos`, ver
+  // abajo) — antes esos dos números no coincidían.
+  const gastosVehiculoAgrupados = [
+    ...agruparPorClave(gastos, (g) => g.categoria, (g) => g.monto),
+    ...(costoMantenimientoRealizado > 0 ? [{ clave: 'mantenimiento_realizado', total: costoMantenimientoRealizado }] : []),
+  ].sort((a, b) => b.total - a.total)
   const maxGastoVehiculo = gastosVehiculoAgrupados[0]?.total ?? 0
   const tituloGastosVehiculo =
     tipoVehiculo === 'moto' ? 'Gastos de la moto' : tipoVehiculo === 'carro' ? 'Gastos del carro' : 'Gastos del vehículo (moto y carro)'
@@ -283,7 +304,7 @@ export function BalanceScreen() {
             gastosVehiculoAgrupados.map((g) => (
               <FilaResumen
                 key={g.clave}
-                nombre={CATEGORIAS_GASTO.find((c) => c.valor === g.clave)?.etiqueta ?? g.clave}
+                nombre={g.clave === 'mantenimiento_realizado' ? 'Mantenimiento realizado' : (CATEGORIAS_GASTO.find((c) => c.valor === g.clave)?.etiqueta ?? g.clave)}
                 monto={g.total}
                 porcentaje={maxGastoVehiculo > 0 ? (g.total / maxGastoVehiculo) * 100 : 0}
                 color="#f0c987"

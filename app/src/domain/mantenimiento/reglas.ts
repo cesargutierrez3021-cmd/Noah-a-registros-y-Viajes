@@ -1,4 +1,4 @@
-import type { EstadoAlerta, ItemMantenimiento, PlantillaItemMantenimiento } from './types'
+import type { EstadoAlerta, ItemMantenimiento, PlantillaItemMantenimiento, RegistroMantenimiento } from './types'
 
 /**
  * Catálogo de mantenimientos comunes para una moto de uso intensivo
@@ -161,4 +161,21 @@ export function tarifaDiariaItem(item: ItemMantenimiento, kmPromedioDiario: numb
   if (item.criterio === 'dias') return tarifaPorDias ?? 0
   if (item.criterio === 'km') return tarifaPorKm ?? 0
   return Math.max(tarifaPorDias ?? 0, tarifaPorKm ?? 0)
+}
+
+/**
+ * 2026-09-23, corrección de un bug real reportado por el usuario ("cuando yo lo pongo en
+ * mantenimiento... y le doy realizado hoy y pongo el valor de lo que costó... tiene que
+ * calcularme eso también como gasto de la moto, pero no me lo está calculando"): `costo`
+ * (`RegistroMantenimiento`, cargado al marcar un mantenimiento como realizado) es plata real
+ * gastada, pero vivía completamente aislado de `domain/gastos` — nada en "Lectura del día",
+ * "Resumen" (Hoy/Semana/Mes) ni el acordeón "Gastos de la moto" de Balance lo sumaba, solo se
+ * contaba un gasto de categoría "mantenimiento" cargado A MANO desde "Gastos de jornada". Un
+ * solo lugar (D-18) para esta cuenta — mismo criterio de rango [desdeISO, hastaISO) que
+ * `sumaCategoria`/`sumaTotalGastos` (SeccionPulso.tsx).
+ */
+export function costoRealizadoEnRango(registros: RegistroMantenimiento[], desdeISO: string, hastaISO: string): number {
+  return registros
+    .filter((r) => r.fechaISO >= desdeISO && r.fechaISO < hastaISO)
+    .reduce((acc, r) => acc + (r.costo ?? 0), 0)
 }
