@@ -47,6 +47,19 @@ export function haySesion(): boolean {
   return obtenerTokenAcceso() !== null
 }
 
+/**
+ * 2026-09-23, pedido explícito del usuario ("login/crear cuenta tarda 1-2 minutos"): Render y
+ * Neon (plan free) se duermen tras inactividad y tardan en despertar en el PRIMER request real
+ * — el keep-alive (.github/workflows/keep-alive.yml) ayuda pero no es 100% confiable (GitHub a
+ * veces retrasa o se salta ejecuciones programadas). Esto dispara un GET /salud apenas se abre
+ * la pantalla de cuenta (CuentaScreen.tsx), antes de que el conductor termine de teclear
+ * email/contraseña, para adelantar el despertar del backend en vez de esperar a que lo dispare
+ * el login mismo. No espera la respuesta ni reporta error — es un empujón, no una garantía.
+ */
+export function precalentarBackend(): void {
+  fetch(`${URL_BASE}/salud`).catch(() => undefined)
+}
+
 export class ErrorSinSesion extends Error {
   constructor() {
     super('Todavía no hay sesión iniciada.')

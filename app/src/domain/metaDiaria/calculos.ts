@@ -139,15 +139,22 @@ export function calcularMetaBaseDiaria(input: {
  */
 const VENTANA_DIAS_DEFICIT = 30
 
-/** Claves YYYY-MM-DD (Bogotá) de ayer hacia atrás, hasta `ventanaDias` días o el primer viaje registrado (lo que sea más reciente) — no se inventa déficit de antes de que el conductor empezara a usar la app. */
-export function generarClavesDiasAnteriores(primerViajeISO: string | null, ventanaDias: number = VENTANA_DIAS_DEFICIT): string[] {
-  if (!primerViajeISO) return []
-  const primerDiaClave = fechaNegocioISO(new Date(primerViajeISO))
+/**
+ * 2026-09-23, corrección de un bug real reportado por el usuario ("me está saliendo que tengo que
+ * hacerme 3 millones de pesos"): antes, esto generaba TODOS los días de ayer hacia atrás hasta
+ * `ventanaDias` días (o desde el primer viaje registrado), y `calcularMetaDiaria` trataba
+ * cualquier día sin ingresos registrados como un día TOTALMENTE perdido — sin poder distinguir
+ * "ese día no trabajé" (día libre, o antes de usar la app en serio) de "ese día trabajé y no
+ * alcancé la meta". Cada día vacío sumaba una meta base completa al arrastre del día siguiente,
+ * y con varios días vacíos en la ventana el déficit se disparaba a números que ningún día real
+ * puede cubrir. Ahora solo se cuentan los días donde SÍ hubo una jornada iniciada
+ * (`diasConJornadaClave`, ver domain/jornada/store.ts) — un día libre ya no cuenta como faltante.
+ */
+export function generarClavesDiasAnteriores(diasConJornadaClave: Set<string>, ventanaDias: number = VENTANA_DIAS_DEFICIT): string[] {
   const claves: string[] = []
   for (let i = ventanaDias; i >= 1; i--) {
     const clave = fechaNegocioISO(new Date(Date.now() - i * 86_400_000))
-    if (clave < primerDiaClave) continue
-    claves.push(clave)
+    if (diasConJornadaClave.has(clave)) claves.push(clave)
   }
   return claves
 }
