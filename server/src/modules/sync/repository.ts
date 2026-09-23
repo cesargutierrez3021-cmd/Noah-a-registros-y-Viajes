@@ -5,8 +5,11 @@ import type {
   JornadaSyncEntrada,
   RegistroMantenimientoSyncEntrada,
   GastoSyncEntrada,
+  BonoSyncEntrada,
   DeudaSyncEntrada,
   AbonoDeudaSyncEntrada,
+  MetaAhorroSyncEntrada,
+  AbonoAhorroSyncEntrada,
   ConceptoFijoSyncEntrada,
   GastoHogarSyncEntrada,
 } from './types.js'
@@ -41,6 +44,17 @@ export const repositorioSync = {
       kmTotalesReales: viaje.kmTotalesReales,
       distanciaReportadaPlataforma: viaje.distanciaReportadaPlataforma,
       ingreso: viaje.ingreso,
+      ingresoPendiente: viaje.ingresoPendiente,
+      // 2026-09-22 (comentario agregado en auditoría, sin cambiar el comportamiento):
+      // `localidad`/`zona` son los campos originales, de antes de que existiera la
+      // separación inicio/fin (ver la migración 20260914090000_viaje_zonas_inicio_fin).
+      // Se siguen escribiendo A PROPÓSITO junto con los nuevos — el cliente todavía lee
+      // `localidad`/`zona` como último fallback (ver `SeccionViajesYJornada.tsx`,
+      // `(v.localidadInicio ?? v.zonaInicio ?? v.localidad ?? v.zona)`) para viajes
+      // sincronizados antes de ese cambio, que solo tienen el par viejo. Quitar la
+      // escritura de acá dejaría esos viajes viejos sin ese dato en futuras
+      // actualizaciones — no es duplicación por descuido, es compatibilidad hacia atrás
+      // deliberada mientras exista algún viaje sincronizado sin el par nuevo.
       localidad: viaje.localidad,
       zona: viaje.zona,
     }
@@ -128,6 +142,25 @@ export const repositorioSync = {
     })
   },
 
+  /** null = no existe todavía ningún bono con ese id. */
+  async buscarBonoPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.bono.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  async guardarBono(usuarioId: string, bono: BonoSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      monto: bono.monto,
+      fechaISO: new Date(bono.fechaISO),
+    }
+
+    await prisma.bono.upsert({
+      where: { id: bono.id },
+      create: { id: bono.id, ...datos },
+      update: datos,
+    })
+  },
+
   /** null = no existe todavía ninguna deuda con ese id. */
   async buscarDeudaPorId(id: string): Promise<{ usuarioId: string } | null> {
     return prisma.deuda.findUnique({ where: { id }, select: { usuarioId: true } })
@@ -141,6 +174,7 @@ export const repositorioSync = {
       saldoInicial: deuda.saldoInicial,
       saldoActual: deuda.saldoActual,
       cuotaProgramada: (deuda.cuotaProgramada ?? undefined) as Prisma.InputJsonValue | undefined,
+      fechaLimiteISO: deuda.fechaLimiteISO ? new Date(deuda.fechaLimiteISO) : null,
       creadaEnISO: new Date(deuda.creadaEnISO),
     }
 
@@ -174,6 +208,51 @@ export const repositorioSync = {
     }
 
     await prisma.abonoDeuda.upsert({
+      where: { id: abono.id },
+      create: { id: abono.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ninguna meta de ahorro con ese id. */
+  async buscarMetaAhorroPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.metaAhorro.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /** Upsert por id — MetaAhorro es mutable (saldoActual sube con cada abono), mismo criterio que Deuda. */
+  async guardarMetaAhorro(usuarioId: string, meta: MetaAhorroSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      nombre: meta.nombre,
+      montoObjetivo: meta.montoObjetivo,
+      saldoActual: meta.saldoActual,
+      creadaEnISO: new Date(meta.creadaEnISO),
+      aportePlaneado: (meta.aportePlaneado ?? undefined) as Prisma.InputJsonValue | undefined,
+      fechaLimiteISO: meta.fechaLimiteISO ? new Date(meta.fechaLimiteISO) : null,
+    }
+
+    await prisma.metaAhorro.upsert({
+      where: { id: meta.id },
+      create: { id: meta.id, ...datos },
+      update: datos,
+    })
+  },
+
+  /** null = no existe todavía ningún abono de ahorro con ese id. */
+  async buscarAbonoAhorroPorId(id: string): Promise<{ usuarioId: string } | null> {
+    return prisma.abonoAhorro.findUnique({ where: { id }, select: { usuarioId: true } })
+  },
+
+  /** Upsert por id. `metaId` es FK real, mismo criterio que guardarAbonoDeuda (la traducción P2003 → 409 vive en service.ts). */
+  async guardarAbonoAhorro(usuarioId: string, abono: AbonoAhorroSyncEntrada): Promise<void> {
+    const datos = {
+      usuarioId,
+      metaId: abono.metaId,
+      monto: abono.monto,
+      fechaISO: new Date(abono.fechaISO),
+    }
+
+    await prisma.abonoAhorro.upsert({
       where: { id: abono.id },
       create: { id: abono.id, ...datos },
       update: datos,
@@ -229,5 +308,48 @@ export const repositorioSync = {
       create: { id: gasto.id, ...datos },
       update: datos,
     })
+  },
+
+  /**
+   * 2026-09-17, pedido explícito del usuario ("cada vez que instalo la
+   * aplicación, se borran todos los datos... supuestamente estamos
+   * conectados... para guardar la base de datos"): hasta acá, el sync era de
+   * una sola vía — el cliente subía datos (los 11 `guardarX` de arriba) pero
+   * nunca los volvía a bajar, así que reinstalar la app perdía todo aunque
+   * el usuario tuviera cuenta y los datos siguieran intactos en la base.
+   * Esta función junta los 11 recursos de un usuario en un solo viaje de
+   * ida — se usa una sola vez, al iniciar sesión (ver domain/restauracion/
+   * en el cliente), no en cada sync como las de arriba. `Promise.all`
+   * porque son 11 lecturas independientes contra la misma base, no hay
+   * razón para hacerlas en serie.
+   */
+  async obtenerTodo(usuarioId: string) {
+    const [
+      viajes,
+      jornadas,
+      registrosMantenimiento,
+      gastos,
+      bonos,
+      deudas,
+      abonosDeuda,
+      metasAhorro,
+      abonosAhorro,
+      conceptosFijos,
+      gastosHogar,
+    ] = await Promise.all([
+      prisma.viaje.findMany({ where: { usuarioId } }),
+      prisma.jornada.findMany({ where: { usuarioId } }),
+      prisma.registroMantenimiento.findMany({ where: { usuarioId } }),
+      prisma.gasto.findMany({ where: { usuarioId } }),
+      prisma.bono.findMany({ where: { usuarioId } }),
+      prisma.deuda.findMany({ where: { usuarioId } }),
+      prisma.abonoDeuda.findMany({ where: { usuarioId } }),
+      prisma.metaAhorro.findMany({ where: { usuarioId } }),
+      prisma.abonoAhorro.findMany({ where: { usuarioId } }),
+      prisma.conceptoFijo.findMany({ where: { usuarioId } }),
+      prisma.gastoHogar.findMany({ where: { usuarioId } }),
+    ])
+
+    return { viajes, jornadas, registrosMantenimiento, gastos, bonos, deudas, abonosDeuda, metasAhorro, abonosAhorro, conceptosFijos, gastosHogar }
   },
 }

@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useGastos } from '../../domain/gastos/store'
 import { sincronizarGastosPendientes } from '../../domain/gastos/sync'
+import { CATEGORIAS_GASTO } from '../../domain/gastos/types'
 import type { CategoriaGasto } from '../../domain/gastos/types'
-
-const CATEGORIAS: { valor: CategoriaGasto; etiqueta: string }[] = [
-  { valor: 'gasolina', etiqueta: 'Gasolina' },
-  { valor: 'aceite', etiqueta: 'Aceite' },
-  { valor: 'llantas', etiqueta: 'Llantas' },
-  { valor: 'mantenimiento', etiqueta: 'Mantenimiento' },
-  { valor: 'otro', etiqueta: 'Otro' },
-]
+import { useVehiculo } from '../../domain/vehiculo/store'
+import { CampoMonto } from '../../components/CampoMonto'
 
 export function SeccionGastos() {
   const { gastos, cargando, cargar, agregarGasto } = useGastos()
+  const { tipoVehiculo } = useVehiculo()
+  /**
+   * 2026-09-15, pedido explícito del usuario: "cuando uno elige solo moto,
+   * debe aparecer gastos relacionados a la moto, no a un carro... si elige
+   * ambos, que ahí sí le aparezcan en ambos casos" — mismo filtro que
+   * SeccionMantenimiento.tsx aplica a su catálogo. Solo se filtra la lista
+   * que arma el SELECTOR (para elegir categoría al cargar un gasto nuevo) —
+   * el historial de abajo sigue buscando en `CATEGORIAS_GASTO` completa, sin
+   * filtrar, para poder mostrar el nombre correcto de un gasto viejo aunque
+   * el conductor haya cambiado de vehículo después de cargarlo.
+   */
+  const categoriasSeleccionables = CATEGORIAS_GASTO.filter((c) => c.vehiculo === 'ambos' || tipoVehiculo === 'ambos' || c.vehiculo === tipoVehiculo)
 
   const [categoria, setCategoria] = useState<CategoriaGasto>('gasolina')
   const [monto, setMonto] = useState('')
@@ -58,14 +65,14 @@ export function SeccionGastos() {
         <label className="texto-mute">
           Categoría
           <select value={categoria} onChange={(e) => setCategoria(e.target.value as CategoriaGasto)} style={{ display: 'block', width: '100%' }}>
-            {CATEGORIAS.map((c) => (
+            {categoriasSeleccionables.map((c) => (
               <option key={c.valor} value={c.valor}>{c.etiqueta}</option>
             ))}
           </select>
         </label>
         <label className="texto-mute">
           Monto
-          <input type="number" inputMode="decimal" placeholder="Ej. 40000" value={monto} onChange={(e) => setMonto(e.target.value)} style={{ display: 'block', width: '100%' }} />
+          <CampoMonto valor={monto} onValorCambia={setMonto} placeholder="Ej. 40.000" />
         </label>
         {categoria === 'gasolina' && (
           <label className="texto-mute">
@@ -89,7 +96,7 @@ export function SeccionGastos() {
         <ul className="lista-viajes" style={{ marginBottom: 24, maxHeight: 240, overflowY: 'auto' }}>
           {gastosOrdenados.slice(0, 20).map((g) => (
             <li key={g.id} className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-              <strong>{CATEGORIAS.find((c) => c.valor === g.categoria)?.etiqueta ?? g.categoria} — ${g.monto.toLocaleString('es-CO')}</strong>
+              <strong>{CATEGORIAS_GASTO.find((c) => c.valor === g.categoria)?.etiqueta ?? g.categoria} — ${g.monto.toLocaleString('es-CO')}</strong>
               <span className="texto-mute">{new Date(g.fechaISO).toLocaleString('es-CO')}</span>
               {g.litros !== null && <span className="texto-mute">{g.litros} L</span>}
               {g.notas && <span className="texto-mute">{g.notas}</span>}

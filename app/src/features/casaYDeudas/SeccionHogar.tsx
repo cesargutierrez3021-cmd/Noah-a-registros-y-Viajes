@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useHogar } from '../../domain/hogar/store'
 import { sincronizarHogarPendiente } from '../../domain/hogar/sync'
+import { CampoMonto } from '../../components/CampoMonto'
 
 export function SeccionHogar() {
-  const { gastos, conceptos, cargando, cargar, agregarGastoUnico, agregarConceptoFijo, actualizarMontoConceptoFijo, desactivarConceptoFijo } = useHogar()
+  const { gastos, conceptos, pendientesDeConfirmar, cargando, cargar, agregarGastoUnico, agregarConceptoFijo, actualizarMontoConceptoFijo, desactivarConceptoFijo, confirmarGastoFijo } = useHogar()
+
+  const [mostrarFormUnico, setMostrarFormUnico] = useState(false)
+  const [mostrarFormFijo, setMostrarFormFijo] = useState(false)
 
   const [nombreUnico, setNombreUnico] = useState('')
   const [montoUnico, setMontoUnico] = useState('')
@@ -39,6 +43,7 @@ export function SeccionHogar() {
       void sincronizarHogarPendiente()
       setNombreUnico('')
       setMontoUnico('')
+      setMostrarFormUnico(false)
     } finally {
       setGuardandoUnico(false)
     }
@@ -67,6 +72,7 @@ export function SeccionHogar() {
       setNombreFijo('')
       setMontoFijo('')
       setDiaFijo('1')
+      setMostrarFormFijo(false)
     } finally {
       setGuardandoFijo(false)
     }
@@ -86,16 +92,44 @@ export function SeccionHogar() {
     void sincronizarHogarPendiente()
   }
 
+  async function manejarConfirmar(conceptoFijoId: string) {
+    await confirmarGastoFijo(conceptoFijoId)
+    void sincronizarHogarPendiente()
+  }
+
   const conceptosActivos = conceptos.filter((c) => c.activo)
   const historialOrdenado = [...gastos].sort((a, b) => b.fechaISO.localeCompare(a.fechaISO))
 
   return (
     <>
       <p className="texto-mute" style={{ marginBottom: 16 }}>
-        Los gastos fijos (arriendo, servicios) se cargan una sola vez y se autogeneran solos cada mes.
+        Los gastos fijos (arriendo, servicios) se cargan una sola vez — cada mes confirmás con un toque que ya se pagó (podés hacerlo antes de la fecha si querés adelantarte).
       </p>
 
+      {/* 2026-09-17, pedido explícito del usuario: "botoncito de chulo... hoy es 5, se vence hoy y la cuota eran 500... que yo le despiche paga y él ya suma que se pagó" — ver domain/hogar/calculos.ts, calcularGastosFijosPendientesDeConfirmar. */}
+      {pendientesDeConfirmar.length > 0 && (
+        <>
+          <h3 className="texto-mute">Pendientes de confirmar este mes</h3>
+          <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            {pendientesDeConfirmar.map((p) => (
+              <li key={p.conceptoFijoId} className="tarjeta-viaje" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>
+                  <strong>{p.nombre}</strong>
+                  <span className="texto-mute" style={{ display: 'block', fontSize: '0.78rem' }}>${p.monto.toLocaleString('es-CO')}</span>
+                </span>
+                <button type="button" onClick={() => void manejarConfirmar(p.conceptoFijoId)}>✓ Ya pagué</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <h3 className="texto-mute">Gasto único</h3>
+      {/* 2026-09-16, pedido explícito del usuario: menos scroll — el formulario queda detrás de un botón. */}
+      <button type="button" style={{ marginBottom: 16 }} onClick={() => setMostrarFormUnico((v) => !v)}>
+        {mostrarFormUnico ? 'Cancelar' : '+ Agregar gasto único'}
+      </button>
+      {mostrarFormUnico && (
       <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 12, alignItems: 'stretch' }}>
         <label className="texto-mute">
           Nombre
@@ -103,15 +137,20 @@ export function SeccionHogar() {
         </label>
         <label className="texto-mute">
           Monto
-          <input type="number" inputMode="decimal" placeholder="Ej. 120000" value={montoUnico} onChange={(e) => setMontoUnico(e.target.value)} style={{ display: 'block', width: '100%' }} />
+          <CampoMonto valor={montoUnico} onValorCambia={setMontoUnico} placeholder="Ej. 120.000" />
         </label>
         {errorUnico && <p style={{ color: '#ff6b6b' }}>{errorUnico}</p>}
         <button type="button" onClick={() => void manejarAgregarUnico()} disabled={guardandoUnico}>
           {guardandoUnico ? 'Guardando…' : 'Agregar gasto único'}
         </button>
       </div>
+      )}
 
       <h3 className="texto-mute">Gasto fijo mensual</h3>
+      <button type="button" style={{ marginBottom: 16 }} onClick={() => setMostrarFormFijo((v) => !v)}>
+        {mostrarFormFijo ? 'Cancelar' : '+ Agregar gasto fijo'}
+      </button>
+      {mostrarFormFijo && (
       <div className="tarjeta-viaje" style={{ marginBottom: 16, flexDirection: 'column', gap: 12, alignItems: 'stretch' }}>
         <label className="texto-mute">
           Nombre
@@ -119,7 +158,7 @@ export function SeccionHogar() {
         </label>
         <label className="texto-mute">
           Monto esperado cada mes
-          <input type="number" inputMode="decimal" placeholder="Ej. 500000" value={montoFijo} onChange={(e) => setMontoFijo(e.target.value)} style={{ display: 'block', width: '100%' }} />
+          <CampoMonto valor={montoFijo} onValorCambia={setMontoFijo} placeholder="Ej. 500.000" />
         </label>
         <label className="texto-mute">
           Día del mes en que se paga
@@ -130,6 +169,7 @@ export function SeccionHogar() {
           {guardandoFijo ? 'Guardando…' : 'Agregar gasto fijo'}
         </button>
       </div>
+      )}
 
       <h3 className="texto-mute">Gastos fijos activos</h3>
       {!cargando && conceptosActivos.length === 0 && <p className="texto-mute">No hay gastos fijos activos.</p>}
@@ -139,12 +179,10 @@ export function SeccionHogar() {
             <strong>{c.nombre}</strong>
             <span className="texto-mute">${c.montoEsperado.toLocaleString('es-CO')} — día {c.diaDelMes} de cada mes</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="number"
-                inputMode="decimal"
+              <CampoMonto
+                valor={montosEdicion[c.id] ?? ''}
+                onValorCambia={(crudo) => setMontosEdicion((actuales) => ({ ...actuales, [c.id]: crudo }))}
                 placeholder="Nuevo monto"
-                value={montosEdicion[c.id] ?? ''}
-                onChange={(e) => setMontosEdicion((actuales) => ({ ...actuales, [c.id]: e.target.value }))}
                 style={{ flex: 1 }}
               />
               <button type="button" onClick={() => void manejarActualizarMonto(c.id)}>Actualizar monto</button>

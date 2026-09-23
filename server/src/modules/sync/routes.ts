@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { servicioSync, ErrorSync } from './service.js'
-import { esquemaViajeSync, esquemaJornadaSync, esquemaRegistroMantenimientoSync, esquemaGastoSync, esquemaDeudaSync, esquemaAbonoDeudaSync, esquemaConceptoFijoSync, esquemaGastoHogarSync } from './schemas.js'
+import { esquemaViajeSync, esquemaJornadaSync, esquemaRegistroMantenimientoSync, esquemaGastoSync, esquemaBonoSync, esquemaDeudaSync, esquemaAbonoDeudaSync, esquemaMetaAhorroSync, esquemaAbonoAhorroSync, esquemaConceptoFijoSync, esquemaGastoHogarSync } from './schemas.js'
 import { requiereAutenticacion } from '../auth/middleware.js'
 import { async } from '../../http/asyncHandler.js'
 import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
@@ -120,6 +120,28 @@ rutasSync.post(
 )
 
 /**
+ * POST /sync/bonos — 2026-09-17, pedido explícito del usuario. Mismo patrón
+ * que /gastos: upsert por id, un bono por request.
+ */
+rutasSync.post(
+  '/bonos',
+  requiereAutenticacion,
+  limitadorSync,
+  async(async (req: Request, res: Response) => {
+    const bono = esquemaBonoSync.parse(req.body)
+    try {
+      await servicioSync.sincronizarBono(req.usuarioId!, bono)
+      res.json({ id: bono.id, sincronizado: true })
+    } catch (err) {
+      if (err instanceof ErrorSync) {
+        logEventoSeguridad({ tipo: 'sync_conflicto_pertenencia', ip: req.ip ?? 'desconocida', detalle: `bonoId=${bono.id}` })
+      }
+      throw err
+    }
+  }),
+)
+
+/**
  * POST /sync/deudas — Bloque 3 (continuación). A diferencia de /viajes, esta
  * se reenvía completa en cada abono (mismo patrón que /jornadas): el upsert
  * por id actualiza `saldoActual` en el lugar.
@@ -172,6 +194,51 @@ rutasSync.post(
 )
 
 /**
+ * POST /sync/ahorro — 2026-09-15. Mismo patrón exacto que /sync/deudas
+ * (upsert, mutable, un recurso por request) — ver schema.prisma (modelo MetaAhorro).
+ */
+rutasSync.post(
+  '/ahorro',
+  requiereAutenticacion,
+  limitadorSync,
+  async(async (req: Request, res: Response) => {
+    const meta = esquemaMetaAhorroSync.parse(req.body)
+    try {
+      await servicioSync.sincronizarMetaAhorro(req.usuarioId!, meta)
+      res.json({ id: meta.id, sincronizado: true })
+    } catch (err) {
+      if (err instanceof ErrorSync) {
+        logEventoSeguridad({ tipo: 'sync_conflicto_pertenencia', ip: req.ip ?? 'desconocida', detalle: `metaAhorroId=${meta.id}` })
+      }
+      throw err
+    }
+  }),
+)
+
+/**
+ * POST /sync/ahorro/abonos — mismo patrón exacto que /sync/deudas/abonos: el
+ * cliente sube la meta antes que sus abonos (domain/ahorro/sync.ts), puede
+ * igual recibir un 409 si el abono llega primero (FK real a MetaAhorro).
+ */
+rutasSync.post(
+  '/ahorro/abonos',
+  requiereAutenticacion,
+  limitadorSync,
+  async(async (req: Request, res: Response) => {
+    const abono = esquemaAbonoAhorroSync.parse(req.body)
+    try {
+      await servicioSync.sincronizarAbonoAhorro(req.usuarioId!, abono)
+      res.json({ id: abono.id, sincronizado: true })
+    } catch (err) {
+      if (err instanceof ErrorSync && err.codigoHttp === 403) {
+        logEventoSeguridad({ tipo: 'sync_conflicto_pertenencia', ip: req.ip ?? 'desconocida', detalle: `abonoAhorroId=${abono.id}` })
+      }
+      throw err
+    }
+  }),
+)
+
+/**
  * POST /sync/hogar/conceptos-fijos — Bloque 3, sección 3/4. Mismo patrón que
  * /deudas: se reenvía completo cada vez que cambia (monto esperado, o al
  * desactivarlo) — el upsert por id actualiza la fila en el lugar.
@@ -216,5 +283,25 @@ rutasSync.post(
       }
       throw err
     }
+  }),
+)
+
+/**
+ * GET /sync/todo — 2026-09-17, pedido explícito del usuario: el sync hasta
+ * acá era de una sola vía (push), así que reinstalar la app perdía todo aunque
+ * hubiera cuenta. Esta ruta devuelve los 11 recursos completos del usuario
+ * autenticado en un solo request — la usa domain/restauracion/ en el cliente,
+ * una sola vez al iniciar sesión (login o registro), nunca en el loop de sync
+ * automático normal (eso sigue siendo solo push, ver el resto de este
+ * archivo). Mismo `limitadorSync` que las rutas de arriba — un usuario real
+ * inicia sesión unas pocas veces por instalación, nunca en ráfaga.
+ */
+rutasSync.get(
+  '/todo',
+  requiereAutenticacion,
+  limitadorSync,
+  async(async (req: Request, res: Response) => {
+    const datos = await servicioSync.obtenerTodo(req.usuarioId!)
+    res.json(datos)
   }),
 )

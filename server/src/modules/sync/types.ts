@@ -49,6 +49,7 @@ export interface ViajeSyncEntrada {
   kmTotalesReales: number
   distanciaReportadaPlataforma: number | null
   ingreso: number
+  ingresoPendiente: boolean
   localidad: string | null
   zona: string | null
 }
@@ -87,13 +88,27 @@ export interface GastoSyncEntrada {
   notas: string | null
 }
 
+/** 2026-09-17, pedido explícito del usuario: "bono" de plataforma — solo monto y fecha. */
+export interface BonoSyncEntrada {
+  id: string
+  monto: number
+  fechaISO: string
+}
+
 /** Lo que el cliente manda por deuda (Bloque 3). Se reenvía completa en cada abono (mismo criterio que Jornada). */
 export interface DeudaSyncEntrada {
   id: string
   nombre: string
   saldoInicial: number
   saldoActual: number
-  cuotaProgramada: { monto: number; frecuencia: string } | null
+  cuotaProgramada: {
+    monto: number
+    frecuencia: string
+    diaDelMes?: number | null
+    diasDelMes?: [number, number] | null
+    diaDeLaSemana?: number | null
+  } | null
+  fechaLimiteISO: string | null
   creadaEnISO: string
 }
 
@@ -101,6 +116,28 @@ export interface DeudaSyncEntrada {
 export interface AbonoDeudaSyncEntrada {
   id: string
   deudaId: string
+  monto: number
+  fechaISO: string
+}
+
+/**
+ * Lo que el cliente manda por meta de ahorro (2026-09-15). Mismo patrón que
+ * DeudaSyncEntrada, invertido: `saldoActual` sube con cada abono en vez de bajar.
+ */
+export interface MetaAhorroSyncEntrada {
+  id: string
+  nombre: string
+  montoObjetivo: number
+  saldoActual: number
+  creadaEnISO: string
+  aportePlaneado: { monto: number; frecuencia: string } | null
+  fechaLimiteISO: string | null
+}
+
+/** Lo que el cliente manda por abono a una meta de ahorro. Mismo patrón que AbonoDeudaSyncEntrada. */
+export interface AbonoAhorroSyncEntrada {
+  id: string
+  metaId: string
   monto: number
   fechaISO: string
 }

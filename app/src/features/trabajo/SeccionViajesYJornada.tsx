@@ -1,61 +1,86 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useViajes } from '../../domain/viajes/store'
+import { useViajes, calcularKmLocal } from '../../domain/viajes/store'
 import { useJornada } from '../../domain/jornada/store'
+import { useBonos } from '../../domain/bonos/store'
 import { sincronizarViajesPendientes } from '../../domain/viajes/sync'
 import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
-import type { Plataforma } from '../../domain/viajes/types'
+import { sincronizarBonosPendientes } from '../../domain/bonos/sync'
+import { fechaNegocioISO, limitesDiaBogotaISODesdeClave } from '../../lib/fechas'
+import { PLATAFORMAS_DISPONIBLES as PLATAFORMAS } from '../../domain/viajes/types'
 
-const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap', 'Rappi', 'Particular']
-
-/** Misma lógica de orquestación que tenía ViajesScreen.tsx — solo se movió acá adentro del panel único. */
+/**
+ * Misma lógica de orquestación que tenía ViajesScreen.tsx — solo se movió
+ * acá adentro del panel único.
+ *
+ * 2026-09-15, pedido explícito del usuario: el botón "Iniciar/Terminar
+ * jornada" que vivía acá se quitó — estaba duplicado con el botón CTA de
+ * arriba (SeccionPulso, mismo store `useJornada`), y tener los dos confundía
+ * ("aparece arriba y también acá abajo"). El único botón de jornada que
+ * queda en todo el Panel Trabajo es el de arriba.
+ *
+ * 2026-09-15 (misma sesión, ronda posterior): la tarjeta de "viajes
+ * pendientes de ingreso" que vivía acá se sacó a `TarjetaViajesPendientes.tsx`
+ * — el usuario pidió que apareciera justo debajo de "Estado del sistema"
+ * (SeccionPulso.tsx), no acá abajo, donde había que hacer scroll para
+ * encontrarla.
+ *
+ * 2026-09-17, pedido explícito del usuario: "Agregar bono" (domain/bonos)
+ * vive acá, justo debajo del selector de plataforma ("los iconos... que está
+ * ahí lo de agregar viajes"). Esta sección ya se monta en TrabajoScreen.tsx
+ * como hermana de SeccionPulso, no adentro de ninguna de sus pestañas — por
+ * eso ya es "siempre visible sin importar la pantalla que esté
+ * seleccionando" sin necesidad de tocar nada de esa estructura. A propósito
+ * fuera de los dos bloques `viajeEnCurso`/`!viajeEnCurso`: un bono no
+ * depende de si hay un viaje en curso o no.
+ */
 export function SeccionViajesYJornada() {
-  const { viajes, viajeEnCurso, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje, corregirKmViaje } = useViajes()
-  const { jornadaAbierta, iniciarJornada, terminarJornada, agregarViajeAJornadaAbierta, cargar: cargarJornadas } =
-    useJornada()
+  const { viajeEnCurso, viajes, cargando, errorGPS, cargar, iniciarViaje, marcarRecogida, finalizarViaje } = useViajes()
+  const { agregarViajeAJornadaAbierta, cargar: cargarJornadas } = useJornada()
+  const { agregarBono, cargar: cargarBonos } = useBonos()
 
   const [ingreso, setIngreso] = useState('')
-  const [editandoKmId, setEditandoKmId] = useState<string | null>(null)
-  const [kmEnEdicion, setKmEnEdicion] = useState('')
+  const [kmCorregido, setKmCorregido] = useState('')
+  const [diaHistorial, setDiaHistorial] = useState(() => fechaNegocioISO())
+  const [montoBono, setMontoBono] = useState('')
 
   useEffect(() => {
     void cargar()
     void cargarJornadas()
-  }, [cargar, cargarJornadas])
-
-  const jornada = jornadaAbierta()
+    void cargarBonos()
+  }, [cargar, cargarJornadas, cargarBonos])
 
   async function manejarFinalizar() {
-    const viaje = await finalizarViaje({ ingreso: Number(ingreso) || 0, distanciaReportadaPlataforma: null })
+    const kmManual = kmCorregido.trim() ? Number(kmCorregido) : null
+    const viaje = await finalizarViaje({ ingreso: Number(ingreso) || 0, distanciaReportadaPlataforma: null, kmManual })
     if (viaje) await agregarViajeAJornadaAbierta(viaje.id)
     setIngreso('')
+    setKmCorregido('')
     void sincronizarViajesPendientes()
     void sincronizarJornadasPendientes()
   }
 
-  async function manejarTerminarJornada() {
-    await terminarJornada()
-    void sincronizarJornadasPendientes()
-  }
-
-  async function guardarKmEditado(id: string) {
-    const km = Number(kmEnEdicion)
-    if (!Number.isFinite(km) || km < 0) return
-    await corregirKmViaje(id, km)
-    setEditandoKmId(null)
-    void sincronizarViajesPendientes()
+  async function manejarAgregarBono() {
+    const monto = Number(montoBono)
+    if (!monto || monto <= 0) return
+    await agregarBono(monto)
+    setMontoBono('')
+    void sincronizarBonosPendientes()
   }
 
   return (
     <div id="seccion-viajes-jornada">
       <h2 className="tt-titulo-seccion">Jornada y viajes</h2>
 
-      <div className="tarjeta-viaje" style={{ marginBottom: 16 }}>
-        {jornada ? (
-          <button type="button" onClick={() => void manejarTerminarJornada()}>Terminar jornada</button>
-        ) : (
-          <button type="button" onClick={() => void iniciarJornada()}>Iniciar jornada</button>
-        )}
+      <div className="tarjeta-viaje" style={{ marginBottom: 16, gap: 8, alignItems: 'center' }}>
+        <input
+          type="number"
+          placeholder="Monto del bono"
+          value={montoBono}
+          onChange={(e) => setMontoBono(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <button type="button" onClick={() => void manejarAgregarBono()}>Agregar bono</button>
       </div>
 
       {!viajeEnCurso && (
@@ -86,49 +111,56 @@ export function SeccionViajesYJornada() {
             <button type="button" onClick={marcarRecogida}>Marcar recogida del pasajero</button>
           )}
           <input type="number" placeholder="Ingreso del viaje" value={ingreso} onChange={(e) => setIngreso(e.target.value)} />
+          <label className="texto-mute">
+            Km (opcional, corrige si el GPS midió mal)
+            <input
+              type="number"
+              step="0.1"
+              placeholder={`${calcularKmLocal(viajeEnCurso.recorrido).toFixed(1)} km medidos por GPS`}
+              value={kmCorregido}
+              onChange={(e) => setKmCorregido(e.target.value)}
+              style={{ display: 'block', width: '100%' }}
+            />
+          </label>
           <button type="button" onClick={() => void manejarFinalizar()}>Finalizar viaje</button>
         </div>
       )}
 
+      <h3 className="texto-mute" style={{ marginTop: 8 }}>Historial</h3>
+      <div className="tarjeta-viaje" style={{ marginBottom: 12 }}>
+        <label className="texto-mute" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          Día
+          <input type="date" value={diaHistorial} onChange={(e) => setDiaHistorial(e.target.value)} style={{ flex: 1 }} />
+        </label>
+      </div>
+
       {cargando ? (
         <p className="texto-mute">Cargando viajes…</p>
-      ) : viajes.length === 0 ? (
-        <p className="texto-mute" style={{ marginBottom: 16 }}>Todavía no hay viajes registrados.</p>
       ) : (
-        <ul className="lista-viajes" style={{ marginBottom: 16, maxHeight: 280, overflowY: 'auto' }}>
-          {viajes.slice(0, 20).map((v) => (
-            <li key={v.id} className="tarjeta-viaje">
-              <span className="tarjeta-viaje__plataforma">{v.plataforma}</span>
-              {editandoKmId === v.id ? (
-                <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    autoFocus
-                    value={kmEnEdicion}
-                    onChange={(e) => setKmEnEdicion(e.target.value)}
-                    style={{ width: 64 }}
-                  />
-                  <button type="button" onClick={() => void guardarKmEditado(v.id)}>✓</button>
-                  <button type="button" onClick={() => setEditandoKmId(null)}>✕</button>
-                </span>
-              ) : (
-                <span
-                  className="tarjeta-viaje__km"
-                  onClick={() => {
-                    setEditandoKmId(v.id)
-                    setKmEnEdicion(String(v.distancia.kmTotalesReales))
-                  }}
-                  style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
-                  title="El GPS puede fallar en viajes cortos o al arrancar detenido — toca para corregir el km a mano"
-                >
-                  {v.distancia.kmTotalesReales.toFixed(1)} km reales ✏️
-                </span>
-              )}
-              <span className="tarjeta-viaje__ingreso">${v.ingreso.toLocaleString('es-CO')}</span>
-            </li>
-          ))}
-        </ul>
+        (() => {
+          const { desde, hasta } = limitesDiaBogotaISODesdeClave(diaHistorial)
+          const delDia = viajes.filter((v) => v.estado === 'finalizado' && v.inicioISO >= desde && v.inicioISO < hasta)
+          if (delDia.length === 0) {
+            return <p className="texto-mute" style={{ marginBottom: 16 }}>Sin viajes ese día.</p>
+          }
+          return (
+            <ul className="lista-viajes" style={{ marginBottom: 16, maxHeight: 320, overflowY: 'auto' }}>
+              {delDia.map((v) => (
+                <li key={v.id} className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+                  <span className="tarjeta-viaje__plataforma">
+                    {v.plataforma} · {v.distancia.kmTotalesReales.toFixed(1)} km ·{' '}
+                    {v.ingresoPendiente ? 'Falta el ingreso' : `$${v.ingreso.toLocaleString('es-CO')}`}
+                  </span>
+                  <span className="texto-mute">
+                    {(v.localidadInicio ?? v.zonaInicio ?? v.localidad ?? v.zona) ?? 'Zona no detectada'}
+                    {' → '}
+                    {(v.localidadFin ?? v.zonaFin ?? v.localidad ?? v.zona) ?? 'Zona no detectada'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )
+        })()
       )}
     </div>
   )

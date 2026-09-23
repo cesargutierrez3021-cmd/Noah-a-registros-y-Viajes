@@ -24,7 +24,14 @@
  * pendiente #4 original: "alcanza para el caso normal").
  */
 
-interface ResultadoSincronizacion {
+/**
+ * 2026-09-22 (limpieza de auditoría, D-18): antes esta misma interfaz se
+ * redeclaraba, idéntica, en cada uno de los 8 sync.ts de dominio — cualquier
+ * cambio de forma había que aplicarlo a mano 9 veces. Ahora se exporta desde
+ * acá (el único consumidor genérico que le da forma real) y cada sync.ts la
+ * importa en vez de repetirla.
+ */
+export interface ResultadoSincronizacion {
   intentados: number
   sincronizados: number
   primerError: string | null

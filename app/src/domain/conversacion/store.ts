@@ -19,6 +19,16 @@ interface EstadoStoreConversacion {
   estado: EstadoConversacion
   turnos: TurnoConversacion[]
   ultimoError: string | null
+  /**
+   * 2026-09-15, pedido explícito del usuario: la manija de la burbuja
+   * flotante activa a MIA sin que el conductor tenga que navegar nada — ver
+   * domain/viajes/burbujaOrquestacion.ts (quien llama `solicitarAperturaConVoz`)
+   * y features/mia/MiaBurbuja.tsx (quien lo consume: abre el panel Y arranca
+   * a escuchar solo, apenas el permiso de micrófono esté listo).
+   */
+  aperturaConVozSolicitada: boolean
+  solicitarAperturaConVoz: () => void
+  limpiarSolicitudApertura: () => void
   /** Escucha una frase, la manda al backend, y lee la respuesta en voz alta. */
   escucharYResponder: (contexto?: ContextoConversacionEnvio) => Promise<void>
   cancelar: () => void
@@ -29,6 +39,9 @@ export const useConversacion = create<EstadoStoreConversacion>((set, get) => ({
   estado: 'inactiva',
   turnos: [],
   ultimoError: null,
+  aperturaConVozSolicitada: false,
+  solicitarAperturaConVoz: () => set({ aperturaConVozSolicitada: true }),
+  limpiarSolicitudApertura: () => set({ aperturaConVozSolicitada: false }),
 
   escucharYResponder: async (contextoBase) => {
     set({ estado: 'escuchando', ultimoError: null })

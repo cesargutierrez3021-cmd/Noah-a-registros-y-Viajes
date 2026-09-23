@@ -1,12 +1,7 @@
+import type { ResultadoSincronizacion } from '../../lib/autoSync'
 import { haySesion } from '../../lib/api'
 import { repositorioMantenimiento } from './repository'
 import { subirRegistroMantenimiento } from './api'
-
-export interface ResultadoSincronizacion {
-  intentados: number
-  sincronizados: number
-  primerError: string | null
-}
 
 /**
  * Mismo patrón que domain/viajes/sync.ts y domain/jornada/sync.ts. Solo

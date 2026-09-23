@@ -31,6 +31,25 @@ class BurbujaPlugin : Plugin() {
         instanciaActiva = this
     }
 
+    /**
+     * 2026-09-15, pedido explícito del usuario: BurbujaService.activarAsistenteDeVoz()
+     * deja un aviso en SharedPreferences y trae la Activity al frente cuando
+     * se toca la manija — acá es donde se recoge ese aviso, apenas la app
+     * vuelve a primer plano (mismo patrón que GpsTrackingPlugin.handleOnDestroy(),
+     * un lifecycle callback que Capacitor ya expone en `Plugin`, sin plugin
+     * nuevo). Reusa el mismo canal "accion" que ya escucha
+     * domain/viajes/burbujaOrquestacion.ts — ahí es donde de verdad se abre
+     * la conversación con MIA.
+     */
+    override fun handleOnResume() {
+        super.handleOnResume()
+        val prefs = context.getSharedPreferences("mia-burbuja", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("voz_pendiente", false)) {
+            prefs.edit().putBoolean("voz_pendiente", false).apply()
+            notificarAccion("abrirVoz")
+        }
+    }
+
     fun notificarAccion(accion: String, km: Double? = null, inicioMs: Long? = null, finMs: Long? = null, tiempoMs: Long? = null) {
         val datos = JSObject()
         datos.put("accion", accion)
@@ -74,9 +93,6 @@ class BurbujaPlugin : Plugin() {
         i.putExtra(BurbujaService.EXTRA_TIEMPO, call.getString("tiempo", "0m"))
         i.putExtra(BurbujaService.EXTRA_EN_VIAJE, call.getBoolean("enViaje", false) ?: false)
         i.putExtra(BurbujaService.EXTRA_TOTAL_VIAJES, call.getInt("totalViajes", 0) ?: 0)
-        i.putExtra(BurbujaService.EXTRA_RESUMEN_HOY, call.getString("resumenHoy", ""))
-        i.putExtra(BurbujaService.EXTRA_RESUMEN_SEMANA, call.getString("resumenSemana", ""))
-        i.putExtra(BurbujaService.EXTRA_RESUMEN_MES, call.getString("resumenMes", ""))
         i.putExtra(BurbujaService.EXTRA_COLOR_ACENTO, call.getString("colorAcento", "#D4AF37"))
         i.putExtra(BurbujaService.EXTRA_COLOR_FG, call.getString("colorFg", "#F3EDDD"))
         i.putExtra(BurbujaService.EXTRA_COLOR_SURFACE, call.getString("colorSurface", "#14100A"))
@@ -94,10 +110,7 @@ class BurbujaPlugin : Plugin() {
         i.putExtra(BurbujaService.EXTRA_TIEMPO, call.getString("tiempo", "0m"))
         i.putExtra(BurbujaService.EXTRA_EN_VIAJE, call.getBoolean("enViaje", false) ?: false)
         i.putExtra(BurbujaService.EXTRA_TOTAL_VIAJES, call.getInt("totalViajes", 0) ?: 0)
-        i.putExtra(BurbujaService.EXTRA_RESUMEN_HOY, call.getString("resumenHoy", ""))
-        i.putExtra(BurbujaService.EXTRA_RESUMEN_SEMANA, call.getString("resumenSemana", ""))
-        i.putExtra(BurbujaService.EXTRA_RESUMEN_MES, call.getString("resumenMes", ""))
-        val prefs = context.getSharedPreferences("noah-burbuja", android.content.Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("mia-burbuja", android.content.Context.MODE_PRIVATE)
         i.putExtra(BurbujaService.EXTRA_COLOR_ACENTO, call.getString("colorAcento", prefs.getString(BurbujaService.EXTRA_COLOR_ACENTO, "#D4AF37")))
         i.putExtra(BurbujaService.EXTRA_COLOR_FG, call.getString("colorFg", prefs.getString(BurbujaService.EXTRA_COLOR_FG, "#F3EDDD")))
         i.putExtra(BurbujaService.EXTRA_COLOR_SURFACE, call.getString("colorSurface", prefs.getString(BurbujaService.EXTRA_COLOR_SURFACE, "#14100A")))
@@ -118,7 +131,7 @@ class BurbujaPlugin : Plugin() {
         val acento = call.getString("colorAcento", "#D4AF37") ?: "#D4AF37"
         val fg = call.getString("colorFg", "#F3EDDD") ?: "#F3EDDD"
         val surface = call.getString("colorSurface", "#14100A") ?: "#14100A"
-        context.getSharedPreferences("noah-burbuja", android.content.Context.MODE_PRIVATE).edit()
+        context.getSharedPreferences("mia-burbuja", android.content.Context.MODE_PRIVATE).edit()
             .putString(BurbujaService.EXTRA_COLOR_ACENTO, acento)
             .putString(BurbujaService.EXTRA_COLOR_FG, fg)
             .putString(BurbujaService.EXTRA_COLOR_SURFACE, surface)
@@ -138,7 +151,7 @@ class BurbujaPlugin : Plugin() {
 
     @PluginMethod
     fun viajePendiente(call: PluginCall) {
-        val prefs = context.getSharedPreferences("noah-burbuja", android.content.Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("mia-burbuja", android.content.Context.MODE_PRIVATE)
         val inicio = prefs.getLong("viaje_inicio", 0L)
         if (inicio == 0L) { call.resolve(JSObject()); return }
         val r = JSObject()
@@ -151,7 +164,7 @@ class BurbujaPlugin : Plugin() {
 
     @PluginMethod
     fun limpiarViajePendiente(call: PluginCall) {
-        context.getSharedPreferences("noah-burbuja", android.content.Context.MODE_PRIVATE).edit().clear().apply()
+        context.getSharedPreferences("mia-burbuja", android.content.Context.MODE_PRIVATE).edit().clear().apply()
         call.resolve()
     }
 }

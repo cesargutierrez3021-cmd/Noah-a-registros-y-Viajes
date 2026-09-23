@@ -19,14 +19,19 @@ model Usuario {
   creadoEnISO    DateTime @default(now()) @map("creado_en")
   planes         PlanDeUsuario[]
   tokensRefresco TokenRefresco[]
+  codigosRecuperacion CodigoRecuperacionContrasena[]
   viajes         Viaje[]
   jornadas       Jornada[]
   registrosMantenimiento RegistroMantenimiento[]
   gastos         Gasto[]
+  bonos          Bono[]
   deudas         Deuda[]
   abonosDeuda    AbonoDeuda[]
+  metasAhorro    MetaAhorro[]
+  abonosAhorro   AbonoAhorro[]
   conceptosFijos ConceptoFijo[]
   gastosHogar    GastoHogar[]
+  consultasIA    ConsultaIA[]
 
   @@map("usuarios")
 }
@@ -43,6 +48,24 @@ model TokenRefresco {
   creadoEnISO   DateTime @default(now()) @map("creado_en")
 
   @@map("tokens_refresco")
+}
+
+/// "Olvidé mi contraseña" — código numérico de 6 dígitos, no un link (la app es
+/// móvil, sin deep-link configurado — más simple pedirle al usuario que teclee
+/// el código que le llega por email que armar universal links para Android).
+/// Se guarda hasheado (mismo criterio que TokenRefresco): igual sirve para
+/// invalidar un código sin poder leerlo si la base de datos se filtra.
+model CodigoRecuperacionContrasena {
+  id            String   @id @default(uuid())
+  usuarioId     String   @map("usuario_id")
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  codigoHash    String   @map("codigo_hash")
+  expiraEnISO   DateTime @map("expira_en")
+  usadoEnISO    DateTime? @map("usado_en")
+  creadoEnISO   DateTime @default(now()) @map("creado_en")
+
+  @@index([usuarioId])
+  @@map("codigos_recuperacion_contrasena")
 }
 
 /// Catálogo de planes. Fase 7 solo necesitaba que existiera "gratis"; Fase 11 agrega
@@ -101,6 +124,11 @@ model Viaje {
   kmTotalesReales               Float     @map("km_totales_reales")
   distanciaReportadaPlataforma  Float?    @map("distancia_reportada_plataforma")
   ingreso                       Float
+  /// 2026-09-16: true mientras el viaje se terminó desde la burbuja flotante
+  /// (sin abrir la app) y todavía no se le escribió el ingreso real — ver el
+  /// comentario completo en app/src/domain/viajes/types.ts. Default false
+  /// para que la migración no rompa filas que ya existían.
+  ingresoPendiente              Boolean   @default(false) @map("ingreso_pendiente")
   localidad                     String?
   zona                          String?
   sincronizadoEnISO             DateTime  @default(now()) @updatedAt @map("sincronizado_en")
@@ -178,6 +206,25 @@ model Gasto {
   @@map("gastos")
 }
 
+/// 2026-09-17, pedido explícito del usuario: "bono" de una plataforma (ej.
+/// Uber/DiDi por cumplir X viajes) — plata que entra pero NO es un viaje.
+/// Mismo criterio append-only que Gasto (nunca se edita ni se borra, solo
+/// monto + fecha, sin categoría ni plataforma — el usuario pidió "solo el
+/// monto" a propósito, sin fricción). Solo cuenta en `ingresos` de
+/// domain/estadisticas/calculos.ts, `calcularResumen` — nunca en
+/// `cantidadViajes` ni en `ingresoPromedioPorViaje` (un bono no es un viaje).
+model Bono {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  monto              Float
+  fechaISO           DateTime  @map("fecha")
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@map("bonos")
+}
+
 /// Bloque 3 (dominios nuevos) — deudas. A diferencia de Gasto/RegistroMantenimiento
 /// (append-only), Deuda es MUTABLE: `saldoActual` se actualiza con cada abono
 /// (ver app/src/domain/deudas/store.ts, función `abonar`) y se resincroniza vía
@@ -190,10 +237,16 @@ model Deuda {
   nombre             String
   saldoInicial       Float     @map("saldo_inicial")
   saldoActual        Float     @map("saldo_actual")
-  /// { monto: number, frecuencia: 'semanal'|'quincenal'|'mensual' } o null. Json en vez de columnas
+  /// { monto: number, frecuencia: 'semanal'|'quincenal'|'mensual', diaDelMes?, diasDelMes?,
+  /// diaDeLaSemana? } o null (2026-09-22, comentario actualizado: solo el ancla que
+  /// corresponde a `frecuencia` viene con valor, ver sync/schemas.ts). Json en vez de columnas
   /// separadas porque es opcional como bloque completo, no campo por campo (D-8: no hay razón
-  /// técnica para partirlo en dos columnas nullable en vez de un solo objeto).
+  /// técnica para partirlo en columnas nullable en vez de un solo objeto).
   cuotaProgramada    Json?     @map("cuota_programada")
+  /// 2026-09-15, pedido explícito del usuario: fecha real de vencimiento, puesta a mano por el
+  /// conductor (antes solo existía `cuotaProgramada`, opcional, sin ancla de fecha real) — ver
+  /// domain/avisos/calculos.ts en el cliente para cómo se usa en la alerta de "por vencer".
+  fechaLimiteISO     DateTime? @map("fecha_limite")
   creadaEnISO        DateTime  @map("creada_en")
   sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
   abonos             AbonoDeuda[]
@@ -218,6 +271,61 @@ model AbonoDeuda {
   @@index([usuarioId])
   @@index([deudaId])
   @@map("abonos_deuda")
+}
+
+/// 2026-09-15, pedido explícito del usuario tras ver la maqueta visual:
+/// "Ahorro" estaba mencionado desde el diseño de paneles (Panel "Casa y
+/// Deudas" = Hogar/Deudas/Ahorro) pero nunca se había construido — ver el
+/// comentario que quedó en CasaYDeudasScreen.tsx. Mismo patrón exacto que
+/// Deuda/AbonoDeuda, invertido: acá `saldoActual` SUBE con cada abono en vez
+/// de bajar, y nunca pasa de `montoObjetivo` (mismo criterio que Deuda nunca
+/// baja de 0 — ver domain/ahorro/store.ts del cliente).
+model MetaAhorro {
+  id                 String    @id
+  usuarioId          String    @map("usuario_id")
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nombre             String
+  montoObjetivo      Float     @map("monto_objetivo")
+  saldoActual        Float     @map("saldo_actual")
+  /// 2026-09-17, pedido explícito del usuario: "no me aparece fecha de
+  /// límite para ahorrar" — mismo campo y mismo criterio que
+  /// Deuda.fechaLimiteISO (fecha real, puesta a mano, editable, null = sin
+  /// fecha puesta todavía). A diferencia de Deuda, hoy no dispara ningún
+  /// aviso propio (domain/avisos solo cubre deudas/hogar) — se guarda para
+  /// mostrarla en la tarjeta de la meta; si más adelante se pide un aviso de
+  /// ahorro, este es el campo que ya existe para eso.
+  fechaLimiteISO     DateTime? @map("fecha_limite")
+  /// 2026-09-16 (corrección posterior, misma sesión): reemplaza el
+  /// `aporteMensualObjetivo Float?` de la ronda anterior — un solo número
+  /// no dejaba decir "ahorro X por SEMANA" (bug real reportado: "la meta
+  /// diaria no subía"). Ahora es un objeto `{monto, frecuencia}` como
+  /// `Deuda.cuotaProgramada`, sin tipar columna por columna (mismo
+  /// criterio que esa) — el cliente decide la forma exacta
+  /// (domain/ahorro/types.ts, `AportePlaneado`). Solo se usa para
+  /// prorratear domain/metaDiaria; null = esta meta no cuenta ahí.
+  aportePlaneado     Json?     @map("aporte_planeado")
+  creadaEnISO        DateTime  @map("creada_en")
+  sincronizadoEnISO  DateTime  @default(now()) @updatedAt @map("sincronizado_en")
+  abonos             AbonoAhorro[]
+
+  @@index([usuarioId])
+  @@map("metas_ahorro")
+}
+
+/// Historial de abonos a una meta de ahorro. Append-only, mismo criterio que AbonoDeuda.
+model AbonoAhorro {
+  id                 String     @id
+  usuarioId          String     @map("usuario_id")
+  usuario            Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  metaId             String     @map("meta_id")
+  meta               MetaAhorro @relation(fields: [metaId], references: [id], onDelete: Cascade)
+  monto              Float
+  fechaISO           DateTime   @map("fecha")
+  sincronizadoEnISO  DateTime   @default(now()) @updatedAt @map("sincronizado_en")
+
+  @@index([usuarioId])
+  @@index([metaId])
+  @@map("abonos_ahorro")
 }
 
 /// Bloque 3, sección 3/4. Plantilla de gasto recurrente (ej. "Arriendo,
@@ -263,4 +371,22 @@ model GastoHogar {
   @@index([usuarioId])
   @@index([conceptoFijoId])
   @@map("gastos_hogar")
+}
+
+/// 2026-09-22, corrección de un bug real encontrado en auditoría: `Plan.limiteConsultasIA` se
+/// definía, se persistía y se mostraba en el catálogo de planes, pero no existía ningún
+/// contador real — un usuario gratis podía consultar a la IA sin tope (más allá del límite
+/// genérico por IP compartido entre todos, ver http/rateLimit.ts). Un registro append-only
+/// (nunca se edita/borra) por cada consulta que de verdad toca el proveedor de IA pago —
+/// `/ai/analisis` y `/ai/conversacion`, NO `/ai/intent` (reglas locales, sin modelo pago, ver
+/// modules/ai/routes.ts). Contar filas del mes actual es más simple y a prueba de fallos que un
+/// contador mutable con reset mensual (no hay que programar ningún job que lo resetee).
+model ConsultaIA {
+  id        String   @id @default(uuid())
+  usuarioId String   @map("usuario_id")
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  fechaISO  DateTime @default(now()) @map("fecha")
+
+  @@index([usuarioId, fechaISO])
+  @@map("consultas_ia")
 }

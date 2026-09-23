@@ -1,12 +1,7 @@
+import type { ResultadoSincronizacion } from '../../lib/autoSync'
 import { haySesion } from '../../lib/api'
 import { repositorioGastos } from './repository'
 import { subirGasto } from './api'
-
-export interface ResultadoSincronizacion {
-  intentados: number
-  sincronizados: number
-  primerError: string | null
-}
 
 /** Mismo patrón que domain/mantenimiento/sync.ts — registrado en App.tsx vía lib/autoSync.ts. */
 export async function sincronizarGastosPendientes(): Promise<ResultadoSincronizacion> {

@@ -35,6 +35,14 @@ class AlarmaActivity : AppCompatActivity() {
     private var voz: MediaPlayer? = null
     private val repetidor = Handler(Looper.getMainLooper())
     private var alarmaDescartada = false
+    // 2026-09-22, corrección de un bug real encontrado en auditoría: mismo patrón que ya se
+    // había corregido en BurbujaService.kt (el ValueAnimator de la órbita) — estos dos
+    // ObjectAnimator infinitos (repeatCount = INFINITE) nunca se guardaban en ningún lado, así
+    // que nadie podía cancelarlos. Seguían tickeando (Choreographer, cada frame) PARA SIEMPRE
+    // incluso después de cerrar la alarma, y además retenían una referencia fuerte al ImageView
+    // (fuga de memoria). Pasa en CADA alarma que se muestra (vencimientos, meta diaria, rutina).
+    private var animadorEscalaX: ObjectAnimator? = null
+    private var animadorEscalaY: ObjectAnimator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,8 +91,8 @@ class AlarmaActivity : AppCompatActivity() {
             contentDescription = "Icono de NOAH"
             layoutParams = LinearLayout.LayoutParams(dp(132), dp(132)).apply { gravity = Gravity.CENTER; bottomMargin = dp(12) }
         }
-        ObjectAnimator.ofFloat(personaje, "scaleX", 0.97f, 1.03f).apply { duration = 1100; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE }.start()
-        ObjectAnimator.ofFloat(personaje, "scaleY", 0.97f, 1.03f).apply { duration = 1100; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE }.start()
+        animadorEscalaX = ObjectAnimator.ofFloat(personaje, "scaleX", 0.97f, 1.03f).apply { duration = 1100; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE; start() }
+        animadorEscalaY = ObjectAnimator.ofFloat(personaje, "scaleY", 0.97f, 1.03f).apply { duration = 1100; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE; start() }
         val tituloVista = TextView(this).apply {
             text = titulo
             setTextColor(Color.parseColor("#F8FAFC"))
@@ -119,18 +127,7 @@ class AlarmaActivity : AppCompatActivity() {
 
     private fun sonarYVibrar(vozId: String) {
         if (vozId == "sin_voz") return
-        runCatching {
-            val recurso = when (vozId) { "voz_2" -> R.raw.voz_2; "voz_3" -> R.raw.voz_3; "voz_4" -> R.raw.voz_4; "voz_5" -> R.raw.voz_5; else -> R.raw.voz_1 }
-            voz = MediaPlayer.create(this, recurso)
-            voz?.setOnCompletionListener { reproductor ->
-                reproductor.release()
-                voz = null
-                if (!alarmaDescartada && !isFinishing) {
-                    repetidor.postDelayed({ if (!alarmaDescartada && !isFinishing) sonarYVoz(vozId) }, 2000)
-                }
-            }
-            voz?.start()
-        }
+        reproducirVoz(vozId)
         runCatching {
             vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             val patron = longArrayOf(0, 500, 400)
@@ -146,20 +143,29 @@ class AlarmaActivity : AppCompatActivity() {
     override fun onDestroy() {
         alarmaDescartada = true
         repetidor.removeCallbacksAndMessages(null)
+        animadorEscalaX?.cancel(); animadorEscalaY?.cancel()
         super.onDestroy()
         runCatching { voz?.stop() }
         runCatching { voz?.release() }
         vibrator?.cancel()
     }
 
-    private fun sonarYVoz(vozId: String) {
+    /**
+     * 2026-09-22 (limpieza de auditoría): antes esto estaba duplicado casi textual en
+     * `sonarYVibrar` (primera reproducción) y `sonarYVoz` (reintentos cada 2s) — un solo
+     * reproductor de voz que se reprograma a sí mismo hasta que se descarta la alarma.
+     */
+    private fun reproducirVoz(vozId: String) {
         if (vozId == "sin_voz" || alarmaDescartada || isFinishing) return
         runCatching {
             val recurso = when (vozId) { "voz_2" -> R.raw.voz_2; "voz_3" -> R.raw.voz_3; "voz_4" -> R.raw.voz_4; "voz_5" -> R.raw.voz_5; else -> R.raw.voz_1 }
             voz = MediaPlayer.create(this, recurso)
             voz?.setOnCompletionListener { reproductor ->
-                reproductor.release(); voz = null
-                if (!alarmaDescartada && !isFinishing) repetidor.postDelayed({ sonarYVoz(vozId) }, 2000)
+                reproductor.release()
+                voz = null
+                if (!alarmaDescartada && !isFinishing) {
+                    repetidor.postDelayed({ reproducirVoz(vozId) }, 2000)
+                }
             }
             voz?.start()
         }

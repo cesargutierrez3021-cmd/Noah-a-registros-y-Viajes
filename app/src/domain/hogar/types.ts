@@ -25,7 +25,11 @@ export interface ConceptoFijo {
   nombre: string
   /** Lo que se espera pagar cada período — puede cambiar con el tiempo (ej. sube el arriendo), por eso es mutable y no un valor fijo para siempre. */
   montoEsperado: number
-  /** 1-31. Si el mes tiene menos días, se genera el último día de ese mes (ver `calculos.ts`, `fechaParaPeriodo`). */
+  /**
+   * 1-31 — día "de referencia" del mes para mostrarle al conductor cuándo vence este concepto.
+   * 2026-09-23: ya no bloquea la confirmación — se puede pagar antes de que llegue este día
+   * (ver `calcularGastosFijosPendientesDeConfirmar`, calculos.ts).
+   */
   diaDelMes: number
   /** Desactivar en vez de borrar — mismo motivo que Deuda no se puede borrar (D-16). Un concepto inactivo deja de autogenerar gastos nuevos; el historial ya generado no se toca. */
   activo: boolean

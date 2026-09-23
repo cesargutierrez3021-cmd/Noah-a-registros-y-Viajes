@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CategoriaGasto, Gasto } from './types'
 import { repositorioGastos } from './repository'
+import { totalGastosEnRango } from './calculos'
 
 interface DatosGastoNuevo {
   categoria: CategoriaGasto
@@ -49,8 +50,5 @@ export const useGastos = create<EstadoGastos>((set, get) => ({
     return gasto
   },
 
-  totalEnRango: (desdeISO, hastaISO) =>
-    get()
-      .gastos.filter((g) => g.fechaISO >= desdeISO && g.fechaISO < hastaISO)
-      .reduce((suma, g) => suma + g.monto, 0),
+  totalEnRango: (desdeISO, hastaISO) => totalGastosEnRango(get().gastos, desdeISO, hastaISO),
 }))

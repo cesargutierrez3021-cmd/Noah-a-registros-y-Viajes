@@ -4,7 +4,7 @@
  * compra contra Google Play — ver modules/billing/.
  */
 export const CLAVE_PLAN_GRATIS = 'gratis'
-export const CLAVE_PLAN_PRO_MENSUAL = 'pro_mensual'
+const CLAVE_PLAN_PRO_MENSUAL = 'pro_mensual'
 
 export interface PlanBase {
   clave: string

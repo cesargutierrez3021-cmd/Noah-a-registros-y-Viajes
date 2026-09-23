@@ -14,8 +14,14 @@ export type Intencion =
   | 'km_hoy'
   | 'ingresos_hoy'
   | 'viajes_hoy'
+  | 'resumen_hoy'
   | 'resumen_semana'
   | 'mantenimientos_pendientes'
+  | 'mejor_zona'
+  | 'mejor_horario'
+  | 'deudas_estado'
+  | 'ahorro_estado'
+  | 'meta_diaria_estado'
   | 'no_reconocida' // ninguna regla matcheó Y el clasificador IA tampoco resolvió (o es el stub)
 
 export interface ResultadoIntent {
@@ -70,10 +76,61 @@ export interface ContextoResumen {
  * Todo opcional a propósito: si el cliente no manda nada, el backend solo confirma la
  * intención detectada, igual que en la versión anterior de esta ruta.
  */
+/**
+ * Mismo shape que `DesglosePor<T>` del cliente (app/src/domain/estadisticas/types.ts).
+ * 2026-09-15, pedido explícito del usuario: MIA tiene que poder decir "en qué zona/franja
+ * te va mejor" con reglas, sin tocar IA — mismo criterio que el resto del Intent Router.
+ */
+export interface ContextoDesgloseItem {
+  clave: string
+  resumen: ContextoResumen
+}
+
+/**
+ * 2026-09-23, pedido explícito del usuario ("cuánta deuda tengo, cuánto es el pago de este
+ * mes"): mismo shape que arma MiaBurbuja.tsx (cliente) a partir de domain/deudas +
+ * domain/avisos/calculos.ts (`proximaFechaCuotaDeuda`) — no se manda la lista completa de
+ * deudas, solo el resumen que la respuesta necesita (D-8: server no importa tipos de app/).
+ */
+export interface ContextoProximoPago {
+  nombre: string
+  monto: number
+  diasFaltantes: number
+}
+
+export interface ContextoDeudas {
+  totalPendiente: number
+  cantidadActivas: number
+  /** La cuota/deuda con la fecha de vencimiento más próxima entre las activas, o null si ninguna tiene fecha resolvible. */
+  proximoPago: ContextoProximoPago | null
+}
+
+/** Mismo shape que arma MiaBurbuja.tsx a partir de domain/ahorro (metas en progreso, saldoActual < montoObjetivo). */
+export interface ContextoAhorro {
+  totalGuardado: number
+  totalObjetivo: number
+  cantidadMetas: number
+}
+
+/** Mismo shape que `ResultadoMetaDiaria` del cliente (app/src/domain/metaDiaria/types.ts), solo los campos que la respuesta hablada necesita. */
+export interface ContextoMetaDiaria {
+  metaDeHoy: number
+  ingresoHoy: number
+  progresoPorcentaje: number
+  faltanteRealista: number
+}
+
 export interface ContextoIntent {
   hoy?: ContextoResumen
   semana?: ContextoResumen
   mantenimiento?: ContextoMantenimientoItem[]
+  /** Salida de domain/estadisticas/calculos.ts → desglosePorZona (zona de RECOGIDA, no de destino). */
+  porZona?: ContextoDesgloseItem[]
+  /** Salida de domain/estadisticas/calculos.ts → desglosePorFranjaHoraria. */
+  porFranja?: ContextoDesgloseItem[]
+  deudas?: ContextoDeudas
+  ahorro?: ContextoAhorro
+  metaDiaria?: ContextoMetaDiaria
 }
 
 /**

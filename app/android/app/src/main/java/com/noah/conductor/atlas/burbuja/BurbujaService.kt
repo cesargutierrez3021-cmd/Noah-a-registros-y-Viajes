@@ -2,26 +2,17 @@
 
 package com.noah.conductor.atlas.burbuja
 
-import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.RadialGradient
-import android.graphics.Shader
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -44,14 +35,16 @@ import kotlin.math.abs
 class BurbujaService : Service(), TextToSpeech.OnInitListener {
     companion object {
         @Volatile var activo: Boolean = false
+        // 2026-09-15, pedido explícito del usuario: "en la burbuja a veces no me hace el
+        // conteo de los kilómetros". Referencia estática para que GpsTrackingService pueda
+        // avisarle a la burbuja directo, nativo-a-nativo, sin pasar por el WebView — ver
+        // `actualizarKmDesdeGps()` más abajo para el porqué.
+        @Volatile var instanciaActiva: BurbujaService? = null
         const val ACCION_MOSTRAR = "mostrar"
         const val ACCION_ACTUALIZAR = "actualizar"
         const val EXTRA_KM = "km"
         const val EXTRA_TIEMPO = "tiempo"
         const val EXTRA_EN_VIAJE = "enViaje"
-        const val EXTRA_RESUMEN_HOY = "resumenHoy"
-        const val EXTRA_RESUMEN_SEMANA = "resumenSemana"
-        const val EXTRA_RESUMEN_MES = "resumenMes"
         const val EXTRA_COLOR_ACENTO = "colorAcento"
         const val EXTRA_COLOR_FG = "colorFg"
         const val EXTRA_COLOR_SURFACE = "colorSurface"
@@ -59,45 +52,60 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         const val EXTRA_ESTILO = "estilo"
         const val EXTRA_TOTAL_VIAJES = "totalViajes"
         const val EXTRA_SOLO_ESTILO = "soloEstilo"
-        private const val CANAL_ID = "noah_burbuja"
+        private const val CANAL_ID = "mia_burbuja"
         private const val NOTIF_ID = 4201
-        private const val UMBRAL_TOQUE_MS = 650L
         private const val UMBRAL_ARRASTRE_PX = 12
-        private const val UMBRAL_DESLIZAMIENTO_PX = 100
+        // 2026-09-15, pedido explícito del usuario: mantener presionada la burbuja 2s termina
+        // la jornada (y la cierra); doble-tap la pausa/reanuda. El tap simple (iniciar/terminar
+        // un VIAJE) se retrasa este mismo tiempo de doble-tap para poder distinguir si viene un
+        // segundo toque — mismo umbral que usa Android para su propio gesture detector.
+        private const val UMBRAL_JORNADA_MS = 2000L
+        private const val UMBRAL_DOBLE_TAP_MS = 300L
         private const val INTERVALO_RELOJ_MS = 1000L
         private const val PRECISION_MAXIMA_M = 35f
-        private const val VELOCIDAD_MINIMA_MS = 0.42
         private const val VELOCIDAD_MAXIMA_MS = 55.0
-        private const val INTERVALO_MAXIMO_S = 30.0
+        // 2026-09-22: ver el comentario largo en domain/viajes/gps.ts (mismo criterio,
+        // espejado acá para que el km que se ve EN VIVO en la burbuja — que no depende del
+        // WebView, ver actualizarKmDesdeGps() — coincida con el que se guarda al final del
+        // viaje. Antes era 30s; con el ancla ahora congelada (no reinicio en cada tick
+        // rechazado) hace falta más margen para que el tráfico lento sostenido tenga tiempo
+        // de cruzar el umbral antes de que se lo trate como un corte real.
+        private const val DT_REINICIO_S = 120.0
     }
 
     private lateinit var windowManager: WindowManager
-    private lateinit var locationManager: LocationManager
     private var vistaBurbuja: View? = null
-    private var vistaResumen: View? = null
     private var vistaManija: View? = null
-    private var resumenAnimator: ValueAnimator? = null
-    private var decoracionResumen: ResumenDecoracionView? = null
-    private var resumenParams: WindowManager.LayoutParams? = null
     private lateinit var etiquetaTiempo: TextView
     private lateinit var etiquetaKm: TextView
     private lateinit var etiquetaViajes: TextView
-    private lateinit var etiquetaResumen: TextView
-    private var etiquetasPeriodo = emptyList<TextView>()
-    private var periodoResumen = "hoy"
-    private var resumenHoy = ""
-    private var resumenSemana = ""
-    private var resumenMes = ""
     private var colorAcento = "#D4AF37"
     private var colorFg = "#F3EDDD"
     private var colorSurface = "#14100A"
     private var tarjetaActiva = true
     private var estilo = "marea"
     private var enViaje = false
+    // 2026-09-22, pedido explícito del usuario: el ciclo de toques pasa de 2
+    // (iniciar/terminar) a 3 (iniciar/recogida/terminar) — ver accionTapPendiente
+    // más abajo y el comentario largo en burbuja.ts / burbujaOrquestacion.ts.
+    private var pasajeroRecogido = false
     private var inicioViajeMs = 0L
     private var kmAcumulados = 0.0
     private var viajesContados = 0
-    private var ultimaUbicacion: Location? = null
+    // 2026-09-22, pedido explícito del usuario ("la aplicación no debería consumir tanto
+    // recurso"): bug real — el ValueAnimator de la órbita (ver crearBurbuja()) nunca se
+    // guardaba en ningún lado, así que nadie podía cancelarlo. Con repeatCount = INFINITE eso
+    // significa que sigue tickeando (Choreographer, cada frame) PARA SIEMPRE, incluso después
+    // de que el servicio se destruye y la vista se saca del WindowManager — un conductor que
+    // trabaja 8-10 horas tenía esa animación corriendo de fondo todo ese tiempo sin ningún
+    // motivo. Ahora se guarda la referencia para poder cancelarla en onDestroy().
+    private var animadorOrbita: ValueAnimator? = null
+    // Ancla GPS vigente de `actualizarKmDesdeGps()` (nativo, ver comentario ahí) — solo avanza
+    // cuando un punto se acepta de verdad, mismo criterio que domain/viajes/gps.ts.
+    private var ultimoLatNativo: Double? = null
+    private var ultimoLngNativo: Double? = null
+    private var ultimaPrecisionNativa: Float = 0f
+    private var ultimoTimestampNativoMs: Long = 0L
     private var tts: TextToSpeech? = null
     private val handler = Handler(Looper.getMainLooper())
     private val reloj = object : Runnable {
@@ -108,58 +116,18 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
             }
         }
     }
-    private val locationListener = object : LocationListener {
-        override fun onLocationChanged(location: Location) {
-            // La red puede saltar decenas o cientos de metros. Solo el proveedor
-            // GPS se usa como fuente oficial de kilómetros.
-            if (location.provider != LocationManager.GPS_PROVIDER) return
-            if (location.accuracy <= 0f || location.accuracy > PRECISION_MAXIMA_M) {
-                ultimaUbicacion = null
-                return
-            }
-            val anterior = ultimaUbicacion
-            if (anterior != null) {
-                val distancia = anterior.distanceTo(location)
-                val segundos = ((location.time - anterior.time).coerceAtLeast(1L)) / 1000.0
-                val velocidad = distancia / segundos
-                val umbralM = maxOf(8f, (location.accuracy + anterior.accuracy) * 0.5f)
-                // Tras una pérdida de señal no se une el punto nuevo al anterior:
-                // hacerlo convertiría un salto GPS en kilómetros recorridos.
-                if (segundos > INTERVALO_MAXIMO_S) {
-                    ultimaUbicacion = location
-                    actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
-                    return
-                }
-                if (distancia >= umbralM && velocidad >= VELOCIDAD_MINIMA_MS && velocidad <= VELOCIDAD_MAXIMA_MS) {
-                    kmAcumulados += distancia / 1000.0
-                } else if (velocidad > VELOCIDAD_MAXIMA_MS) {
-                    // Punto incompatible con la velocidad de una moto/carro: se
-                    // descarta y se reinicia la referencia para no arrastrar el salto.
-                    ultimaUbicacion = location
-                    actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
-                    return
-                }
-            }
-            ultimaUbicacion = location
-            actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
-        }
-        override fun onProviderEnabled(provider: String) {}
-        override fun onProviderDisabled(provider: String) {}
-        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-    }
-
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onCreate() {
         super.onCreate()
         activo = true
-        val apariencia = getSharedPreferences("noah-burbuja", MODE_PRIVATE)
+        instanciaActiva = this
+        val apariencia = getSharedPreferences("mia-burbuja", MODE_PRIVATE)
         colorAcento = apariencia.getString(EXTRA_COLOR_ACENTO, colorAcento) ?: colorAcento
         colorFg = apariencia.getString(EXTRA_COLOR_FG, colorFg) ?: colorFg
         colorSurface = apariencia.getString(EXTRA_COLOR_SURFACE, colorSurface) ?: colorSurface
         estilo = apariencia.getString(EXTRA_ESTILO, estilo) ?: estilo
-        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", true).apply()
+        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", true).apply()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         tts = TextToSpeech(this, this)
     }
     override fun onInit(status: Int) { if (status == TextToSpeech.SUCCESS) tts?.language = Locale("es", "CO") }
@@ -167,17 +135,23 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         crearCanalSiHaceFalta()
         startForeground(NOTIF_ID, construirNotificacion())
-        intent?.getStringExtra(EXTRA_RESUMEN_HOY)?.takeIf { it.isNotBlank() }?.let { resumenHoy = it }
-        intent?.getStringExtra(EXTRA_RESUMEN_SEMANA)?.takeIf { it.isNotBlank() }?.let { resumenSemana = it }
-        intent?.getStringExtra(EXTRA_RESUMEN_MES)?.takeIf { it.isNotBlank() }?.let { resumenMes = it }
         colorAcento = intent?.getStringExtra(EXTRA_COLOR_ACENTO) ?: colorAcento
         colorFg = intent?.getStringExtra(EXTRA_COLOR_FG) ?: colorFg
         colorSurface = intent?.getStringExtra(EXTRA_COLOR_SURFACE) ?: colorSurface
-        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit().putString(EXTRA_COLOR_ACENTO, colorAcento).putString(EXTRA_COLOR_FG, colorFg).putString(EXTRA_COLOR_SURFACE, colorSurface).apply()
+        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putString(EXTRA_COLOR_ACENTO, colorAcento).putString(EXTRA_COLOR_FG, colorFg).putString(EXTRA_COLOR_SURFACE, colorSurface).apply()
         tarjetaActiva = intent?.getBooleanExtra(EXTRA_TARJETA_ACTIVA, tarjetaActiva) ?: tarjetaActiva
         estilo = intent?.getStringExtra(EXTRA_ESTILO) ?: estilo
-        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit().putString(EXTRA_ESTILO, estilo).apply()
-        val km = intent?.getStringExtra(EXTRA_KM) ?: formatearKm(kmAcumulados)
+        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putString(EXTRA_ESTILO, estilo).apply()
+        // 2026-09-15: antes esto solo mostraba el km recibido UNA vez — el
+        // reloj de abajo (`reloj`, cada 1s mientras enViaje) lo pisaba con
+        // kmAcumulados, que nunca se actualizaba acá, así que un segundo
+        // después de cada punto GPS real la burbuja volvía a mostrar "0".
+        // Ahora, si el intent trae un km real (viene de actualizarBurbuja()
+        // en domain/viajes/store.ts, con el km real medido por GPS), también
+        // se guarda en kmAcumulados para que el reloj lo siga mostrando.
+        val kmExtra = intent?.getStringExtra(EXTRA_KM)
+        if (kmExtra != null) kmExtra.toDoubleOrNull()?.let { kmAcumulados = it }
+        val km = kmExtra ?: formatearKm(kmAcumulados)
         val tiempo = intent?.getStringExtra(EXTRA_TIEMPO) ?: formatearTiempo(if (enViaje) System.currentTimeMillis() - inicioViajeMs else 0)
         val estadoSolicitado = intent?.getBooleanExtra(EXTRA_EN_VIAJE, enViaje) ?: enViaje
         val viajesExternos = intent?.getIntExtra(EXTRA_TOTAL_VIAJES, -1) ?: -1
@@ -185,7 +159,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         if (estadoSolicitado && !enViaje) iniciarViaje(false)
         if (!estadoSolicitado && enViaje) finalizarViaje(false)
         if (vistaBurbuja == null) crearBurbuja()
-        if (tarjetaActiva && vistaManija == null) crearManijaResumen()
+        if (tarjetaActiva && vistaManija == null) crearManijaVoz()
         if (!tarjetaActiva && vistaManija != null) { vistaManija?.let { runCatching { windowManager.removeView(it) } }; vistaManija = null }
         aplicarColores()
         if (intent?.getBooleanExtra(EXTRA_SOLO_ESTILO, false) == true) return START_STICKY
@@ -195,19 +169,23 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         activo = false
-        detenerGps(); handler.removeCallbacksAndMessages(null); tts?.stop(); tts?.shutdown()
-        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", false).apply()
-        vistaResumen?.let { runCatching { windowManager.removeView(it) } }
+        if (instanciaActiva === this) instanciaActiva = null
+        animadorOrbita?.cancel(); animadorOrbita = null
+        handler.removeCallbacksAndMessages(null); tts?.stop(); tts?.shutdown()
+        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", false).apply()
         vistaManija?.let { runCatching { windowManager.removeView(it) } }
         vistaBurbuja?.let { runCatching { windowManager.removeView(it) } }
-        vistaResumen = null; vistaManija = null; vistaBurbuja = null
+        vistaManija = null; vistaBurbuja = null
         super.onDestroy()
     }
 
     private fun iniciarViaje(anunciar: Boolean) {
         if (enViaje) return
-        enViaje = true; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0; ultimaUbicacion = null
-        solicitarGps(); handler.removeCallbacks(reloj); handler.post(reloj)
+        enViaje = true; pasajeroRecogido = false; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
+        // Viaje nuevo, punto de referencia nuevo — si se dejara el de un viaje anterior,
+        // el primer punto de este viaje calcularía distancia contra un lugar viejo.
+        ultimoLatNativo = null; ultimoLngNativo = null; ultimoTimestampNativoMs = 0L
+        handler.removeCallbacks(reloj); handler.post(reloj)
         if (anunciar) hablar("Viaje iniciado")
         actualizarTextos("0.0", "0m")
     }
@@ -215,27 +193,92 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private fun finalizarViaje(anunciar: Boolean) {
         if (!enViaje) return
         val finMs = System.currentTimeMillis(); val duracionMs = (finMs - inicioViajeMs).coerceAtLeast(0L); val kmFinal = kmAcumulados; val inicioMs = inicioViajeMs
-        enViaje = false; detenerGps(); handler.removeCallbacks(reloj)
+        enViaje = false; handler.removeCallbacks(reloj)
         if (anunciar) hablar("Viaje finalizado")
         actualizarTextos(formatearKm(kmFinal), formatearTiempo(duracionMs))
-        getSharedPreferences("noah-burbuja", MODE_PRIVATE).edit()
+        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit()
             .putFloat("viaje_km", kmFinal.toFloat()).putLong("viaje_inicio", inicioMs)
             .putLong("viaje_fin", finMs).putLong("viaje_tiempo", duracionMs).apply()
         if (anunciar) BurbujaPlugin.instanciaActiva?.notificarAccion("terminar", kmFinal, inicioMs, finMs, duracionMs)
     }
 
-    private fun solicitarGps() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
-        runCatching {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 5f, locationListener, Looper.getMainLooper())
+    /**
+     * 2026-09-15, pedido explícito del usuario: "en la burbuja a veces no me hace el conteo
+     * de los kilómetros... dentro de la aplicación sí, a veces sí los coge". Causa real: antes
+     * el km que ve la burbuja llegaba SOLO por un viaje redondo nativo→JS→nativo
+     * (GpsTrackingService entrega el punto a GpsTrackingPlugin, que se lo pasa a
+     * domain/viajes/gps.ts, que llama a `actualizarBurbuja()`). Ese viaje redondo depende de
+     * que el WebView/Activity siga viva — Android la puede matar por presión de memoria
+     * mientras el conductor pasa horas con la app minimizada (usando Uber en primer plano),
+     * SIN matar los foreground services (BurbujaService y GpsTrackingService sí sobreviven).
+     * Cuando eso pasa, `GpsTrackingPlugin.handleOnDestroy()` deja `GpsTrackingService.listener
+     * = null` — los puntos se siguen guardando bien en SharedPreferences (por eso "dentro de
+     * la aplicación, a veces sí los coge": al reabrir se recupera toda la traza persistida),
+     * pero la burbuja deja de enterarse en vivo, porque nada la actualiza mientras tanto.
+     *
+     * Fix: GpsTrackingService llama ACÁ directo (mismo proceso, sin pasar por el WebView) cada
+     * vez que recibe un punto nuevo — la burbuja cuenta los km sola, sin depender de que la
+     * app siga viva. El filtro de abajo (precisión/velocidad/distancia mínima) es el mismo
+     * criterio que ya usa `domain/viajes/gps.ts` (`puntoValido`) para no acumular ruido del
+     * GPS — aproximado, no bit a bit idéntico: el km definitivo del viaje lo sigue calculando
+     * el lado JS sobre la traza completa persistida al cerrar el viaje; esto es solo para que
+     * el número que el conductor VE mientras maneja no se quede pegado.
+     */
+    fun actualizarKmDesdeGps(lat: Double, lng: Double, precisionMetros: Float, timestampMs: Long) {
+        if (!enViaje) return
+        if (precisionMetros <= 0f || precisionMetros > PRECISION_MAXIMA_M) return
+
+        val latAncla = ultimoLatNativo
+        val lngAncla = ultimoLngNativo
+
+        if (latAncla == null || lngAncla == null) {
+            ultimoLatNativo = lat; ultimoLngNativo = lng; ultimaPrecisionNativa = precisionMetros; ultimoTimestampNativoMs = timestampMs
+            return
         }
+
+        val distanciaM = distanciaHaversineM(latAncla, lngAncla, lat, lng)
+        val dtS = (timestampMs - ultimoTimestampNativoMs) / 1000.0
+        if (dtS <= 0.0) return
+
+        if (dtS > DT_REINICIO_S) {
+            // Corte real (no tráfico lento) — reinicia el ancla sin acreditar distancia.
+            ultimoLatNativo = lat; ultimoLngNativo = lng; ultimaPrecisionNativa = precisionMetros; ultimoTimestampNativoMs = timestampMs
+            return
+        }
+
+        val velocidadMs = distanciaM / dtS
+        if (velocidadMs > VELOCIDAD_MAXIMA_MS) {
+            // Salto de un solo punto imposible (rebote de señal) — se descarta entero, el ancla NO avanza.
+            return
+        }
+
+        val umbralMinimoM = kotlin.math.max(8.0, (ultimaPrecisionNativa + precisionMetros + 10) * 0.5)
+        if (distanciaM < umbralMinimoM) {
+            // Movimiento ambiguo (ruido parado vs. avance lento real) — el ancla queda IGUAL
+            // para que el desplazamiento se acumule tick a tick hasta cruzar el umbral, mismo
+            // criterio que domain/viajes/gps.ts (ver el comentario largo ahí).
+            return
+        }
+
+        ultimoLatNativo = lat; ultimoLngNativo = lng; ultimaPrecisionNativa = precisionMetros; ultimoTimestampNativoMs = timestampMs
+        kmAcumulados += distanciaM / 1000.0
+        actualizarTextos(formatearKm(kmAcumulados), formatearTiempo(System.currentTimeMillis() - inicioViajeMs))
     }
-    private fun detenerGps() { runCatching { locationManager.removeUpdates(locationListener) }; ultimaUbicacion = null }
-    private fun hablar(texto: String) { tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "noah-viaje-${System.currentTimeMillis()}") }
+
+    private fun distanciaHaversineM(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val r = 6371000.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val a = kotlin.math.sin(dLat / 2).let { it * it } +
+            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) * kotlin.math.sin(dLng / 2).let { it * it }
+        return r * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    }
+
+    private fun hablar(texto: String) { tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "mia-viaje-${System.currentTimeMillis()}") }
     private fun crearCanalSiHaceFalta() { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { val nm = getSystemService(NotificationManager::class.java); if (nm.getNotificationChannel(CANAL_ID) == null) nm.createNotificationChannel(NotificationChannel(CANAL_ID, "Jornada activa", NotificationManager.IMPORTANCE_LOW)) } }
     private fun construirNotificacion(): android.app.Notification {
         val abrirApp = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        return NotificationCompat.Builder(this, CANAL_ID).setContentTitle("NOAH · jornada abierta").setContentText("La burbuja está contando el tiempo y los kilómetros.").setSmallIcon(R.mipmap.ic_launcher).setContentIntent(abrirApp).setOngoing(true).build()
+        return NotificationCompat.Builder(this, CANAL_ID).setContentTitle("MIA · jornada abierta").setContentText("La burbuja muestra el tiempo y los kilómetros registrados.").setSmallIcon(R.mipmap.ic_launcher).setContentIntent(abrirApp).setOngoing(true).build()
     }
 
     private fun crearBurbuja() {
@@ -252,28 +295,96 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         val tipoVentana = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
         val params = WindowManager.LayoutParams(ancho, alto, tipoVentana, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.START; x = dp(12); y = dp(160) }
         var xInicial = 0; var yInicial = 0; var toqueXInicial = 0f; var toqueYInicial = 0f; var tiempoInicioToque = 0L; var fueArrastre = false
+        var tiempoUltimoTap = 0L
+        // 2026-09-15, pedido explícito del usuario: "manteniendo el presionado dos segundos se
+        // termina la jornada... haciéndole doble tap a la burbuja, se pausa la jornada". Antes,
+        // mantener presionado ~650ms abría la app — se reemplaza por este gesto nuevo; para
+        // abrir la app sigue estando la notificación persistente (construirNotificacion(),
+        // siempre visible mientras la jornada está abierta).
+        val accionJornadaLarga = Runnable {
+            hablar("Jornada terminada")
+            BurbujaPlugin.instanciaActiva?.notificarAccion("terminarJornada")
+            stopSelf()
+        }
+        // El tap simple (iniciar/recogida/terminar de un VIAJE) se retrasa UMBRAL_DOBLE_TAP_MS
+        // para poder saber si viene un segundo toque atrás (doble-tap = pausar/reanudar la
+        // JORNADA, algo completamente distinto) — sin este retraso no hay forma de distinguir
+        // los dos gestos.
+        //
+        // 2026-09-22, pedido explícito del usuario: antes eran 2 toques (iniciar/terminar) — el
+        // primero se usaba como "zona de inicio" del viaje, pero en realidad es el momento de
+        // ACEPTAR el servicio, no donde se recoge al pasajero. Ahora son 3: iniciar (arranca
+        // GPS/km igual que siempre) → recogida (acá sí se marca la zona de inicio real, ver
+        // `marcarRecogida` en domain/viajes/store.ts vía burbujaOrquestacion.ts) → terminar.
+        val accionTapPendiente = Runnable {
+            when {
+                !enViaje -> { iniciarViaje(true); BurbujaPlugin.instanciaActiva?.notificarAccion("iniciar") }
+                !pasajeroRecogido -> {
+                    pasajeroRecogido = true
+                    hablar("Pasajero recogido")
+                    BurbujaPlugin.instanciaActiva?.notificarAccion("recogida")
+                }
+                else -> finalizarViaje(true)
+            }
+        }
         contenedor.setOnTouchListener { _, evento ->
             when (evento.action) {
-                MotionEvent.ACTION_DOWN -> { xInicial = params.x; yInicial = params.y; toqueXInicial = evento.rawX; toqueYInicial = evento.rawY; tiempoInicioToque = System.currentTimeMillis(); fueArrastre = false; true }
-                MotionEvent.ACTION_MOVE -> { val dx = (evento.rawX - toqueXInicial).toInt(); val dy = (evento.rawY - toqueYInicial).toInt(); if (abs(dx) > UMBRAL_ARRASTRE_PX || abs(dy) > UMBRAL_ARRASTRE_PX) fueArrastre = true; params.x = xInicial + dx; params.y = yInicial + dy; runCatching { windowManager.updateViewLayout(contenedor, params) }; true }
+                MotionEvent.ACTION_DOWN -> {
+                    xInicial = params.x; yInicial = params.y; toqueXInicial = evento.rawX; toqueYInicial = evento.rawY
+                    tiempoInicioToque = System.currentTimeMillis(); fueArrastre = false
+                    handler.postDelayed(accionJornadaLarga, UMBRAL_JORNADA_MS)
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = (evento.rawX - toqueXInicial).toInt(); val dy = (evento.rawY - toqueYInicial).toInt()
+                    if (abs(dx) > UMBRAL_ARRASTRE_PX || abs(dy) > UMBRAL_ARRASTRE_PX) {
+                        if (!fueArrastre) handler.removeCallbacks(accionJornadaLarga)
+                        fueArrastre = true
+                    }
+                    params.x = xInicial + dx; params.y = yInicial + dy
+                    runCatching { windowManager.updateViewLayout(contenedor, params) }
+                    true
+                }
                 MotionEvent.ACTION_UP -> {
-                    val dx = evento.rawX - toqueXInicial; val duracion = System.currentTimeMillis() - tiempoInicioToque; val cercaDelFondo = params.y > resources.displayMetrics.heightPixels - dp(220)
+                    handler.removeCallbacks(accionJornadaLarga)
+                    val duracion = System.currentTimeMillis() - tiempoInicioToque
+                    val cercaDelFondo = params.y > resources.displayMetrics.heightPixels - dp(220)
                     when {
-                        fueArrastre && dx < -UMBRAL_DESLIZAMIENTO_PX && tarjetaActiva -> mostrarResumen(params)
-                        fueArrastre && dx > UMBRAL_DESLIZAMIENTO_PX -> ocultarResumen()
                         fueArrastre && cercaDelFondo -> { BurbujaPlugin.instanciaActiva?.notificarAccion("cerrar"); stopSelf() }
-                        !fueArrastre && duracion >= UMBRAL_TOQUE_MS -> startActivity(Intent(this, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) })
-                        !fueArrastre -> if (enViaje) finalizarViaje(true) else { iniciarViaje(true); BurbujaPlugin.instanciaActiva?.notificarAccion("iniciar") }
-                    }; true
+                        fueArrastre -> Unit
+                        duracion >= UMBRAL_JORNADA_MS -> Unit // ya se disparó solo vía accionJornadaLarga arriba
+                        else -> {
+                            val ahora = System.currentTimeMillis()
+                            if (ahora - tiempoUltimoTap < UMBRAL_DOBLE_TAP_MS) {
+                                handler.removeCallbacks(accionTapPendiente)
+                                tiempoUltimoTap = 0L
+                                BurbujaPlugin.instanciaActiva?.notificarAccion("alternarPausaJornada")
+                            } else {
+                                tiempoUltimoTap = ahora
+                                handler.postDelayed(accionTapPendiente, UMBRAL_DOBLE_TAP_MS)
+                            }
+                        }
+                    }
+                    true
                 }
                 else -> false
             }
         }
         windowManager.addView(contenedor, params); vistaBurbuja = contenedor
-        ValueAnimator.ofFloat(0f, 360f).apply { duration = 9000; repeatCount = ValueAnimator.INFINITE; addUpdateListener { (contenedor.getChildAt(0) as? OrbitaView)?.angulo = it.animatedValue as Float; contenedor.getChildAt(0).invalidate() }; start() }
+        animadorOrbita = ValueAnimator.ofFloat(0f, 360f).apply { duration = 9000; repeatCount = ValueAnimator.INFINITE; addUpdateListener { (contenedor.getChildAt(0) as? OrbitaView)?.angulo = it.animatedValue as Float; contenedor.getChildAt(0).invalidate() }; start() }
     }
 
-    private fun crearManijaResumen() {
+    /**
+     * 2026-09-15, pedido explícito del usuario: esta manija abría un panel
+     * "resumen" (Hoy/Semana/Mes) — se quitó, reemplazada por un solo toque
+     * que activa el asistente de voz de MIA. No hay forma de correr
+     * reconocimiento de voz de verdad sin la app en primer plano (mismo
+     * límite ya documentado en domain/conversacion/voz.ts), así que esto
+     * deja un aviso en SharedPreferences y trae la app al frente — el lado
+     * TS (BurbujaPlugin.handleOnResume) lo recoge y abre la conversación con
+     * MIA lista para escuchar, sin que el conductor tenga que navegar nada.
+     */
+    private fun crearManijaVoz() {
         val manija = TextView(this).apply {
             text = "◁"
             textSize = 14f
@@ -287,8 +398,8 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         manija.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> { downX = event.rawX; downY = event.rawY; originX = params.x; originY = params.y; moved = false; true }
-                MotionEvent.ACTION_MOVE -> { val dx = (event.rawX - downX).toInt(); val dy = (event.rawY - downY).toInt(); moved = moved || abs(dx) > dp(4) || abs(dy) > dp(4); params.x = (originX - dx).coerceAtLeast(0); params.y = (originY + dy).coerceIn(dp(80), resources.displayMetrics.heightPixels - dp(100)); runCatching { windowManager.updateViewLayout(manija, params) }; resumenParams?.let { panel -> panel.y = posicionResumenY(params.y, panel.height); vistaResumen?.let { panelView -> runCatching { windowManager.updateViewLayout(panelView, panel) } } }; true }
-                MotionEvent.ACTION_UP -> { if (!moved) { if (vistaResumen == null) abrirResumenDesdeManija() else ocultarResumen() }; true }
+                MotionEvent.ACTION_MOVE -> { val dx = (event.rawX - downX).toInt(); val dy = (event.rawY - downY).toInt(); moved = moved || abs(dx) > dp(4) || abs(dy) > dp(4); params.x = (originX - dx).coerceAtLeast(0); params.y = (originY + dy).coerceIn(dp(80), resources.displayMetrics.heightPixels - dp(100)); runCatching { windowManager.updateViewLayout(manija, params) }; true }
+                MotionEvent.ACTION_UP -> { if (!moved) activarAsistenteDeVoz(); true }
                 else -> false
             }
         }
@@ -296,59 +407,17 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         vistaManija = manija
     }
 
-    private fun abrirResumenDesdeManija() {
-        val params = WindowManager.LayoutParams(dp(184), dp(174), tipoVentana(), WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.END; x = dp(14); y = dp(220) }
-        mostrarResumen(params)
+    /** Ver el comentario de `crearManijaVoz()` — deja el aviso para BurbujaPlugin.handleOnResume() y trae la app al frente. */
+    private fun activarAsistenteDeVoz() {
+        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("voz_pendiente", true).apply()
+        startActivity(Intent(this, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) })
     }
 
-    private fun mostrarResumen(burbujaParams: WindowManager.LayoutParams) {
-        if (vistaResumen != null) return
-        val contenedor = FrameLayout(this)
-        val decoracion = ResumenDecoracionView(this)
-        decoracionResumen = decoracion
-        contenedor.addView(decoracion, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        val contenido = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(9), dp(10), dp(9)); background = ColorDrawable(Color.TRANSPARENT) }
-        val pestañas = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        val nombres = listOf("Hoy" to "hoy", "Semana" to "semana", "Mes" to "mes")
-        etiquetasPeriodo = nombres.map { (nombre, clave) ->
-            TextView(this).apply {
-                text = nombre; textSize = 10f; gravity = Gravity.CENTER; setPadding(dp(7), dp(5), dp(7), dp(5))
-                setOnClickListener { periodoResumen = clave; actualizarResumenSeleccionado() }
-                pestañas.addView(this, LinearLayout.LayoutParams(0, dp(27), 1f))
-            }
-        }
-        etiquetaResumen = TextView(this).apply { textSize = 12f; setPadding(dp(4), dp(8), dp(4), dp(2)); text = textoResumenSeleccionado() }
-        contenido.addView(pestañas); contenido.addView(etiquetaResumen, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        contenedor.addView(contenido, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        val fondo = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; cornerRadii = floatArrayOf(dp(18).toFloat(), dp(18).toFloat(), dp(4).toFloat(), dp(4).toFloat(), dp(18).toFloat(), dp(18).toFloat(), dp(4).toFloat(), dp(4).toFloat()); setColor(colorSeguro(colorSurface, "#14100A")); setStroke(dp(1), colorSeguro(colorAcento, "#D4AF37")) }; contenedor.background = fondo
-        val params = WindowManager.LayoutParams(dp(128), dp(154), tipoVentana(), WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.END; x = dp(14); y = posicionResumenY(burbujaParams.y, dp(154)) }
-        windowManager.addView(contenedor, params); vistaResumen = contenedor; resumenParams = params; actualizarResumenSeleccionado()
-        resumenAnimator = ValueAnimator.ofFloat(0f, 360f).apply { duration = 9000; repeatCount = ValueAnimator.INFINITE; addUpdateListener { decoracion.fase = it.animatedValue as Float; decoracion.invalidate() }; start() }
-    }
-    private fun posicionResumenY(manijaY: Int, panelAlto: Int): Int {
-        val altoPantalla = resources.displayMetrics.heightPixels
-        val margen = dp(8)
-        val debajo = manijaY + dp(64) + margen
-        val encima = manijaY - panelAlto - margen
-        return if (debajo + panelAlto <= altoPantalla - dp(70)) debajo else encima.coerceAtLeast(dp(70))
-    }
-    private fun ocultarResumen() { resumenAnimator?.cancel(); resumenAnimator = null; decoracionResumen = null; resumenParams = null; vistaResumen?.let { runCatching { windowManager.removeView(it) } }; vistaResumen = null }
-    private fun textoResumenSeleccionado(): String {
-        val datos = when (periodoResumen) { "semana" -> resumenSemana; "mes" -> resumenMes; else -> resumenHoy }
-        val partes = datos.split(" · ")
-        val viajes = partes.getOrNull(0)?.replace(" viajes", "")?.replace(" viaje", "")?.ifBlank { "0" } ?: "0"
-        val dinero = partes.getOrNull(1)?.ifBlank { "$0" } ?: "$0"
-        val km = partes.getOrNull(2)?.replace(" km", "")?.ifBlank { "0.0" } ?: "0.0"
-        val kmLimpio = km.toDoubleOrNull()?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: km
-        return "Viajes  $viajes   Km  $kmLimpio\nTotal   $dinero"
-    }
-    private fun actualizarResumenSeleccionado() { if (::etiquetaResumen.isInitialized) etiquetaResumen.text = textoResumenSeleccionado(); etiquetasPeriodo.forEachIndexed { i, vista -> vista.setTypeface(null, if (listOf("hoy", "semana", "mes")[i] == periodoResumen) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL) } }
     private fun aplicarColores() {
         if (::etiquetaTiempo.isInitialized) {
             etiquetaTiempo.setTextColor(colorVisible(colorFg, colorSurface)); etiquetaKm.setTextColor(colorSeguro(colorAcento, "#D4AF37")); etiquetaViajes.setTextColor(colorVisible(colorFg, colorSurface))
             (etiquetaTiempo.parent?.parent as? View)?.background = GradientDrawable().apply { shape = if (estilo == "pulso" || estilo == "marea") GradientDrawable.OVAL else GradientDrawable.RECTANGLE; cornerRadius = when (estilo) { "taller" -> dp(5).toFloat(); "editorial" -> dp(2).toFloat(); else -> dp(28).toFloat() }; setColor(colorSeguro(colorSurface, "#14100A")); setStroke(dp(if (estilo == "pulso") 3 else 2), colorSeguro(colorAcento, "#D4AF37")) }
         }
-        if (::etiquetaResumen.isInitialized) { etiquetaResumen.setTextColor(colorVisible(colorFg, colorSurface)); etiquetasPeriodo.forEach { it.setTextColor(colorVisible(colorFg, colorSurface)) }; (vistaResumen?.background as? GradientDrawable)?.setColor(colorSeguro(colorSurface, "#14100A")); (vistaResumen?.background as? GradientDrawable)?.setStroke(dp(1), colorSeguro(colorAcento, "#D4AF37")) }
         if (vistaManija is TextView) { val manija = vistaManija as TextView; manija.setTextColor(colorVisible(colorFg, colorSurface)); (manija.background as? GradientDrawable)?.setColor(colorSeguro(colorSurface, "#14100A")); (manija.background as? GradientDrawable)?.setStroke(dp(1), colorSeguro(colorAcento, "#D4AF37")) }
     }
     private fun colorSeguro(valor: String, respaldo: String): Int = runCatching { Color.parseColor(valor.trim()) }.getOrElse { Color.parseColor(respaldo) }
@@ -360,9 +429,13 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         return if (kotlin.math.abs(tl - fl) < 0.28) { if (fl > 0.55) Color.BLACK else Color.WHITE } else t
     }
     private fun tipoVentana() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
-    private fun actualizarTextos(km: String, tiempo: String) { if (::etiquetaTiempo.isInitialized) { etiquetaTiempo.text = tiempo.ifBlank { "0m" }.replace(Regex("\\s+\\d{2}s"), ""); etiquetaKm.text = "Km ${km.ifBlank { "0" }}"; etiquetaViajes.text = "$viajesContados viaje${if (viajesContados == 1) "" else "s"}"; if (vistaResumen != null) actualizarResumenSeleccionado() } }
+    private fun actualizarTextos(km: String, tiempo: String) { if (::etiquetaTiempo.isInitialized) { etiquetaTiempo.text = tiempo.ifBlank { "0m" }.replace(Regex("\\s+\\d{2}s"), ""); etiquetaKm.text = "Km ${km.ifBlank { "0" }}"; etiquetaViajes.text = "$viajesContados viaje${if (viajesContados == 1) "" else "s"}" } }
     private fun formatearTiempo(ms: Long): String { val totalMinutos = (ms / 60000).coerceAtLeast(0); val horas = totalMinutos / 60; val minutos = totalMinutos % 60; return if (horas > 0) "%dh %02dm".format(horas, minutos) else "${minutos}m" }
-    private fun formatearKm(km: Double): String = kotlin.math.round(km).toInt().toString()
+    // 2026-09-22, pedido explícito del usuario (bug real): antes redondeaba a km entero
+    // (round().toInt()) — cualquier viaje de pocos cientos de metros se veía "en 0" toda la
+    // ruta, dando la impresión de que la burbuja no estaba contando nada. Con 1 decimal, igual
+    // que el lado JS (ver actualizarBurbuja en domain/viajes/store.ts), se ve avanzar de verdad.
+    private fun formatearKm(km: Double): String = "%.1f".format(km)
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
     private fun dp(v: Float): Int = (v * resources.displayMetrics.density).toInt()
 
@@ -381,49 +454,4 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
-    /** Escena orbital animada: volumen, brillo, profundidad y partículas sin tapar los datos. */
-    private inner class ResumenDecoracionView(context: android.content.Context) : View(context) {
-        var fase = 0f
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val particulas = listOf(.12f to .22f, .24f to .68f, .42f to .17f, .73f to .78f, .9f to .36f, .84f to .9f)
-
-        init { setLayerType(View.LAYER_TYPE_SOFTWARE, null) }
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val acento = colorSeguro(colorAcento, "#D4AF37")
-            val azul = Color.rgb(60, 150, 255)
-            val fg = colorSeguro(colorFg, "#FFFFFF")
-            val w = width.toFloat(); val h = height.toFloat(); val cx = w * .52f; val cy = h * .65f
-            val radio = (w.coerceAtMost(h) * .25f)
-            val giro = Math.toRadians(fase.toDouble())
-
-            // Aura y esfera central con degradado radial para dar sensación de volumen.
-            paint.style = Paint.Style.FILL
-            paint.shader = RadialGradient(cx - radio * .28f, cy - radio * .35f, radio * 1.65f, intArrayOf(Color.argb(48, 80, 180, 255), Color.argb(24, Color.red(acento), Color.green(acento), Color.blue(acento)), Color.TRANSPARENT), floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
-            canvas.drawCircle(cx, cy, radio * 1.65f, paint)
-            paint.shader = RadialGradient(cx - radio * .35f, cy - radio * .38f, radio * 1.25f, intArrayOf(Color.argb(58, 255, 255, 255), Color.argb(44, 60, 150, 255), Color.argb(30, 8, 25, 70)), floatArrayOf(0f, .25f, 1f), Shader.TileMode.CLAMP)
-            canvas.drawCircle(cx, cy, radio, paint)
-            paint.shader = null
-
-            // Tres anillos elípticos en distintos ángulos: sustituyen las líneas planas por órbitas.
-            paint.style = Paint.Style.STROKE; paint.strokeWidth = dp(1).toFloat(); paint.setShadowLayer(dp(5).toFloat(), 0f, 0f, acento)
-            paint.color = acento; paint.alpha = 72
-            canvas.save(); canvas.rotate(18f + fase * .65f, cx, cy); canvas.drawOval(cx - radio * 2.25f, cy - radio * .52f, cx + radio * 2.25f, cy + radio * .52f, paint); canvas.restore()
-            paint.color = azul; paint.alpha = 62
-            canvas.save(); canvas.rotate(-28f - fase * .42f, cx, cy); canvas.drawOval(cx - radio * 1.9f, cy - radio * .42f, cx + radio * 1.9f, cy + radio * .42f, paint); canvas.restore()
-            paint.color = fg; paint.alpha = 38; paint.clearShadowLayer()
-            canvas.save(); canvas.rotate(72f + fase * .3f, cx, cy); canvas.drawOval(cx - radio * 1.65f, cy - radio * .26f, cx + radio * 1.65f, cy + radio * .26f, paint); canvas.restore()
-
-            // Puntos que orbitan y cambian de profundidad con la fase.
-            paint.style = Paint.Style.FILL; paint.setShadowLayer(dp(4).toFloat(), 0f, 0f, acento)
-            particulas.forEachIndexed { i, (px, py) ->
-                val angulo = giro + i * 1.15
-                val profundidad = .72f + .28f * kotlin.math.sin(angulo).toFloat()
-                paint.color = if (i % 2 == 0) acento else azul; paint.alpha = (45 + profundidad * 55).toInt()
-                canvas.drawCircle(w * px + kotlin.math.cos(angulo).toFloat() * dp(5), h * py + kotlin.math.sin(angulo).toFloat() * dp(4), dp(1.5f + profundidad * 1.7f).toFloat(), paint)
-            }
-            paint.clearShadowLayer()
-        }
-    }
 }

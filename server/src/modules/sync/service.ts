@@ -4,8 +4,11 @@ import type {
   JornadaSyncEntrada,
   RegistroMantenimientoSyncEntrada,
   GastoSyncEntrada,
+  BonoSyncEntrada,
   DeudaSyncEntrada,
   AbonoDeudaSyncEntrada,
+  MetaAhorroSyncEntrada,
+  AbonoAhorroSyncEntrada,
   ConceptoFijoSyncEntrada,
   GastoHogarSyncEntrada,
 } from './types.js'
@@ -30,6 +33,16 @@ function verificarPertenencia(usuarioId: string, existente: { usuarioId: string 
   if (existente && existente.usuarioId !== usuarioId) {
     throw new ErrorSync(mensaje, 403)
   }
+}
+
+/**
+ * 2026-09-22 (limpieza de auditoría, D-18): esta detección estaba copiada
+ * literal 3 veces (sincronizarAbonoDeuda, sincronizarAbonoAhorro,
+ * sincronizarGastoHogar) — factorizada acá, mismo motivo que
+ * `verificarPertenencia` arriba.
+ */
+function esViolacionDeFK(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
 }
 
 export const servicioSync = {
@@ -76,6 +89,13 @@ export const servicioSync = {
     await repositorioSync.guardarGasto(usuarioId, gasto)
   },
 
+  /** Mismo criterio que sincronizarGasto. Ver schema.prisma (modelo Bono). */
+  async sincronizarBono(usuarioId: string, bono: BonoSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarBonoPorId(bono.id)
+    verificarPertenencia(usuarioId, existente, 'Este bono ya pertenece a otra cuenta.')
+    await repositorioSync.guardarBono(usuarioId, bono)
+  },
+
   /** Mismo criterio que sincronizarViaje. Ver schema.prisma (modelo Deuda) sobre por qué esta sí se sincroniza mutable, sin soporte de borrado. */
   async sincronizarDeuda(usuarioId: string, deuda: DeudaSyncEntrada): Promise<void> {
     const existente = await repositorioSync.buscarDeudaPorId(deuda.id)
@@ -98,9 +118,29 @@ export const servicioSync = {
     try {
       await repositorioSync.guardarAbonoDeuda(usuarioId, abono)
     } catch (err) {
-      const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
-      if (esViolacionDeFK) {
+      if (esViolacionDeFK(err)) {
         throw new ErrorSync('La deuda de este abono todavía no está sincronizada. Reintentá en un momento.', 409)
+      }
+      throw err
+    }
+  },
+
+  /** Mismo criterio que sincronizarDeuda, invertido: ver schema.prisma (modelo MetaAhorro) sobre por qué saldoActual sube en vez de bajar. */
+  async sincronizarMetaAhorro(usuarioId: string, meta: MetaAhorroSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarMetaAhorroPorId(meta.id)
+    verificarPertenencia(usuarioId, existente, 'Esta meta de ahorro ya pertenece a otra cuenta.')
+    await repositorioSync.guardarMetaAhorro(usuarioId, meta)
+  },
+
+  /** Mismo criterio que sincronizarAbonoDeuda (incluida la traducción P2003 → 409), `metaId` en vez de `deudaId`. */
+  async sincronizarAbonoAhorro(usuarioId: string, abono: AbonoAhorroSyncEntrada): Promise<void> {
+    const existente = await repositorioSync.buscarAbonoAhorroPorId(abono.id)
+    verificarPertenencia(usuarioId, existente, 'Este abono ya pertenece a otra cuenta.')
+    try {
+      await repositorioSync.guardarAbonoAhorro(usuarioId, abono)
+    } catch (err) {
+      if (esViolacionDeFK(err)) {
+        throw new ErrorSync('La meta de este abono todavía no está sincronizada. Reintentá en un momento.', 409)
       }
       throw err
     }
@@ -127,11 +167,15 @@ export const servicioSync = {
     try {
       await repositorioSync.guardarGastoHogar(usuarioId, gasto)
     } catch (err) {
-      const esViolacionDeFK = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2003'
-      if (esViolacionDeFK) {
+      if (esViolacionDeFK(err)) {
         throw new ErrorSync('El concepto fijo de este gasto todavía no está sincronizado. Reintentá en un momento.', 409)
       }
       throw err
     }
+  },
+
+  /** Ver el comentario largo en repository.ts, `obtenerTodo` — restauración completa al iniciar sesión. */
+  async obtenerTodo(usuarioId: string) {
+    return repositorioSync.obtenerTodo(usuarioId)
   },
 }

@@ -7,6 +7,7 @@ import { procesarTurnoConversacion } from './conversacion.js'
 import { requiereAutenticacion } from '../auth/middleware.js'
 import { async } from '../../http/asyncHandler.js'
 import { crearLimitadorDeTasa } from '../../http/rateLimit.js'
+import { verificarLimiteConsultasIA, registrarConsultaIA } from './limite.js'
 
 export const rutasAI = Router()
 
@@ -18,6 +19,11 @@ export const rutasAI = Router()
 // modelo pago hoy — Fase 8 son reglas + un clasificador que es un stub),
 // pero comparte el mismo limitador por simplicidad: no vale la pena un
 // tercer contador para una ruta que ya es barata.
+//
+// Esto es un límite genérico por IP (frena abuso/bugs a corto plazo) — el límite REAL por
+// plan (`Plan.limiteConsultasIA`, 20/mes gratis, 300/mes pro), por usuario y mensual, se
+// aplica aparte en `verificarLimiteConsultasIA` (limite.ts, 2026-09-22, corrección de un bug
+// real encontrado en auditoría: antes ese límite no tenía ningún efecto).
 const limitadorAI = crearLimitadorDeTasa(60 * 1000, 20, 'Demasiadas preguntas seguidas. Espera un momento.')
 
 const esquemaContextoResumen = z.object({
@@ -34,11 +40,37 @@ const esquemaContextoMantenimientoItem = z.object({
   diasFaltantes: z.number().nullable(),
 })
 
+// 2026-09-15: mismo shape que ContextoDesgloseItem (server) / DesglosePor<T> (cliente) — para 'mejor_zona'/'mejor_horario'.
+const esquemaContextoDesgloseItem = z.object({
+  clave: z.string(),
+  resumen: esquemaContextoResumen,
+})
+
+// 2026-09-23: mismo shape que ContextoDeudas/ContextoAhorro/ContextoMetaDiaria (server, types.ts) — ver ese archivo para el porqué de cada campo.
+const esquemaContextoProximoPago = z.object({ nombre: z.string(), monto: z.number(), diasFaltantes: z.number() })
+const esquemaContextoDeudas = z.object({
+  totalPendiente: z.number(),
+  cantidadActivas: z.number(),
+  proximoPago: esquemaContextoProximoPago.nullable(),
+})
+const esquemaContextoAhorro = z.object({ totalGuardado: z.number(), totalObjetivo: z.number(), cantidadMetas: z.number() })
+const esquemaContextoMetaDiaria = z.object({
+  metaDeHoy: z.number(),
+  ingresoHoy: z.number(),
+  progresoPorcentaje: z.number(),
+  faltanteRealista: z.number(),
+})
+
 const esquemaContexto = z
   .object({
     hoy: esquemaContextoResumen.optional(),
     semana: esquemaContextoResumen.optional(),
     mantenimiento: z.array(esquemaContextoMantenimientoItem).optional(),
+    porZona: z.array(esquemaContextoDesgloseItem).optional(),
+    porFranja: z.array(esquemaContextoDesgloseItem).optional(),
+    deudas: esquemaContextoDeudas.optional(),
+    ahorro: esquemaContextoAhorro.optional(),
+    metaDiaria: esquemaContextoMetaDiaria.optional(),
   })
   .optional()
 
@@ -92,9 +124,10 @@ const esquemaPreguntaAnalisis = z.object({
  * POST /ai/analisis — proxy de IA con contexto compacto (Fase 9). Para preguntas que
  * necesitan que un modelo razone sobre los datos, no solo mapear a una intención fija
  * (eso es /ai/intent, Fase 8). Arma el contexto compacto + el prompt (modules/ai/analisis.ts,
- * modules/ai/contextoCompacto.ts) y se lo pasa al proveedor de IA — que hoy es un stub sin
- * implementar (modules/ai/proveedorIA.ts): responde 503 porque el proveedor de IA sigue sin
- * decidirse (ver PLAN-MAESTRO, "Qué falta decidir"), nunca inventa una respuesta.
+ * modules/ai/contextoCompacto.ts) y se lo pasa al proveedor de IA — que ya es una
+ * integración real con OpenAI (2026-09-22, corrección de comentario desactualizado — ver
+ * modules/ai/proveedorIA.ts). El 503 solo ocurre si falta configurar OPENAI_API_KEY,
+ * nunca inventa una respuesta.
  */
 rutasAI.post(
   '/analisis',
@@ -102,7 +135,9 @@ rutasAI.post(
   limitadorAI,
   async(async (req: Request, res: Response) => {
     const { pregunta, contexto, profundidad } = esquemaPreguntaAnalisis.parse(req.body)
+    await verificarLimiteConsultasIA(req.usuarioId!)
     const resultado = await generarAnalisis(pregunta, contexto, profundidad)
+    await registrarConsultaIA(req.usuarioId!)
     res.json(resultado)
   }),
 )
@@ -143,7 +178,9 @@ rutasAI.post(
   limitadorAI,
   async(async (req: Request, res: Response) => {
     const { texto, contexto, profundidad } = esquemaPreguntaConversacion.parse(req.body)
+    await verificarLimiteConsultasIA(req.usuarioId!)
     const resultado = await procesarTurnoConversacion(texto, contexto, profundidad)
+    await registrarConsultaIA(req.usuarioId!)
     res.json(resultado)
   }),
 )

@@ -8,6 +8,15 @@
 
 export type Plataforma = 'Uber' | 'DiDi' | 'inDrive' | 'Cabify' | 'Picap' | 'Rappi' | 'Particular'
 
+/**
+ * 2026-09-15, pedido explícito del usuario: hoisteada acá (antes vivía
+ * duplicada como una constante local en SeccionViajesYJornada.tsx, D-18) para
+ * que Ajustes (elegir la plataforma preferida) y la tarjeta de "viaje
+ * pendiente de ingreso" (poder cambiarla antes de guardar) usen la misma
+ * lista, sin repetirla.
+ */
+export const PLATAFORMAS_DISPONIBLES: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap', 'Rappi', 'Particular']
+
 export type EstadoViaje = 'en_curso' | 'finalizado'
 
 /** Un punto de recorrido capturado por el plugin nativo de GPS. */
@@ -26,10 +35,7 @@ export interface DistanciaReal {
   kmHastaRecoger: number
   /** Km recorridos con el pasajero a bordo. */
   kmConPasajero: number
-  /** Suma de los dos anteriores. Se calcula al finalizar el viaje — pero si el
-   *  GPS falló (ver GpsTrackingService.kt / distancia.ts), el conductor puede
-   *  corregirlo a mano después (`corregirKmViaje` en store.ts, editable desde
-   *  el historial de viajes). Ya no es "nunca se guarda a mano". */
+  /** Suma de los dos anteriores. Se calcula, nunca se guarda a mano. */
   kmTotalesReales: number
 }
 
@@ -47,6 +53,27 @@ export interface Viaje {
   ingreso: number
   localidad: string | null
   zona: string | null
+  /** Ubicación administrativa al iniciar y terminar el recorrido. */
+  localidadInicio: string | null
+  zonaInicio: string | null
+  localidadFin: string | null
+  zonaFin: string | null
+  /**
+   * 2026-09-16, corrección de un bug real reportado por el usuario: cuando
+   * un viaje se termina desde la burbuja (sin abrir la app) no hay forma de
+   * escribir el ingreso ahí mismo — `ingreso` queda en 0 y este campo en
+   * `true` hasta que el conductor lo complete. Antes ese estado "pausado
+   * esperando ingreso" vivía SOLO en `viajeEnCurso` (un único slot en el
+   * store, ver store.ts) — si el conductor hacía un segundo viaje por la
+   * burbuja antes de abrir la app, `iniciarViaje` lo ignoraba en silencio
+   * (ya había "un viaje" ocupando el slot) y ese viaje se perdía por
+   * completo. Ahora el viaje se guarda de una (como cualquier otro,
+   * `estado: 'finalizado'`) apenas se toca "terminar" en la burbuja, y
+   * `viajeEnCurso` queda libre de inmediato para el siguiente — puede haber
+   * varios viajes con `ingresoPendiente: true` al mismo tiempo, cada uno se
+   * completa por separado (ver `completarIngreso` en store.ts).
+   */
+  ingresoPendiente: boolean
   /** true mientras el viaje no se ha confirmado como sincronizado con el backend. */
   pendienteDeSync: boolean
 }
@@ -60,6 +87,8 @@ export interface CierreViajeInput {
   puntoDeRecogidaISO: string | null
   distanciaReportadaPlataforma: number | null
   ingreso: number
+  /** Ver el comentario de `ingresoPendiente` en `Viaje` arriba. */
+  ingresoPendiente: boolean
 }
 
 /**

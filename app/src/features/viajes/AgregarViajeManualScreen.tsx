@@ -5,6 +5,7 @@ import { useJornada } from '../../domain/jornada/store'
 import { sincronizarViajesPendientes } from '../../domain/viajes/sync'
 import { sincronizarJornadasPendientes } from '../../domain/jornada/sync'
 import type { Plataforma } from '../../domain/viajes/types'
+import { NOMBRES_ZONAS_BOGOTA } from '../../domain/viajes/zonasBogota'
 
 const PLATAFORMAS: Plataforma[] = ['Uber', 'DiDi', 'inDrive', 'Cabify', 'Picap', 'Rappi', 'Particular']
 
@@ -37,6 +38,7 @@ export function AgregarViajeManualScreen() {
   const [fin, setFin] = useState(fechaHoraLocalParaInput(ahora))
   const [km, setKm] = useState('')
   const [ingreso, setIngreso] = useState('')
+  const [zona, setZona] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
@@ -74,8 +76,14 @@ export function AgregarViajeManualScreen() {
         kmTotalesReales: kmNumero,
         distanciaReportadaPlataforma: null,
         ingreso: ingresoNumero,
-        localidad: null,
-        zona: null,
+        // 2026-09-17, pedido explícito del usuario: sin GPS no hay cómo
+        // detectar la zona sola — se elige a mano acá para que el viaje sí
+        // cuente en "Por zona donde recoges/dejas" (SeccionEstadisticas.tsx),
+        // en vez de caer siempre en "Sin zona detectada". Mismo valor para
+        // los dos: un viaje manual no distingue inicio/fin (no hay recorrido
+        // que cortar en dos), ver crearViajeManual (repository.ts).
+        localidad: zona || null,
+        zona: zona || null,
       })
 
       if (jornadaAbierta()) {
@@ -125,6 +133,19 @@ export function AgregarViajeManualScreen() {
         <label className="texto-mute">
           Ingreso
           <input type="number" inputMode="decimal" placeholder="Ej. 18000" value={ingreso} onChange={(e) => setIngreso(e.target.value)} style={{ display: 'block', width: '100%' }} />
+        </label>
+
+        <label className="texto-mute">
+          Zona (opcional)
+          <select value={zona} onChange={(e) => setZona(e.target.value)} style={{ display: 'block', width: '100%' }}>
+            <option value="">No sé / no aplica</option>
+            {NOMBRES_ZONAS_BOGOTA.map((nombre) => (
+              <option key={nombre} value={nombre}>{nombre}</option>
+            ))}
+          </select>
+          <span style={{ display: 'block', fontSize: '0.72rem', marginTop: 2 }}>
+            Sin GPS no hay cómo detectarla sola — si la elegís, este viaje sí cuenta en las estadísticas "Por zona".
+          </span>
         </label>
 
         {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}

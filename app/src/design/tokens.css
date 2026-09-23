@@ -4,19 +4,198 @@
  * Regla: si necesitas un estilo nuevo, se agrega AQUÍ o se extiende una clase
  * existente. Nunca se crea un archivo "-extra.css" o "-overrides.css" — eso fue
  * exactamente el problema del proyecto viejo (20 archivos CSS parchados).
+ *
+ * 2026-09-15 — Temas reales (pedido explícito del usuario, "construye los
+ * temas reales, que sea realidad", no más maqueta): todo color/gradiente/
+ * fuente/radio que antes estaba escrito a mano en cada regla ahora es una
+ * variable acá arriba. `[data-tema="verde"]` (default, sin atributo también
+ * cae acá — son los valores que la app ya tenía) y `[data-tema="oro"]`
+ * ("Carbón dorado mate", tokens exactos del documento de especificación que
+ * compartió el usuario) redefinen las MISMAS variables — el resto del
+ * archivo (600+ líneas de ahí para abajo) no cambia ni una regla, solo deja
+ * de tener colores sueltos. `domain/tema/store.ts` decide cuál data-tema
+ * queda en <html>, ver App.tsx.
  */
 
-:root {
-  --color-fondo: #0b0d10;
-  --color-superficie: #14171c;
-  --color-borde: #23262c;
-  --color-texto: #f5f6f7;
-  --color-texto-mute: #9aa0a8;
-  --color-acento: #4f8cff;
+:root,
+[data-tema='verde'] {
+  /* --- Fondo / superficies --- */
+  --color-fondo: #070a0d;
+  --color-fondo-profundo: #05070a;
+  --color-superficie: #111a18;
+  --color-superficie-2: #0d1312;
+  --color-superficie-alta: #0c1211;
+  --color-borde: rgba(255, 255, 255, 0.08);
+  --color-borde-suave: rgba(255, 255, 255, 0.07);
+
+  /* --- Texto --- */
+  --color-texto: #f3f7f5;
+  --color-texto-mute: #899992;
+  --color-texto-tenue: #7f918b;
+  --color-texto-sobre-acento: #08221b;
+
+  /* --- Acentos --- */
+  --color-acento: #6ee7c8; /* menta — elementos activos, íconos, foco */
+  --color-acento-2: #f0c987; /* oro — valores/métricas destacadas */
+  --color-lila: #b18cf5;
+  --color-coral: #f0806a;
+  --color-danger: #ff8e7d;
+  --color-error-insignia: #f04646;
+  --color-advertencia-insignia: #f0b428;
+  --color-exito: #6ee7c8;
+
+  /* --- Degradados --- */
+  --gradiente-cta: linear-gradient(100deg, #6ee7c8 0%, #d9dc8f 55%, #f0c987 100%);
+  --gradiente-tarjeta: linear-gradient(145deg, #111a18, #0d1312);
+  --gradiente-app-card: linear-gradient(145deg, #111a18, #0c1211);
+  --gradiente-primario: linear-gradient(100deg, #6ee7c8, #c9d98d, #efc784);
+  --gradiente-fondo-pantalla: radial-gradient(circle at 50% -10%, rgba(70, 120, 105, 0.16), transparent 38%), #070a0d;
+  --sombra-tarjeta: 0 12px 30px rgba(0, 0, 0, 0.18);
+  --sombra-tarjeta-alta: 0 16px 38px rgba(0, 0, 0, 0.2);
+  --anillo-foco: 0 0 0 3px rgba(110, 231, 200, 0.1);
+
+  /* --- Tipografía --- */
+  --fuente-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Noto Serif', serif;
+  --fuente-cuerpo: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ui-sans-serif, system-ui, sans-serif;
+  --fuente-etiqueta: ui-monospace, 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+
+  /* --- Geometría --- */
+  --radio-tarjeta: 20px;
+  --radio-tarjeta-grande: 22px;
+  --radio-boton: 14px;
+  --radio-chip: 999px;
+  --espacio-unidad: 8px;
+}
+
+/**
+ * TEMA "Carbón dorado mate" — tokens exactos del documento/JSON que
+ * compartió el usuario (colors, gradients, typography, geometry, shadows).
+ * No se ajustó ningún valor a ojo. Donde el documento no define un rol que
+ * Verde sí tiene (ej. "lila"), se reutiliza el acento bronce — el propio
+ * documento pide explícitamente no introducir colores fuera de la paleta
+ * ("no introducir azul, rosa ni otro tema de color").
+ */
+[data-tema='oro'] {
+  --color-fondo: #0c0c0c;
+  --color-fondo-profundo: #080808;
+  --color-superficie: #1b1a18;
+  --color-superficie-2: #1b1a18;
+  --color-superficie-alta: #24221e;
+  --color-borde: #4d463c;
+  --color-borde-suave: #332f29;
+
+  --color-texto: #eeeae0;
+  --color-texto-mute: #aaa297;
+  --color-texto-tenue: #746d63;
+  --color-texto-sobre-acento: #141310;
+
+  --color-acento: #aa9671; /* bronce mate */
+  --color-acento-2: #d0ae70; /* oro mate */
+  --color-lila: #aa9671;
+  --color-coral: #c87868;
+  --color-danger: #c87868;
+  --color-error-insignia: #c87868;
+  --color-advertencia-insignia: #d0ae70;
+  --color-exito: #8f9b70;
+
+  --gradiente-cta: linear-gradient(135deg, #b39d73 0%, #8b7045 100%);
+  --gradiente-tarjeta: linear-gradient(135deg, #24221e 0%, #1b1a18 58%, #141310 100%);
+  --gradiente-app-card: linear-gradient(135deg, #24221e 0%, #1b1a18 58%, #141310 100%);
+  --gradiente-primario: linear-gradient(135deg, #b39d73 0%, #8b7045 100%);
+  --gradiente-fondo-pantalla: radial-gradient(circle at 50% -12%, #29251f 0%, #0c0c0c 44%, #080808 100%);
+  --sombra-tarjeta: 0 10px 28px rgba(0, 0, 0, 0.32);
+  --sombra-tarjeta-alta: 0 16px 38px rgba(0, 0, 0, 0.48);
+  --anillo-foco: 0 0 18px rgba(208, 174, 112, 0.1);
+
+  --fuente-display: Georgia, 'Times New Roman', serif;
+  --fuente-cuerpo: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --fuente-etiqueta: ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --radio-tarjeta: 18px;
-  --radio-boton: 14px;
-  --espacio-unidad: 8px;
+  --radio-tarjeta-grande: 18px;
+  --radio-boton: 12px;
+  --radio-chip: 10px;
+}
+
+/**
+ * TEMA "Papel" (2026-09-15, pedido explícito del usuario: "blanco y negro,
+ * pero predomine el blanco... muy serio, muy formal... nada de animaciones").
+ * Fondo casi blanco, texto casi negro, sin degradados (son colores planos —
+ * un degradado "se mueve" visualmente, no calza con "serio") y esquinas
+ * cuadradas en vez de redondeadas. Casi monocromo a propósito: solo error/
+ * advertencia/éxito usan un color real (apagado, no vivo) porque esos 3
+ * estados necesitan distinguirse incluso en blanco y negro — todo lo demás
+ * (acento, botones, tarjetas) es negro/gris.
+ *
+ * "Nada de animaciones" tiene DOS partes, no una: el bloque de acá abajo
+ * (`[data-tema='papel'] *`) apaga toda animación/transición CSS (las de
+ * `@keyframes`, como `cristal3d-flotar`/`prisma-recorrer`/`mia-pulso-mate`).
+ * Pero el punto que orbita en AnilloMeta.tsx es SVG `<animateTransform>`
+ * (SMIL, no CSS) — a ESE no lo apaga ningún CSS, por eso además cada
+ * pantalla que usa gráficos (Balance, Estadísticas, GraficoDistribucion)
+ * calcula `animado = tema !== 'papel'` y se lo pasa como prop. Las dos
+ * partes hacen falta — quitar cualquiera de las dos deja animaciones vivas.
+ */
+[data-tema='papel'] {
+  --color-fondo: #fafaf9;
+  --color-fondo-profundo: #f0f0ee;
+  --color-superficie: #ffffff;
+  --color-superficie-2: #f5f5f3;
+  --color-superficie-alta: #ececea;
+  --color-borde: #d8d8d4;
+  --color-borde-suave: #e6e6e2;
+
+  --color-texto: #161615;
+  --color-texto-mute: #5c5c58;
+  --color-texto-tenue: #8a8a85;
+  --color-texto-sobre-acento: #ffffff;
+
+  --color-acento: #161615; /* negro — sin tonalidad, a propósito */
+  --color-acento-2: #3a3a37;
+  --color-lila: #161615;
+  --color-coral: #7a2e26;
+  --color-danger: #8c2f26;
+  --color-error-insignia: #8c2f26;
+  --color-advertencia-insignia: #7a611f;
+  --color-exito: #2f5f42;
+
+  --gradiente-cta: #161615; /* plano, no degradado — un degradado "se mueve" al ojo */
+  --gradiente-tarjeta: #ffffff;
+  --gradiente-app-card: #ffffff;
+  --gradiente-primario: #161615;
+  --gradiente-fondo-pantalla: #fafaf9;
+  --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --sombra-tarjeta-alta: 0 2px 6px rgba(0, 0, 0, 0.08);
+  --anillo-foco: 0 0 0 2px rgba(0, 0, 0, 0.18);
+
+  --fuente-display: Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --fuente-cuerpo: Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --fuente-etiqueta: 'Courier New', ui-monospace, monospace;
+
+  --radio-tarjeta: 4px;
+  --radio-tarjeta-grande: 4px;
+  --radio-boton: 3px;
+  --radio-chip: 3px;
+}
+
+/* Parte 1/2 de "nada de animaciones" en el tema Papel — ver el comentario grande de arriba. */
+[data-tema='papel'] *,
+[data-tema='papel'] *::before,
+[data-tema='papel'] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Animación de pulso muy leve — el documento del tema oro la pide para la burbuja MIA
+   ("lenta, discreta y ambiental"); Verde no la usa, pero declararla acá no le cuesta nada. */
+@keyframes mia-pulso-mate {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(208, 174, 112, 0);
+  }
+  50% {
+    box-shadow: var(--anillo-foco);
+  }
 }
 
 .pantalla {
@@ -61,18 +240,18 @@
 }
 
 .insignia--ok {
-  background: rgba(79, 140, 255, 0.15);
+  background: color-mix(in srgb, var(--color-acento) 15%, transparent);
   color: var(--color-acento);
 }
 
 .insignia--proximo {
-  background: rgba(240, 180, 40, 0.15);
-  color: #f0b428;
+  background: color-mix(in srgb, var(--color-advertencia-insignia) 15%, transparent);
+  color: var(--color-advertencia-insignia);
 }
 
 .insignia--vencido {
-  background: rgba(240, 70, 70, 0.15);
-  color: #f04646;
+  background: color-mix(in srgb, var(--color-error-insignia) 15%, transparent);
+  color: var(--color-error-insignia);
 }
 
 /* Fase 6: navegación entre las 3 pantallas (antes solo existía Viajes). */
@@ -111,34 +290,32 @@
  * pantallas. `.tema-trabajo` se aplica una sola vez, en el `<section>` raíz
  * de `TrabajoScreen.tsx` — todo lo de acá abajo hereda de ahí para adentro.
  *
- * Referencia visual: guía de capturas de pantalla que aportó el usuario
- * (paleta oscura verde-azulada casi negra, acento degradado menta→dorado,
- * tarjetas circulares/recortadas para métricas, tipografía serif para
- * titulares y monoespaciada para etiquetas). Se sigue esa referencia tal
- * cual la pidió el usuario ("quiero un tema así igual").
- *
- * Fuentes: pilas de fuentes del sistema (serif/sans/mono), sin `@import` ni
- * Google Fonts — la app corre empaquetada en Capacitor sin garantía de
- * internet en el momento de abrir, así que depender de una fuente remota
- * dejaría el tema roto offline. Decisión deliberada, no un olvido.
+ * 2026-09-15: las variables `--tt-*` ya NO tienen su propio valor — son
+ * alias de las variables de tema de arriba (`--color-*`/`--gradiente-*`/
+ * `--fuente-*`), así que cuando `<html data-tema="oro">` cambia, este panel
+ * cambia solo, sin tocar ninguna de las ~50 reglas de acá abajo que ya
+ * usaban `var(--tt-*)`. Antes de este cambio, este bloque tenía su propia
+ * paleta fija (referencia visual verde-azulada que aportó el usuario) — ese
+ * era justo el problema: un tema aparte que "Carbón dorado mate" no podía
+ * tocar sin duplicar todo el bloque.
  */
 .tema-trabajo {
-  --tt-fondo: #060e0c;
-  --tt-fondo-alto: #0c1a17;
-  --tt-superficie: #101f1c;
-  --tt-superficie-alta: #16302a;
-  --tt-borde: rgba(255, 255, 255, 0.08);
-  --tt-texto: #eef5f2;
-  --tt-texto-mute: #8ea39d;
-  --tt-menta: #6ee7c8;
-  --tt-oro: #f0c987;
-  --tt-lila: #b18cf5;
-  --tt-coral: #f0806a;
-  --tt-gradiente-cta: linear-gradient(100deg, #6ee7c8 0%, #d9dc8f 55%, #f0c987 100%);
+  --tt-fondo: var(--color-fondo);
+  --tt-fondo-alto: var(--color-superficie-alta);
+  --tt-superficie: var(--color-superficie);
+  --tt-superficie-alta: var(--color-superficie-alta);
+  --tt-borde: var(--color-borde);
+  --tt-texto: var(--color-texto);
+  --tt-texto-mute: var(--color-texto-mute);
+  --tt-menta: var(--color-acento);
+  --tt-oro: var(--color-acento-2);
+  --tt-lila: var(--color-lila);
+  --tt-coral: var(--color-coral);
+  --tt-gradiente-cta: var(--gradiente-cta);
 
-  --tt-fuente-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Noto Serif', serif;
-  --tt-fuente-cuerpo: -apple-system, 'Segoe UI', Roboto, ui-sans-serif, system-ui, sans-serif;
-  --tt-fuente-etiqueta: ui-monospace, 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+  --tt-fuente-display: var(--fuente-display);
+  --tt-fuente-cuerpo: var(--fuente-cuerpo);
+  --tt-fuente-etiqueta: var(--fuente-etiqueta);
 
   background: var(--tt-fondo);
   color: var(--tt-texto);
@@ -239,6 +416,42 @@
   font-size: 0.85rem;
 }
 
+/* --- Meta diaria (2026-09-16, pedido explícito del usuario) --- */
+.tt-meta-diaria {
+  margin-top: 12px;
+  text-align: left;
+}
+.tt-meta-diaria__fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+  color: var(--tt-texto-mute);
+  margin-bottom: 6px;
+}
+.tt-meta-diaria__fila strong {
+  color: var(--tt-texto);
+  font-family: var(--tt-fuente-display);
+  font-size: 1rem;
+}
+.tt-meta-diaria__pista {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tt-superficie-alta);
+  overflow: hidden;
+}
+.tt-meta-diaria__barra {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tt-meta-diaria__detalle {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--tt-texto-mute);
+}
+
 .tt-boton-cta {
   display: flex;
   align-items: center;
@@ -250,7 +463,7 @@
   border-radius: 20px;
   border: none;
   background: var(--tt-gradiente-cta);
-  color: #08221b;
+  color: var(--color-texto-sobre-acento);
   font-family: var(--tt-fuente-cuerpo);
   font-size: 1.05rem;
   font-weight: 700;
@@ -267,51 +480,42 @@
   border: 1px solid var(--tt-borde);
 }
 
-/* --- Grupo de píldoras (Redondas / Recortadas / Resumen, Hoy / Semana / Mes) --- */
+/* --- Grupo de píldoras (Lectura del día / Resumen / Mantenimiento y gastos / Estadísticas, Hoy / Semana / Mes) --- */
 .tt-pildoras {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding: 0 18px 16px;
-  overflow-x: auto;
-}
-
-.tt-pildoras__etiqueta {
-  font-family: var(--tt-fuente-etiqueta);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--tt-texto-mute);
-  line-height: 1.2;
-  flex-shrink: 0;
-  width: 58px;
 }
 
 .tt-pildora {
   flex-shrink: 0;
-  padding: 10px 16px;
+  padding: 6px 11px;
   border-radius: 999px;
   border: 1px solid var(--tt-borde);
   background: var(--tt-fondo-alto);
   color: var(--tt-texto-mute);
   font-family: var(--tt-fuente-cuerpo);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .tt-pildora--activa {
   background: var(--tt-lila);
   border-color: var(--tt-lila);
-  color: #1c1030;
+  color: var(--color-texto-sobre-acento);
 }
 
 .tt-pildora--activa.tt-pildora--dorada {
   background: var(--tt-gradiente-cta);
-  color: #08221b;
+  color: var(--color-texto-sobre-acento);
 }
 
-/* --- Grilla de métricas (vista "Redondas" / "Recortadas") --- */
+/* --- Grilla de métricas (vista "Lectura del día") --- */
 .tt-grilla-metricas {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -358,10 +562,18 @@
   font-weight: 700;
 }
 
-.tt-metrica__valor--menta { color: var(--tt-menta); }
-.tt-metrica__valor--oro { color: var(--tt-oro); }
-.tt-metrica__valor--lila { color: var(--tt-lila); }
-.tt-metrica__valor--coral { color: var(--tt-coral); }
+.tt-metrica__valor--menta {
+  color: var(--tt-menta);
+}
+.tt-metrica__valor--oro {
+  color: var(--tt-oro);
+}
+.tt-metrica__valor--lila {
+  color: var(--tt-lila);
+}
+.tt-metrica__valor--coral {
+  color: var(--tt-coral);
+}
 
 /* --- Vista "Resumen": neto grande + desglose + acciones + historial --- */
 .tt-resumen-neto {
@@ -409,6 +621,25 @@
   color: var(--tt-texto-mute);
   font-size: 0.78rem;
   margin-top: 2px;
+}
+
+/* 2026-09-17, pedido explícito del usuario: ranking 1-4 de franjas horarias por dinero — ver SeccionEstadisticas.tsx. */
+.tt-rango-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--tt-borde);
+  color: var(--tt-texto-mute);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.tt-rango-badge--primero {
+  border-color: var(--tt-oro);
+  color: var(--tt-oro);
 }
 
 .tt-divisor {
@@ -484,18 +715,18 @@
 }
 
 .tema-trabajo .insignia--ok {
-  background: rgba(110, 231, 200, 0.15);
+  background: color-mix(in srgb, var(--tt-menta) 15%, transparent);
   color: var(--tt-menta);
 }
 
 .tema-trabajo .insignia--proximo {
-  background: rgba(240, 201, 135, 0.18);
+  background: color-mix(in srgb, var(--tt-oro) 18%, transparent);
   color: var(--tt-oro);
 }
 
 .tema-trabajo .insignia--vencido {
-  background: rgba(240, 128, 106, 0.18);
-  color: var(--tt-coral);
+  background: color-mix(in srgb, var(--color-error-insignia) 18%, transparent);
+  color: var(--color-error-insignia);
 }
 
 .tema-trabajo button {
@@ -520,36 +751,587 @@
 }
 
 /* ===== MIA APP-WIDE UI ===== */
-*{box-sizing:border-box}
-html,body,#root{margin:0;min-height:100%;background:#070a0d;color:#f3f7f5}
-body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-button,input,select,textarea{font:inherit}
-button{border:0;cursor:pointer;color:#f3f7f5;background:#17221f;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:12px 15px;transition:.18s ease}
-button:hover{transform:translateY(-1px);background:#1d2d28}
-button:disabled{opacity:.48;cursor:not-allowed;transform:none}
-input,select,textarea{width:100%;background:#0e1513;color:#edf5f1;border:1px solid rgba(255,255,255,.10);border-radius:13px;padding:12px 13px;outline:none}
-input:focus,select:focus,textarea:focus{border-color:#6ee7c8;box-shadow:0 0 0 3px rgba(110,231,200,.10)}
-.pantalla{min-height:100vh;padding:20px 16px 92px;background:radial-gradient(circle at 50% -10%,rgba(70,120,105,.16),transparent 38%),#070a0d}
-.titulo-pantalla{font-size:1.7rem;font-weight:700;letter-spacing:-.03em;margin:0 0 8px}
-.texto-mute{color:#899992;font-size:.9rem;line-height:1.5}
-.lista-viajes{gap:10px}
-.tarjeta-viaje{background:linear-gradient(145deg,#111a18,#0d1312);border:1px solid rgba(255,255,255,.08);box-shadow:0 12px 30px rgba(0,0,0,.18);border-radius:20px}
-.barra-navegacion{height:72px;padding:8px 8px max(8px,env(safe-area-inset-bottom));gap:5px;background:rgba(9,13,12,.94);backdrop-filter:blur(18px);border-top:1px solid rgba(255,255,255,.08);z-index:50}
-.barra-navegacion__item{flex:1;text-align:center;padding:9px 4px;border-radius:13px;font-size:.72rem;font-weight:600}
-.barra-navegacion__item--activo{background:rgba(110,231,200,.10);color:#6ee7c8}
-.app-panel{max-width:760px;margin:0 auto}
-.app-hero{padding:8px 2px 20px}
-.app-eyebrow{font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:#6ee7c8;font-weight:700}
-.app-title{font-size:2.1rem;line-height:1.05;letter-spacing:-.045em;margin:8px 0}
-.app-card{background:linear-gradient(145deg,#111a18,#0c1211);border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:17px;box-shadow:0 16px 38px rgba(0,0,0,.20)}
-.app-card + .app-card{margin-top:12px}
-.app-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.app-stat{padding:15px;border-radius:18px;background:#0d1513;border:1px solid rgba(255,255,255,.07)}
-.app-stat strong{display:block;font-size:1.25rem;margin-top:5px}
-.app-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:#7f918b;font-weight:700}
-.app-primary{width:100%;background:linear-gradient(100deg,#6ee7c8,#c9d98d,#efc784);color:#07100d;font-weight:800;border:0}
-.app-danger{color:#ff8e7d}
-.app-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;background:#0c1211;border:1px solid rgba(255,255,255,.07);border-radius:15px}
-.app-tabs button{background:transparent;border:0;color:#82918d}
-.app-tabs button.active{background:#17231f;color:#6ee7c8}
-@media(min-width:700px){.pantalla{padding-left:28px;padding-right:28px}.app-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+}
+body {
+  font-family: var(--fuente-cuerpo);
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  border: 0;
+  cursor: pointer;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-suave);
+  border-radius: var(--radio-boton);
+  padding: 12px 15px;
+  transition: 0.18s ease;
+}
+button:hover {
+  transform: translateY(-1px);
+  background: var(--color-superficie-alta);
+}
+button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  transform: none;
+}
+input,
+select,
+textarea {
+  width: 100%;
+  background: var(--color-superficie-2);
+  color: var(--color-texto);
+  border: 1px solid var(--color-borde-suave);
+  border-radius: 13px;
+  padding: 12px 13px;
+  outline: none;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-acento);
+  box-shadow: var(--anillo-foco);
+}
+.pantalla {
+  min-height: 100vh;
+  padding: 20px 16px 92px;
+  background: var(--gradiente-fondo-pantalla);
+}
+.titulo-pantalla {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 8px;
+}
+.texto-mute {
+  color: var(--color-texto-mute);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.lista-viajes {
+  gap: 10px;
+}
+.tarjeta-viaje {
+  background: var(--gradiente-tarjeta);
+  border: 1px solid var(--color-borde-suave);
+  box-shadow: var(--sombra-tarjeta);
+  border-radius: var(--radio-tarjeta);
+}
+.barra-navegacion {
+  height: 72px;
+  padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+  gap: 5px;
+  background: color-mix(in srgb, var(--color-fondo-profundo) 94%, transparent);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid var(--color-borde-suave);
+  z-index: 50;
+}
+.barra-navegacion__item {
+  flex: 1;
+  text-align: center;
+  padding: 9px 4px;
+  border-radius: 13px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.barra-navegacion__item--activo {
+  background: color-mix(in srgb, var(--color-acento) 10%, transparent);
+  color: var(--color-acento);
+}
+.app-panel {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* Estilo "Cristal 3D"/"Prisma" de Balance (2026-09-15) — ver components/graficos/ para la
+   lógica de color/movimiento; acá solo el layout alrededor del <svg>. */
+.balance-orbital {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 20px;
+  color: var(--color-texto);
+}
+.balance-orbital svg {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+}
+.balance-orbital__leyenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 18px;
+}
+.balance-orbital__leyenda li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+.balance-orbital__punto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.balance-orbital__nombre {
+  color: var(--color-texto-mute);
+}
+
+/* Estilo "Cristal 3D" (2026-09-15, reescrito 2026-09-16 con fotos reales de placas de vidrio) — ver components/graficos/Cristal3D.tsx */
+.cristal3d__stage {
+  position: relative;
+  /* 2026-09-16: subió de 380 a 420px al pasar de 4 a 5 categorías satélite
+     (layout en pentágono, ver Cristal3D.tsx) — con la cruz de 4 alcanzaba,
+     con 5 el radio del pentágono necesita un poco más de aire vertical. */
+  height: 420px;
+  margin-bottom: 8px;
+}
+.cristal3d__placa {
+  position: relative;
+  transform: rotate(var(--rot, 0deg));
+  filter: drop-shadow(0 16px 14px rgba(0, 0, 0, 0.4));
+}
+.cristal3d__placa--animada {
+  animation: cristal3d-flotar 8s ease-in-out infinite;
+}
+@keyframes cristal3d-flotar {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--rot, 0deg)); }
+  25% { transform: translate3d(2px, -6px, 0) rotate(calc(var(--rot, 0deg) + 1deg)); }
+  50% { transform: translate3d(-3px, -10px, 0) rotate(calc(var(--rot, 0deg) - 1deg)); }
+  75% { transform: translate3d(3px, -5px, 0) rotate(calc(var(--rot, 0deg) + 0.6deg)); }
+}
+.cristal3d__dato {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  transform: translate(-50%, -50%);
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Estilo "Prisma" (2026-09-15, reescrito 2026-09-16 para calcar la referencia exacta) — ver components/graficos/Prisma.tsx */
+.prisma__fuente {
+  position: absolute;
+  left: 2%;
+  top: 44%;
+  transform: translateY(-50%);
+  width: 74px;
+  height: 50px;
+  border: 1px solid;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.prisma__fuente-icono {
+  font-size: 0.85rem;
+}
+.prisma__fuente b {
+  font-size: 0.8rem;
+}
+.prisma__lineas {
+  position: absolute;
+  left: 24%;
+  right: 34%;
+  top: 30%;
+  height: 90px;
+}
+.prisma__linea {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--linea);
+  box-shadow: 0 0 10px var(--linea);
+  transform-origin: left center;
+  transform: rotate(var(--angulo, 0deg));
+}
+.prisma__linea--animada {
+  animation: prisma-fluir 2.8s ease-in-out infinite;
+}
+@keyframes prisma-fluir {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.8); }
+}
+.prisma__destinos {
+  position: absolute;
+  right: 1%;
+  top: 8%;
+  display: grid;
+  gap: 8px;
+}
+.prisma__destino {
+  min-width: 96px;
+  padding: 7px 9px;
+  border: 1px solid;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-superficie) 85%, transparent);
+  color: var(--color-texto);
+  font-size: 0.66rem;
+  font-family: monospace;
+}
+.prisma__destino--animado {
+  animation: prisma-destino 2.8s ease-in-out infinite alternate;
+}
+@keyframes prisma-destino {
+  to { transform: translateX(-4px); }
+}
+
+/* "Frasco de ahorro" (2026-09-15) — ver components/graficos/GraficoAhorroMeta.tsx */
+.balance-ahorro {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px 26px;
+  border-radius: var(--radio-tarjeta-grande, 22px);
+  background: var(--gradiente-app-card, var(--color-superficie));
+  border: 1px solid var(--color-borde-suave);
+  overflow: hidden;
+  isolation: isolate;
+}
+.balance-ahorro::before {
+  content: '';
+  position: absolute;
+  inset: -20% -10%;
+  background: radial-gradient(circle at 50% 30%, rgba(183, 164, 255, 0.22), transparent 65%);
+  z-index: -1;
+  pointer-events: none;
+}
+.balance-ahorro--vacio {
+  padding: 34px 22px;
+  gap: 8px;
+}
+.balance-ahorro__vacio-icono {
+  font-size: 2.6rem;
+  opacity: 0.7;
+}
+.balance-ahorro__texto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.balance-ahorro__porcentaje {
+  font-size: 2.3rem;
+  font-weight: 800;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #e4d9ff, #9a86e8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/*
+  2026-09-17, pedido explícito del usuario: "no me gusta ese contenedor...
+  quiero que sea el mismo tarro de cristal con su tapa, pero que vayan
+  apareciendo monedas de oro por dentro a medida que voy ahorrando" — el
+  líquido con olas/burbujas se reemplaza por monedas que aparecen una a una
+  (mismo tarro/tapa/vidrio de siempre, solo cambia qué hay adentro).
+*/
+.balance-ahorro__moneda {
+  animation: balance-ahorro-moneda-aparece 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes balance-ahorro-moneda-aparece {
+  0% { opacity: 0; transform: scale(0); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.balance-ahorro--estatico .balance-ahorro__moneda {
+  animation: none;
+}
+.balance-ahorro--cumplida .balance-ahorro__porcentaje {
+  background: linear-gradient(135deg, #ffe9a8, #f0c987);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.balance-ahorro__chispas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.balance-ahorro__chispas span {
+  position: absolute;
+  color: #f0c987;
+  font-size: 1rem;
+  opacity: 0;
+  animation: balance-ahorro-chispa 2.4s ease-in-out infinite;
+}
+.balance-ahorro__chispas span:nth-child(1) { top: 14%; left: 18%; animation-delay: 0s; }
+.balance-ahorro__chispas span:nth-child(2) { top: 22%; left: 78%; animation-delay: 0.4s; }
+.balance-ahorro__chispas span:nth-child(3) { top: 55%; left: 8%; animation-delay: 0.9s; }
+.balance-ahorro__chispas span:nth-child(4) { top: 68%; left: 86%; animation-delay: 1.3s; }
+.balance-ahorro__chispas span:nth-child(5) { top: 40%; left: 50%; animation-delay: 1.7s; }
+@keyframes balance-ahorro-chispa {
+  0%, 100% { opacity: 0; transform: scale(0.6) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(90deg); }
+}
+
+/* Acordeones "papeleta" (2026-09-15) — ver components/AcordeonResumen.tsx.
+   Usados en Balance para los resúmenes de Deudas/Hogar/Vehículo: pedido
+   explícito del usuario de que no fuera scroll infinito sino desplegables,
+   "no solo letras y números" al abrirse. */
+.acordeon-resumen {
+  border-radius: var(--radio-tarjeta-grande, 20px);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-suave);
+  overflow: hidden;
+}
+.acordeon-resumen + .acordeon-resumen {
+  margin-top: 10px;
+}
+.acordeon-resumen__cabecera {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-texto);
+}
+.acordeon-resumen__icono {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex: none;
+}
+.acordeon-resumen__titulos {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.acordeon-resumen__titulos strong {
+  font-size: 0.96rem;
+}
+.acordeon-resumen__titulos .texto-mute {
+  font-size: 0.78rem;
+}
+.acordeon-resumen__chevron {
+  font-size: 1.2rem;
+  color: var(--color-texto-tenue);
+  transition: transform 0.3s ease;
+  flex: none;
+}
+.acordeon-resumen__chevron--abierto {
+  transform: rotate(180deg);
+}
+.acordeon-resumen__panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s ease;
+}
+.acordeon-resumen__panel--abierto {
+  grid-template-rows: 1fr;
+}
+.acordeon-resumen__panel-interior {
+  overflow: hidden;
+}
+.acordeon-resumen__papeleta {
+  margin: 0 14px 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--color-superficie-2);
+  border: 1px dashed var(--color-borde);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.28s ease 0.05s, transform 0.28s ease 0.05s;
+}
+.acordeon-resumen__panel--abierto .acordeon-resumen__papeleta {
+  opacity: 1;
+  transform: translateY(0);
+}
+.acordeon-resumen__fila {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.acordeon-resumen__fila-linea {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.86rem;
+}
+.acordeon-resumen__barra {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-borde-suave);
+  overflow: hidden;
+}
+.acordeon-resumen__barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* Secciones desplegables de Ajustes (2026-09-15) — ver components/SeccionDesplegable.tsx.
+   La mecánica de abrir/cerrar (grid-template-rows, chevron) reusa las clases
+   acordeon-resumen__panel y acordeon-resumen__chevron de arriba (D-18);
+   acá solo la cabecera propia. */
+.seccion-desplegable {
+  margin-top: 16px;
+  border-radius: var(--radio-tarjeta-grande, 20px);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-suave);
+  overflow: hidden;
+}
+.seccion-desplegable__cabecera {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-texto);
+}
+.seccion-desplegable__contenido {
+  padding: 0 20px 20px;
+}
+
+/* Tarjetas ejecutivas de mantenimiento (2026-09-15) — ver features/trabajo/TarjetaMantenimiento.tsx */
+.tarjeta-mantenimiento__imagen--animada {
+  animation: tarjeta-mantenimiento-respirar 6s ease-in-out infinite;
+}
+@keyframes tarjeta-mantenimiento-respirar {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+.tarjeta-mantenimiento__barra {
+  transition: width 0.4s ease;
+}
+.tarjeta-mantenimiento__barra--animada {
+  transition: width 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-hero {
+  padding: 8px 2px 20px;
+}
+.app-eyebrow {
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-acento);
+  font-weight: 700;
+}
+.app-title {
+  font-family: var(--fuente-display);
+  font-size: 2.1rem;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  margin: 8px 0;
+}
+.app-card {
+  background: var(--gradiente-app-card);
+  border: 1px solid var(--color-borde-suave);
+  border-radius: var(--radio-tarjeta-grande);
+  padding: 17px;
+  box-shadow: var(--sombra-tarjeta-alta);
+}
+.app-card + .app-card {
+  margin-top: 12px;
+}
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.app-stat {
+  padding: 15px;
+  border-radius: 18px;
+  background: var(--color-superficie-2);
+  border: 1px solid var(--color-borde-suave);
+}
+.app-stat strong {
+  display: block;
+  font-size: 1.25rem;
+  margin-top: 5px;
+}
+.app-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-texto-tenue);
+  font-weight: 700;
+}
+.app-primary {
+  width: 100%;
+  background: var(--gradiente-primario);
+  color: var(--color-texto-sobre-acento);
+  font-weight: 800;
+  border: 0;
+}
+.app-danger {
+  color: var(--color-danger);
+}
+.app-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 5px;
+  background: var(--color-superficie-alta);
+  border: 1px solid var(--color-borde-suave);
+  border-radius: 15px;
+}
+.app-tabs button {
+  background: transparent;
+  border: 0;
+  color: var(--color-texto-tenue);
+}
+.app-tabs button.active {
+  background: var(--color-superficie);
+  color: var(--color-acento);
+}
+@media (min-width: 700px) {
+  .pantalla {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+  .app-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

@@ -1,13 +1,7 @@
+import type { ResultadoSincronizacion } from '../../lib/autoSync'
 import { haySesion } from '../../lib/api'
 import { repositorioViajes } from './repository'
 import { subirViaje } from './api'
-
-export interface ResultadoSincronizacion {
-  intentados: number
-  sincronizados: number
-  /** Motivo del primer fallo, si alguno — para mostrar algo útil sin frenar el resto. */
-  primerError: string | null
-}
 
 /**
  * Sincroniza todos los viajes pendientes, uno a la vez y en orden (no en

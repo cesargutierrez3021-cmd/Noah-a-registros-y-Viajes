@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { usePlanes } from '../../domain/planes/store'
 import { useAuth } from '../../domain/auth/store'
 
@@ -34,9 +35,10 @@ export function PlanesScreen() {
       )}
 
       {!autenticado() && (
-        <p className="texto-mute" style={{ marginBottom: 16 }}>
-          Inicia sesión para ver tu plan actual.
-        </p>
+        <div className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, marginBottom: 16 }}>
+          <span className="texto-mute">Estás usando MIA gratis, sin cuenta. Para suscribirte a un plan pago hace falta una cuenta.</span>
+          <Link to="/cuenta"><button type="button">Iniciar sesión o crear cuenta</button></Link>
+        </div>
       )}
 
       {planActual && (

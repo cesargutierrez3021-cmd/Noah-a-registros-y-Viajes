@@ -7,9 +7,11 @@ interface EstadoDeudas {
   abonos: AbonoDeuda[]
   cargando: boolean
   cargar: () => Promise<void>
-  agregarDeuda: (nombre: string, saldoInicial: number, cuotaProgramada: CuotaProgramada | null) => Promise<Deuda>
+  agregarDeuda: (nombre: string, saldoInicial: number, cuotaProgramada: CuotaProgramada | null, fechaLimiteISO: string | null) => Promise<Deuda>
   /** Crea el abono Y actualiza saldoActual de la deuda — misma transacción lógica, ver comentario adentro. */
   abonar: (deudaId: string, monto: number) => Promise<void>
+  /** Cambia SOLO la fecha límite (ej. "ya pagué esta cuota, la próxima es en un mes") — mismo patrón que `actualizarMontoConceptoFijo` en domain/hogar. */
+  actualizarFechaLimite: (deudaId: string, fechaLimiteISO: string | null) => Promise<void>
   /** Deudas con saldoActual > 0. `alertas`/pantallas usan esto para no mostrar deudas ya pagadas mezcladas con las activas. */
   deudasActivas: () => Deuda[]
 }
@@ -29,19 +31,28 @@ export const useDeudas = create<EstadoDeudas>((set, get) => ({
     set({ deudas, abonos, cargando: false })
   },
 
-  agregarDeuda: async (nombre, saldoInicial, cuotaProgramada) => {
+  agregarDeuda: async (nombre, saldoInicial, cuotaProgramada, fechaLimiteISO) => {
     const deuda: Deuda = {
       id: generarId(),
       nombre,
       saldoInicial,
       saldoActual: saldoInicial,
       cuotaProgramada,
+      fechaLimiteISO,
       creadaEnISO: new Date().toISOString(),
       pendienteDeSync: true,
     }
     await repositorioDeudas.guardarDeuda(deuda)
     set({ deudas: [...get().deudas, deuda] })
     return deuda
+  },
+
+  actualizarFechaLimite: async (deudaId, fechaLimiteISO) => {
+    const deuda = get().deudas.find((d) => d.id === deudaId)
+    if (!deuda) return
+    const deudaActualizada: Deuda = { ...deuda, fechaLimiteISO, pendienteDeSync: true }
+    await repositorioDeudas.guardarDeuda(deudaActualizada)
+    set({ deudas: get().deudas.map((d) => (d.id === deudaId ? deudaActualizada : d)) })
   },
 
   abonar: async (deudaId, monto) => {

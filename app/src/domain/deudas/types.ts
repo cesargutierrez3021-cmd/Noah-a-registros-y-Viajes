@@ -14,6 +14,26 @@ export type FrecuenciaCuota = 'semanal' | 'quincenal' | 'mensual'
 export interface CuotaProgramada {
   monto: number
   frecuencia: FrecuenciaCuota
+  /**
+   * 2026-09-16, pedido explícito del usuario: "cuando le pongo cuota
+   * semanal o quincenal o mensual, no hay una fecha para solucionar...
+   * ¿cómo vas a ver qué día es la cuota?" — sin esto, `proximaFechaCuotaDeuda`
+   * (domain/avisos/calculos.ts) solo podía APROXIMAR contando intervalos de
+   * calendario desde que se cargó la deuda, un día que no significa nada
+   * real para el conductor. Ahora el conductor elige el ancla real —
+   * SOLO el campo que corresponde a `frecuencia` se usa, los otros dos
+   * quedan en `null`:
+   * - mensual   → `diaDelMes` (1-31, mismo patrón que ConceptoFijo.diaDelMes)
+   * - quincenal → `diasDelMes`, DOS días del mes — "cada quincena no es
+   *   siempre igual para todo el mundo" (palabras del usuario)
+   * - semanal   → `diaDeLaSemana` (0=domingo..6=sábado, igual que Date.getDay())
+   * Opcionales (no `| null` sin `?`) para no romper deudas ya sincronizadas
+   * antes de este campo (D-16) — sin ancla puesta, cae de vuelta a la
+   * aproximación vieja.
+   */
+  diaDelMes?: number | null
+  diasDelMes?: [number, number] | null
+  diaDeLaSemana?: number | null
 }
 
 export interface Deuda {
@@ -24,6 +44,19 @@ export interface Deuda {
   saldoActual: number
   /** Cuota recurrente esperada (para mostrar "te toca pagar X cada Y"), opcional — no genera abonos solo, el usuario los carga a mano. */
   cuotaProgramada: CuotaProgramada | null
+  /**
+   * 2026-09-15, pedido explícito del usuario: "hay que ponerle fecha límite...
+   * si no, ¿cómo me va a emitir la alerta de cuándo se va a vencer si no
+   * tiene fecha límite?" — antes la única forma de generar un aviso de
+   * vencimiento (domain/avisos/calculos.ts) era proyectar una fecha a partir
+   * de `creadaEnISO` + `cuotaProgramada.frecuencia`, una aproximación honesta
+   * pero que dejaba SIN ningún aviso a cualquier deuda sin cuota programada
+   * (el checkbox "tiene cuota fija" es opcional). Esta es una fecha real que
+   * el conductor pone a mano y puede actualizar cuando quiera (ver
+   * `store.ts`, `actualizarFechaLimite`) — null = sin fecha puesta todavía,
+   * sin aviso (mismo comportamiento que antes para esas deudas).
+   */
+  fechaLimiteISO: string | null
   creadaEnISO: string
   /**
    * Deuda es mutable (`saldoActual` cambia) pero deliberadamente no se puede

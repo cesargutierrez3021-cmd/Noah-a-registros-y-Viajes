@@ -1,5 +1,6 @@
 package com.noah.conductor.atlas.gps
 
+import com.noah.conductor.atlas.burbuja.BurbujaService
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,13 +11,14 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import org.json.JSONArray
+import org.json.JSONObject
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 
 /**
  * Foreground service tipo "location" para capturar el recorrido del viaje
@@ -42,9 +44,23 @@ class GpsTrackingService : Service() {
         // Se setea/limpia desde GpsTrackingPlugin en su ciclo de vida.
         var listener: GpsLocationListener? = null
 
+        // 2026-09-22: referencia estática a la instancia viva del servicio — mismo patrón que
+        // BurbujaService.instanciaActiva. Hace falta porque `getPersistedTrack()` (el plugin,
+        // llamado desde JS al cerrar un viaje) lee SharedPreferences directo, pero con la caché
+        // en memoria de abajo el último lote (hasta PUNTOS_POR_LOTE-1 puntos) puede no estar
+        // escrito a disco todavía — el plugin usa esta referencia para forzar el flush ANTES de
+        // leer, así nunca le faltan los últimos puntos del viaje que se está cerrando.
+        @Volatile var instanciaActiva: GpsTrackingService? = null
+
         // Intervalo de actualización. Ajustable luego según consumo de batería real.
         private const val INTERVAL_MS = 5_000L
         private const val MIN_INTERVAL_MS = 3_000L
+        // 2026-09-22, pedido explícito del usuario ("la aplicación no debería consumir tanto
+        // recurso... optimiza mejor"): antes `guardarPunto()` hacía JSONArray(prefs.getString(...))
+        // — reparsear el string COMPLETO acumulado — en CADA punto GPS nuevo (cada 3-5s, un viaje
+        // puede durar horas). Ahora la traza vive en memoria (`puntosCache`, se carga una sola vez)
+        // y solo se reserializa/escribe a SharedPreferences cada `PUNTOS_POR_LOTE` puntos.
+        private const val PUNTOS_POR_LOTE = 4
     }
 
     interface GpsLocationListener {
@@ -53,12 +69,28 @@ class GpsTrackingService : Service() {
 
     private lateinit var fusedClient: FusedLocationProviderClient
     private var callback: LocationCallback? = null
-    private var cancellationSource: CancellationTokenSource? = null
+    private val prefs by lazy { getSharedPreferences("mia-gps", MODE_PRIVATE) }
+    private var puntosCache: JSONArray = JSONArray()
+    private var puntosSinGuardar = 0
 
     override fun onCreate() {
         super.onCreate()
+        instanciaActiva = this
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
         createChannelIfNeeded()
+        // Por si Android mató el proceso y lo recrea a mitad de viaje (START_STICKY) — hay que
+        // resumir la traza que ya estaba en disco, no arrancar de cero.
+        cargarCacheDesdeDisco()
+    }
+
+    /** Ver el comentario de `instanciaActiva` arriba — fuerza a disco cualquier punto pendiente. */
+    fun persistirCacheSiHaceFalta() {
+        if (puntosSinGuardar > 0) persistirCache()
+    }
+
+    private fun cargarCacheDesdeDisco() {
+        puntosCache = runCatching { JSONArray(prefs.getString("puntos", "[]")) }.getOrElse { JSONArray() }
+        puntosSinGuardar = 0
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -85,27 +117,10 @@ class GpsTrackingService : Service() {
 
         if (callback != null) return // ya está corriendo
 
-        // BUG REAL (auditoría): requestLocationUpdates con PRIORITY_HIGH_ACCURACY
-        // necesita un fix de GPS "en frío" — si el conductor arranca el viaje
-        // detenido (auto recién prendido, en un parqueadero, señal débil), ese
-        // primer fix puede tardar bastante. Si el viaje es corto o el conductor
-        // ya terminó de moverse antes de que llegue ese primer punto, `recorrido`
-        // queda con 0 o 1 puntos y `distanciaRecorridoKm()` (distancia.ts) da 0 —
-        // exactamente el síntoma "a veces marca 0.0 km" reportado.
-        // Fix: pedir un fix inmediato con getCurrentLocation (mezcla GPS+red,
-        // llega mucho más rápido aunque sea menos preciso) como PRIMER punto,
-        // mientras requestLocationUpdates sigue trayendo el stream de precisión
-        // real para el resto del recorrido.
-        try {
-            cancellationSource = CancellationTokenSource()
-            fusedClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cancellationSource!!.token)
-                .addOnSuccessListener { loc ->
-                    loc?.let { listener?.onLocation(it.latitude, it.longitude, it.accuracy, it.time) }
-                }
-        } catch (e: SecurityException) {
-            // Sin permisos — el catch de requestLocationUpdates de abajo ya
-            // detiene el servicio en ese caso, acá no hay nada más que hacer.
-        }
+        // Arranque de un viaje NUEVO (no un resume): el JS ya llamó a clearPersistedTrack() al
+        // cerrar el viaje anterior (ver domain/viajes/store.ts) — hay que releer de disco para
+        // que la caché en memoria no arrastre la traza del viaje anterior.
+        cargarCacheDesdeDisco()
 
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, INTERVAL_MS)
             .setMinUpdateIntervalMillis(MIN_INTERVAL_MS)
@@ -114,7 +129,15 @@ class GpsTrackingService : Service() {
         callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
+                guardarPunto(loc.latitude, loc.longitude, loc.accuracy, loc.time)
                 listener?.onLocation(loc.latitude, loc.longitude, loc.accuracy, loc.time)
+                // 2026-09-15, pedido explícito del usuario: "en la burbuja a veces no me hace
+                // el conteo de los kilómetros" — además de reenviar al JS (`listener`, que
+                // depende de que el WebView siga viva), se avisa DIRECTO a BurbujaService
+                // (mismo proceso, nativo a nativo) para que el km de la burbuja no dependa de
+                // que la app siga corriendo. Ver el comentario completo en
+                // BurbujaService.actualizarKmDesdeGps().
+                BurbujaService.instanciaActiva?.actualizarKmDesdeGps(loc.latitude, loc.longitude, loc.accuracy, loc.time)
             }
         }
 
@@ -130,10 +153,9 @@ class GpsTrackingService : Service() {
     }
 
     private fun stopTracking() {
-        cancellationSource?.cancel()
-        cancellationSource = null
         callback?.let { fusedClient.removeLocationUpdates(it) }
         callback = null
+        if (puntosSinGuardar > 0) persistirCache()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -167,9 +189,29 @@ class GpsTrackingService : Service() {
         manager.createNotificationChannel(channel)
     }
 
+
+    private fun guardarPunto(lat: Double, lng: Double, accuracy: Float, timestampMs: Long) {
+        puntosCache.put(JSONObject().apply { put("lat", lat); put("lng", lng); put("precisionMetros", accuracy); put("timestampMs", timestampMs) })
+        // Mantener solo la traza activa; un viaje normal no debería crecer indefinidamente.
+        while (puntosCache.length() > 5000) puntosCache.remove(0)
+        puntosSinGuardar++
+        if (puntosSinGuardar >= PUNTOS_POR_LOTE) persistirCache()
+    }
+
+    private fun persistirCache() {
+        prefs.edit().putString("puntos", puntosCache.toString()).apply()
+        puntosSinGuardar = 0
+    }
+
+    fun obtenerPuntosPersistidos(): String = prefs.getString("puntos", "[]") ?: "[]"
+    fun limpiarPuntosPersistidos() { prefs.edit().remove("puntos").apply(); puntosCache = JSONArray(); puntosSinGuardar = 0 }
+
     override fun onDestroy() {
-        cancellationSource?.cancel()
         callback?.let { fusedClient.removeLocationUpdates(it) }
+        // No perder el último lote parcial (menos de PUNTOS_POR_LOTE) si el servicio se destruye
+        // a mitad de viaje.
+        if (puntosSinGuardar > 0) persistirCache()
+        if (instanciaActiva === this) instanciaActiva = null
         super.onDestroy()
     }
 

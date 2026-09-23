@@ -1,6 +1,6 @@
 import type { Viaje, CierreViajeInput, ViajeManualInput } from './types'
 import { calcularDistanciaReal } from './distancia'
-import { obtenerZona } from './geofencing'
+import { obtenerLocalidad, obtenerZonaCustom } from './geofencing'
 
 /**
  * Repositorio de viajes. Esta es la ÚNICA puerta de entrada/salida para leer o
@@ -64,6 +64,27 @@ export const repositorioViajes: RepositorioViajes = new RepositorioViajesLocal()
  * Construye un Viaje completo a partir de lo que entrega el plugin nativo de GPS,
  * calculando la distancia real en un único lugar (ver distancia.ts).
  */
+/**
+ * 2026-09-22, pedido explícito del usuario: el primer punto del recorrido es
+ * el momento de ACEPTAR el servicio (toque 1 de la burbuja), no donde se
+ * recoge al pasajero — puede haber varias cuadras de diferencia. Si se marcó
+ * el punto de recogida (`puntoDeRecogidaISO`, toque 2 del nuevo ciclo de la
+ * burbuja — ver burbujaOrquestacion.ts — o el botón equivalente en la app),
+ * la "zona de inicio" del viaje se resuelve desde AHÍ, no desde el primer
+ * punto absoluto. Mismo criterio de corte que ya usa `calcularDistanciaReal`
+ * (distancia.ts) para separar kmHastaRecoger/kmConPasajero — reutilizado acá,
+ * no reinventado (D-18). Sin punto de recogida marcado (viaje corto sin ese
+ * toque, o viaje viejo de antes de este cambio), cae al primer punto del
+ * recorrido, como siempre.
+ */
+function resolverPuntoDeInicio(input: CierreViajeInput): typeof input.recorrido[number] | null {
+  if (input.puntoDeRecogidaISO) {
+    const puntoRecogida = input.recorrido.find((p) => p.timestampISO >= input.puntoDeRecogidaISO!)
+    if (puntoRecogida) return puntoRecogida
+  }
+  return input.recorrido[0] ?? null
+}
+
 export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje {
   // Fase 5 (D-7, resuelto): se resuelve contra el último punto del recorrido
   // (dónde terminó el viaje), no el primero — es el dato más útil para
@@ -75,8 +96,12 @@ export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje
   // (agrupación más amplia, ej. para tarifas) como dos capas separadas.
   // Si esa distinción se vuelve necesaria, se resuelve con un segundo array
   // de polígonos en geofencing.ts en vez de tocar esto de nuevo.
-  const puntoDeReferencia = input.recorrido[input.recorrido.length - 1] ?? null
-  const zonaDetectada = puntoDeReferencia ? obtenerZona(puntoDeReferencia) : null
+  const puntoInicio = resolverPuntoDeInicio(input)
+  const puntoFin = input.recorrido[input.recorrido.length - 1] ?? null
+  const localidadInicio = puntoInicio ? obtenerLocalidad(puntoInicio) : null
+  const localidadFin = puntoFin ? obtenerLocalidad(puntoFin) : null
+  const zonaInicio = puntoInicio ? obtenerZonaCustom(puntoInicio) : null
+  const zonaFin = puntoFin ? obtenerZonaCustom(puntoFin) : null
 
   return {
     id,
@@ -88,8 +113,13 @@ export function crearViajeDesdeCiere(id: string, input: CierreViajeInput): Viaje
     distancia: calcularDistanciaReal(input),
     distanciaReportadaPlataforma: input.distanciaReportadaPlataforma,
     ingreso: input.ingreso,
-    localidad: zonaDetectada,
-    zona: zonaDetectada,
+    localidad: localidadFin,
+    zona: zonaFin,
+    localidadInicio,
+    zonaInicio,
+    localidadFin,
+    zonaFin,
+    ingresoPendiente: input.ingresoPendiente,
     pendienteDeSync: true,
   }
 }
@@ -119,6 +149,12 @@ export function crearViajeManual(id: string, input: ViajeManualInput): Viaje {
     ingreso: input.ingreso,
     localidad: input.localidad,
     zona: input.zona,
+    localidadInicio: input.localidad,
+    zonaInicio: input.zona,
+    localidadFin: input.localidad,
+    zonaFin: input.zona,
+    // Un viaje manual siempre trae el ingreso de una vez, nunca queda pendiente.
+    ingresoPendiente: false,
     pendienteDeSync: true,
   }
 }

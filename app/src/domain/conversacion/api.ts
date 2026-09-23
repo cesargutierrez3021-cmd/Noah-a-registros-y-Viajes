@@ -27,12 +27,50 @@ export interface ContextoPuntoPeriodoEnvio {
   resumen: ContextoResumenEnvio
 }
 
+/** Mismo shape que ContextoDesgloseItem del backend — ver domain/estadisticas/types.ts (DesglosePor<T>) del lado del cliente. */
+export interface ContextoDesgloseItemEnvio {
+  clave: string
+  resumen: ContextoResumenEnvio
+}
+
+/** Mismo shape que ContextoProximoPago/ContextoDeudas/ContextoAhorro/ContextoMetaDiaria del backend (server/src/modules/ai/types.ts) — 2026-09-23, para que MIA responda deudas/ahorro/meta diaria por voz sin IA. */
+export interface ContextoProximoPagoEnvio {
+  nombre: string
+  monto: number
+  diasFaltantes: number
+}
+
+export interface ContextoDeudasEnvio {
+  totalPendiente: number
+  cantidadActivas: number
+  proximoPago: ContextoProximoPagoEnvio | null
+}
+
+export interface ContextoAhorroEnvio {
+  totalGuardado: number
+  totalObjetivo: number
+  cantidadMetas: number
+}
+
+export interface ContextoMetaDiariaEnvio {
+  metaDeHoy: number
+  ingresoHoy: number
+  progresoPorcentaje: number
+  faltanteRealista: number
+}
+
 export interface ContextoConversacionEnvio {
   hoy?: ContextoResumenEnvio
   semana?: ContextoResumenEnvio
   mantenimiento?: ContextoMantenimientoItemEnvio[]
   historial?: ContextoPuntoPeriodoEnvio[]
   turnosPrevios?: TurnoConversacion[]
+  /** 2026-09-15: para que MIA responda "mejor zona"/"mejor horario" con reglas, sin IA. */
+  porZona?: ContextoDesgloseItemEnvio[]
+  porFranja?: ContextoDesgloseItemEnvio[]
+  deudas?: ContextoDeudasEnvio
+  ahorro?: ContextoAhorroEnvio
+  metaDiaria?: ContextoMetaDiariaEnvio
 }
 
 /**

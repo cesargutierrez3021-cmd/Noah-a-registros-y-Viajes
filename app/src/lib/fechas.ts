@@ -1,5 +1,16 @@
 const ZONA_HORARIA_NEGOCIO = 'America/Bogota'
 
+/**
+ * 2026-09-22 (limpieza de auditoría, D-18): la fórmula de "último día del mes"
+ * (`new Date(año, mes+1, 0).getDate()`) estaba copiada literal en 3 archivos
+ * distintos (avisos/calculos.ts, metaDiaria/calculos.ts, hogar/calculos.ts) en
+ * vez de vivir acá, que es donde el proyecto centraliza matemática de fechas.
+ * `mesIndiceCero` = 0-11, igual que `Date.getMonth()`.
+ */
+export function ultimoDiaDelMes(año: number, mesIndiceCero: number): number {
+  return new Date(año, mesIndiceCero + 1, 0).getDate()
+}
+
 export function fechaNegocioISO(fecha: Date = new Date()): string {
   const partes = new Intl.DateTimeFormat('en-CA', {
     timeZone: ZONA_HORARIA_NEGOCIO, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -31,3 +42,23 @@ export function limitesSemanaBogotaISO(fecha: Date = new Date()) {
 }
 
 export function limitesMesBogotaISO(fecha: Date = new Date()) { const {year,month}=componentesBogota(fecha); const inicio=Date.UTC(year,month-1,1,5); const fin=Date.UTC(year,month,1,5); return {desde:new Date(inicio).toISOString(),hasta:new Date(fin).toISOString()} }
+
+/** Límites [desde, hasta) del día de negocio dado, en formato YYYY-MM-DD (Bogotá) — para el selector de día del Historial. */
+export function limitesDiaBogotaISODesdeClave(claveDia: string) {
+  const [year, month, day] = claveDia.split('-').map(Number)
+  const inicio = Date.UTC(year, month - 1, day, 5, 0, 0, 0)
+  return { desde: new Date(inicio).toISOString(), hasta: new Date(inicio + 86400000).toISOString() }
+}
+
+/**
+ * Minutos transcurridos desde medianoche (0-1439) en Bogotá de un ISO dado —
+ * para franjas horarias (domain/estadisticas). Con minutos, no solo hora
+ * entera, porque los cortes de franja (2026-09-17, pedido explícito del
+ * usuario) caen en medias horas ("11 y media de la mañana").
+ */
+export function minutosDelDiaLocalBogota(fechaISO: string): number {
+  const partes = new Intl.DateTimeFormat('en-US', { timeZone: ZONA_HORARIA_NEGOCIO, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(fechaISO))
+  const hora = Number(partes.find((p) => p.type === 'hour')?.value ?? 0)
+  const minuto = Number(partes.find((p) => p.type === 'minute')?.value ?? 0)
+  return hora * 60 + minuto
+}

@@ -1,22 +1,61 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useViajes } from '../../domain/viajes/store'
 import { useMantenimiento } from '../../domain/mantenimiento/store'
 import { sincronizarRegistrosMantenimientoPendientes } from '../../domain/mantenimiento/sync'
 import { calcularResumen } from '../../domain/estadisticas/calculos'
 import { CATALOGO_MANTENIMIENTO } from '../../domain/mantenimiento/reglas'
-import type { CriterioIntervalo } from '../../domain/mantenimiento/types'
+import { useTema } from '../../domain/tema/store'
+import { useVehiculo } from '../../domain/vehiculo/store'
+import { VEHICULOS_DISPONIBLES } from '../../domain/vehiculo/types'
+import { CampoMonto } from '../../components/CampoMonto'
+import { TarjetaMantenimiento } from './TarjetaMantenimiento'
+import { IMAGENES_MANTENIMIENTO } from './tarjetasMantenimiento'
+import type { CriterioIntervalo, PlantillaItemMantenimiento } from '../../domain/mantenimiento/types'
+import type { TipoVehiculo } from '../../domain/vehiculo/types'
 
+/**
+ * 2026-09-15, pedido explícito del usuario: "cuando entra al catálogo y yo
+ * pongo, cambio de aceite y selecciono... me parezca la opción de a
+ * cuántos kilómetros lo cambio o a cuánto tiempo" — antes tocar un ítem
+ * del catálogo lo agregaba tal cual, con el km/días fijo de la plantilla,
+ * sin poder ajustarlo. Ahora abre este paso intermedio: elegir criterio
+ * (km / tiempo / los dos) y su(s) valor(es), pre-llenados con lo sugerido
+ * del catálogo pero editables, antes de confirmar.
+ */
 export function SeccionMantenimiento() {
   const { viajes, cargar: cargarViajes } = useViajes()
-  const { items, cargando, cargar, agregarDesdeCatalogo, agregarPersonalizado, eliminarItem, marcarRealizado, alertas } =
+  const { items, registros, cargando, cargar, agregarDesdeCatalogo, agregarPersonalizado, eliminarItem, marcarRealizado, actualizarCostoYFijo, alertas } =
     useMantenimiento()
+  const { tema } = useTema()
+  const animado = tema !== 'papel'
+  const { tipoVehiculo } = useVehiculo()
+  const nombreVehiculo = VEHICULOS_DISPONIBLES.find((v) => v.valor === tipoVehiculo)?.nombre ?? tipoVehiculo
 
   const [mostrarCatalogo, setMostrarCatalogo] = useState(false)
+  /**
+   * 2026-09-15, pedido explícito del usuario: "en ese caso de ambos, tiene
+   * que aparecer en mantenimiento... las dos pestañas, moto y carro" —
+   * CATALOGO_MANTENIMIENTO solo tiene entradas 'moto'/'carro' (nunca
+   * 'ambos', ver domain/mantenimiento/reglas.ts), así que cuando el
+   * conductor eligió 'ambos' hace falta esta pestaña aparte para saber cuál
+   * de los dos catálogos mostrar. Arranca en 'moto' por default.
+   */
+  const [pestanaCatalogo, setPestanaCatalogo] = useState<'moto' | 'carro'>('moto')
+  const [editandoPlantilla, setEditandoPlantilla] = useState<PlantillaItemMantenimiento | null>(null)
+  const [criterioEdicion, setCriterioEdicion] = useState<CriterioIntervalo>('km_o_dias')
+  const [kmEdicion, setKmEdicion] = useState('')
+  const [diasEdicion, setDiasEdicion] = useState('')
+  const [costoEdicion, setCostoEdicion] = useState('')
+  const [fijoEdicion, setFijoEdicion] = useState(false)
+  const refEdicion = useRef<HTMLDivElement | null>(null)
+
   const [mostrarFormPersonalizado, setMostrarFormPersonalizado] = useState(false)
   const [nombreNuevo, setNombreNuevo] = useState('')
   const [criterioNuevo, setCriterioNuevo] = useState<CriterioIntervalo>('km_o_dias')
   const [intervaloKmNuevo, setIntervaloKmNuevo] = useState('')
   const [intervaloDiasNuevo, setIntervaloDiasNuevo] = useState('')
+  const [costoNuevo, setCostoNuevo] = useState('')
+  const [fijoNuevo, setFijoNuevo] = useState(false)
 
   useEffect(() => {
     void cargarViajes()
@@ -26,22 +65,45 @@ export function SeccionMantenimiento() {
   const kmActual = calcularResumen(viajes).kmTotales
   const listaAlertas = alertas(kmActual)
   const nombresYaAgregados = new Set(items.map((i) => i.nombre))
+  const vehiculoDelCatalogo: TipoVehiculo = tipoVehiculo === 'ambos' ? pestanaCatalogo : tipoVehiculo
+  const catalogoDelVehiculo = CATALOGO_MANTENIMIENTO.filter((p) => p.vehiculo === vehiculoDelCatalogo)
 
-  function claseParaEstado(vencido: boolean, proximo: boolean): string {
-    if (vencido) return 'insignia insignia--vencido'
-    if (proximo) return 'insignia insignia--proximo'
-    return 'insignia insignia--ok'
+  function abrirEdicionCatalogo(plantilla: PlantillaItemMantenimiento) {
+    setEditandoPlantilla(plantilla)
+    setCriterioEdicion(plantilla.criterio)
+    setKmEdicion(plantilla.intervaloKm !== null ? String(plantilla.intervaloKm) : '')
+    setDiasEdicion(plantilla.intervaloDias !== null ? String(plantilla.intervaloDias) : '')
+    setCostoEdicion(plantilla.costoAproximado ? String(plantilla.costoAproximado) : '')
+    setFijoEdicion(false)
   }
 
-  function textoParaEstado(kmFaltantes: number | null, diasFaltantes: number | null): string {
-    const partes: string[] = []
-    if (kmFaltantes !== null) {
-      partes.push(kmFaltantes <= 0 ? `${Math.abs(Math.round(kmFaltantes))} km pasado` : `${Math.round(kmFaltantes)} km`)
+  /**
+   * 2026-09-15, pedido explícito del usuario: "yo pensé que no pasaba nada...
+   * el problema es que a mí me toca hacer manualmente scroll hacia abajo...
+   * que ahí mismo se me abra la ventana" — al tocar un ítem del catálogo el
+   * formulario SÍ se abre, pero queda debajo del catálogo largo y fuera de
+   * la vista. Apenas aparece, lo traemos a la vista solo.
+   */
+  useEffect(() => {
+    if (editandoPlantilla) {
+      refEdicion.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
-    if (diasFaltantes !== null) {
-      partes.push(diasFaltantes <= 0 ? `${Math.abs(diasFaltantes)} días pasado` : `${diasFaltantes} días`)
-    }
-    return partes.join(' · ') || '—'
+  }, [editandoPlantilla])
+
+  async function confirmarAgregarDesdeCatalogo() {
+    if (!editandoPlantilla) return
+    await agregarDesdeCatalogo(
+      editandoPlantilla,
+      {
+        criterio: criterioEdicion,
+        intervaloKm: criterioEdicion === 'dias' ? null : Number(kmEdicion) || null,
+        intervaloDias: criterioEdicion === 'km' ? null : Number(diasEdicion) || null,
+        costoAproximado: Number(costoEdicion) || null,
+        fijo: fijoEdicion,
+      },
+      kmActual,
+    )
+    setEditandoPlantilla(null)
   }
 
   async function manejarAgregarPersonalizado() {
@@ -52,12 +114,16 @@ export function SeccionMantenimiento() {
         criterio: criterioNuevo,
         intervaloKm: criterioNuevo === 'dias' ? null : Number(intervaloKmNuevo) || null,
         intervaloDias: criterioNuevo === 'km' ? null : Number(intervaloDiasNuevo) || null,
+        costoAproximado: Number(costoNuevo) || null,
+        fijo: fijoNuevo,
       },
       kmActual,
     )
     setNombreNuevo('')
     setIntervaloKmNuevo('')
     setIntervaloDiasNuevo('')
+    setCostoNuevo('')
+    setFijoNuevo(false)
     setMostrarFormPersonalizado(false)
   }
 
@@ -73,30 +139,22 @@ export function SeccionMantenimiento() {
       ) : listaAlertas.length === 0 ? (
         <p className="texto-mute">Todavía no tienes mantenimientos configurados.</p>
       ) : (
-        <ul className="lista-viajes" style={{ marginBottom: 16 }}>
-          {listaAlertas.map(({ item, kmFaltantes, diasFaltantes, vencido, proximoAVencer }) => (
-            <li key={item.id} className="tarjeta-viaje" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>{item.nombre}</span>
-                <span className={claseParaEstado(vencido, proximoAVencer)}>{textoParaEstado(kmFaltantes, diasFaltantes)}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void marcarRealizado(item.id, kmActual, null, null)
-                    void sincronizarRegistrosMantenimientoPendientes()
-                  }}
-                >
-                  Marcar realizado hoy
-                </button>
-                {item.origen === 'personalizado' && (
-                  <button type="button" onClick={() => void eliminarItem(item.id)}>Eliminar</button>
-                )}
-              </div>
-            </li>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+          {listaAlertas.map((estado) => (
+            <TarjetaMantenimiento
+              key={estado.item.id}
+              estado={estado}
+              animado={animado}
+              vecesRealizado={registros.filter((r) => r.itemId === estado.item.id).length}
+              onMarcarRealizado={(costo) => {
+                void marcarRealizado(estado.item.id, kmActual, costo, null)
+                void sincronizarRegistrosMantenimientoPendientes()
+              }}
+              onEliminar={estado.item.origen === 'personalizado' ? () => void eliminarItem(estado.item.id) : undefined}
+              onActualizarCostoYFijo={(costo, fijo) => void actualizarCostoYFijo(estado.item.id, costo, fijo)}
+            />
           ))}
-        </ul>
+        </div>
       )}
 
       <div className="tarjeta-viaje" style={{ marginBottom: 12, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
@@ -104,18 +162,82 @@ export function SeccionMantenimiento() {
           {mostrarCatalogo ? 'Ocultar catálogo' : 'Agregar del catálogo'}
         </button>
         {mostrarCatalogo && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {CATALOGO_MANTENIMIENTO.filter((p) => !nombresYaAgregados.has(p.nombre)).map((plantilla) => (
-              <button key={plantilla.nombre} type="button" onClick={() => void agregarDesdeCatalogo(plantilla, kmActual)}>
-                {plantilla.nombre}
-              </button>
-            ))}
-            {CATALOGO_MANTENIMIENTO.every((p) => nombresYaAgregados.has(p.nombre)) && (
-              <p className="texto-mute">Ya agregaste todo el catálogo.</p>
+          <>
+            {tipoVehiculo === 'ambos' ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setPestanaCatalogo('moto')}
+                  style={{ flex: 1, fontWeight: pestanaCatalogo === 'moto' ? 'bold' : 'normal', border: pestanaCatalogo === 'moto' ? '2px solid var(--color-acento)' : '1px solid var(--color-borde)' }}
+                >
+                  Moto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPestanaCatalogo('carro')}
+                  style={{ flex: 1, fontWeight: pestanaCatalogo === 'carro' ? 'bold' : 'normal', border: pestanaCatalogo === 'carro' ? '2px solid var(--color-acento)' : '1px solid var(--color-borde)' }}
+                >
+                  Carro
+                </button>
+              </div>
+            ) : (
+              <p className="texto-mute" style={{ fontSize: '0.78rem', margin: 0 }}>
+                Catálogo de {nombreVehiculo}. ¿Manejas otro vehículo? Cambialo en Ajustes.
+              </p>
             )}
-          </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {catalogoDelVehiculo.filter((p) => !nombresYaAgregados.has(p.nombre)).map((plantilla) => (
+                <button
+                  key={plantilla.nombre}
+                  type="button"
+                  onClick={() => abrirEdicionCatalogo(plantilla)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {plantilla.imagen && (
+                    <img src={IMAGENES_MANTENIMIENTO[plantilla.imagen]} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} />
+                  )}
+                  {plantilla.nombre}
+                </button>
+              ))}
+              {catalogoDelVehiculo.every((p) => nombresYaAgregados.has(p.nombre)) && (
+                <p className="texto-mute">Ya agregaste todo el catálogo.</p>
+              )}
+            </div>
+          </>
         )}
       </div>
+
+      {editandoPlantilla && (
+        <div ref={refEdicion} className="tarjeta-viaje" style={{ marginBottom: 12, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
+          <strong>{editandoPlantilla.nombre}</strong>
+          <p className="texto-mute" style={{ fontSize: '0.8rem', margin: 0 }}>
+            ¿A cuántos km lo cambiás, a cuánto tiempo, o los dos? Esto es solo una sugerencia — tu moto puede ser distinta.
+          </p>
+          <select value={criterioEdicion} onChange={(e) => setCriterioEdicion(e.target.value as CriterioIntervalo)}>
+            <option value="km_o_dias">Por km o por tiempo (lo que pase primero)</option>
+            <option value="km">Solo por km</option>
+            <option value="dias">Solo por tiempo</option>
+          </select>
+          {criterioEdicion !== 'dias' && (
+            <input type="number" placeholder="Cada cuántos km" value={kmEdicion} onChange={(e) => setKmEdicion(e.target.value)} />
+          )}
+          {criterioEdicion !== 'km' && (
+            <input type="number" placeholder="Cada cuántos días" value={diasEdicion} onChange={(e) => setDiasEdicion(e.target.value)} />
+          )}
+          <label className="texto-mute">
+            Costo aproximado
+            <CampoMonto valor={costoEdicion} onValorCambia={setCostoEdicion} placeholder="Ej. 45.000" />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={fijoEdicion} onChange={(e) => setFijoEdicion(e.target.checked)} />
+            <span className="texto-mute">Es un gasto fijo — cuenta en mi meta diaria</span>
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={() => void confirmarAgregarDesdeCatalogo()}>Agregar</button>
+            <button type="button" onClick={() => setEditandoPlantilla(null)} style={{ background: 'transparent' }}>Cancelar</button>
+          </div>
+        </div>
+      )}
 
       <div className="tarjeta-viaje" style={{ marginBottom: 24, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
         <button type="button" onClick={() => setMostrarFormPersonalizado((v) => !v)}>
@@ -135,6 +257,14 @@ export function SeccionMantenimiento() {
             {criterioNuevo !== 'km' && (
               <input type="number" placeholder="Cada cuántos días" value={intervaloDiasNuevo} onChange={(e) => setIntervaloDiasNuevo(e.target.value)} />
             )}
+            <label className="texto-mute">
+              Costo aproximado
+              <CampoMonto valor={costoNuevo} onValorCambia={setCostoNuevo} placeholder="Ej. 45.000" />
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={fijoNuevo} onChange={(e) => setFijoNuevo(e.target.checked)} />
+              <span className="texto-mute">Es un gasto fijo — cuenta en mi meta diaria</span>
+            </label>
             <button type="button" onClick={() => void manejarAgregarPersonalizado()}>Guardar</button>
           </>
         )}

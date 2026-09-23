@@ -1,10 +1,12 @@
 import type { NextFunction, Request, Response } from 'express'
 import { ZodError } from 'zod'
 import { ErrorAuth } from '../modules/auth/service.js'
-import { ErrorProveedorIANoConfigurado } from '../modules/ai/proveedorIA.js'
+import { ErrorProveedorIA } from '../modules/ai/proveedorIA.js'
+import { ErrorLimiteIA } from '../modules/ai/limite.js'
 import { ErrorBilling } from '../modules/billing/service.js'
 import { ErrorBillingNoConfigurado } from '../modules/billing/googlePlay.js'
 import { ErrorSync } from '../modules/sync/service.js'
+import { ErrorEmailNoConfigurado } from '../lib/email.js'
 
 /**
  * Único lugar donde se decide qué código HTTP y qué forma de JSON de error
@@ -22,7 +24,12 @@ export function manejadorDeErrores(err: unknown, _req: Request, res: Response, _
     return
   }
 
-  if (err instanceof ErrorProveedorIANoConfigurado) {
+  if (err instanceof ErrorProveedorIA) {
+    res.status(err.codigoHttp).json({ error: err.message })
+    return
+  }
+
+  if (err instanceof ErrorLimiteIA) {
     res.status(err.codigoHttp).json({ error: err.message })
     return
   }
@@ -38,6 +45,11 @@ export function manejadorDeErrores(err: unknown, _req: Request, res: Response, _
   }
 
   if (err instanceof ErrorSync) {
+    res.status(err.codigoHttp).json({ error: err.message })
+    return
+  }
+
+  if (err instanceof ErrorEmailNoConfigurado) {
     res.status(err.codigoHttp).json({ error: err.message })
     return
   }
