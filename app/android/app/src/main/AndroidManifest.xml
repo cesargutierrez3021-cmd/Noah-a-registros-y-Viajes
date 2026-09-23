@@ -69,16 +69,25 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- 2026-09-23, pedido explícito del usuario (bug real: "ya no me contó el kilómetro
+             aunque iniciara el viaje") — sin `stopWithTask="false"`, Android por defecto (true)
+             mata AMBOS foreground services de inmediato apenas el conductor desliza la app fuera
+             de "Recientes" — un gesto de "cerrar la app" muy común, fácil de confundir con solo
+             minimizarla. Nada del lado JS detecta ni reinicia esto al reabrir la app (solo
+             reacciona a acciones explícitas: botón "Iniciar jornada", tap de la burbuja) — el
+             conductor se queda con una burbuja que ya no cuenta nada, sin ningún aviso. -->
         <!-- Fase 5 — foreground service de GPS en segundo plano (D-9) -->
         <service
             android:name="com.noah.conductor.atlas.gps.GpsTrackingService"
             android:foregroundServiceType="location"
+            android:stopWithTask="false"
             android:exported="false" />
 
         <!-- Plugins reutilizados del proyecto viejo (D-1) -->
         <service
             android:name="com.noah.conductor.atlas.burbuja.BurbujaService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
