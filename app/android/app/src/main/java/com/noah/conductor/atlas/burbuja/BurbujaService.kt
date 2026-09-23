@@ -29,6 +29,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.noah.conductor.atlas.MainActivity
 import com.noah.conductor.atlas.R
+import com.noah.conductor.atlas.gps.GpsTrackingService
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.Locale
 import kotlin.math.abs
 
@@ -90,6 +93,12 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     // más abajo y el comentario largo en burbuja.ts / burbujaOrquestacion.ts.
     private var pasajeroRecogido = false
     private var inicioViajeMs = 0L
+    // 2026-09-23, pedido explícito del usuario (bug real: "hice 5 o 6 viajes
+    // sin abrir la app... me acumuló todos en uno solo de 63 km"): sin esto no
+    // había forma de saber, al reconstruir un viaje que la burbuja cerró sola,
+    // dónde terminaba "hasta recoger" y empezaba "con pasajero" — ver
+    // encolarViajePendiente() más abajo.
+    private var recogidaMs = 0L
     private var kmAcumulados = 0.0
     private var viajesContados = 0
     // 2026-09-22, pedido explícito del usuario ("la aplicación no debería consumir tanto
@@ -181,7 +190,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     private fun iniciarViaje(anunciar: Boolean) {
         if (enViaje) return
-        enViaje = true; pasajeroRecogido = false; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
+        enViaje = true; pasajeroRecogido = false; recogidaMs = 0L; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
         // Viaje nuevo, punto de referencia nuevo — si se dejara el de un viaje anterior,
         // el primer punto de este viaje calcularía distancia contra un lugar viejo.
         ultimoLatNativo = null; ultimoLngNativo = null; ultimoTimestampNativoMs = 0L
@@ -192,14 +201,56 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     private fun finalizarViaje(anunciar: Boolean) {
         if (!enViaje) return
-        val finMs = System.currentTimeMillis(); val duracionMs = (finMs - inicioViajeMs).coerceAtLeast(0L); val kmFinal = kmAcumulados; val inicioMs = inicioViajeMs
+        val finMs = System.currentTimeMillis(); val duracionMs = (finMs - inicioViajeMs).coerceAtLeast(0L); val kmFinal = kmAcumulados; val inicioMs = inicioViajeMs; val recogidaFinal = recogidaMs
         enViaje = false; handler.removeCallbacks(reloj)
         if (anunciar) hablar("Viaje finalizado")
         actualizarTextos(formatearKm(kmFinal), formatearTiempo(duracionMs))
-        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit()
-            .putFloat("viaje_km", kmFinal.toFloat()).putLong("viaje_inicio", inicioMs)
-            .putLong("viaje_fin", finMs).putLong("viaje_tiempo", duracionMs).apply()
+        encolarViajePendiente(kmFinal, inicioMs, recogidaFinal, finMs, duracionMs)
         if (anunciar) BurbujaPlugin.instanciaActiva?.notificarAccion("terminar", kmFinal, inicioMs, finMs, duracionMs)
+    }
+
+    /**
+     * 2026-09-23, pedido explícito del usuario (bug real reportado): "hice 5 o 6 viajes con la
+     * burbuja sin abrir la app... cuando entré me acumuló todos en un solo viaje de 63 km".
+     * Causa: antes esta función escribía el resumen del viaje (km/inicio/fin) en UN SOLO lugar
+     * de `SharedPreferences` (claves fijas `viaje_km`/`viaje_inicio`/...) — cada viaje nuevo
+     * PISABA el anterior. Peor: nada de eso se usaba en realidad (confirmado con grep, cero
+     * consumidores del lado JS) — al reabrir la app, `domain/viajes/store.ts` tomaba el
+     * `viajeEnCurso` que había quedado guardado desde que arrancó el PRIMER viaje (el único que
+     * alcanzó a registrar el lado JS antes de que Android matara el WebView) y le pegaba
+     * ENCIMA la traza GPS completa acumulada desde que arrancó la jornada — todos los viajes
+     * junto con el tiempo muerto entre ellos, de ahí los 63 km de un solo viaje.
+     *
+     * Ahora cada viaje que la burbuja cierra sola queda en una COLA (`viajes_pendientes`, un
+     * JSONArray) con su propio recorte de puntos GPS (filtrados por el rango de tiempo real de
+     * ESTE viaje, `inicioMs`..`finMs` — así el tiempo muerto entre viajes queda afuera solo, sin
+     * necesidad de nada más) y su propio `recogidaMs` (para separar "hasta recoger" de "con
+     * pasajero" igual que un viaje normal). `domain/viajes/store.ts` (`cargar()`) procesa esta
+     * cola entera al abrir la app y crea un `Viaje` de verdad por cada entrada — ya no una sola
+     * mezcla de todo.
+     */
+    private fun encolarViajePendiente(km: Double, inicioMs: Long, recogidaMsViaje: Long, finMs: Long, duracionMs: Long) {
+        GpsTrackingService.instanciaActiva?.persistirCacheSiHaceFalta()
+        val gpsPrefs = getSharedPreferences("mia-gps", MODE_PRIVATE)
+        val todosLosPuntos = runCatching { JSONArray(gpsPrefs.getString("puntos", "[]")) }.getOrElse { JSONArray() }
+        val puntosDelViaje = JSONArray()
+        for (i in 0 until todosLosPuntos.length()) {
+            val p = todosLosPuntos.optJSONObject(i) ?: continue
+            val ts = p.optLong("timestampMs", -1L)
+            if (ts in inicioMs..finMs) puntosDelViaje.put(p)
+        }
+
+        val prefs = getSharedPreferences("mia-burbuja", MODE_PRIVATE)
+        val cola = runCatching { JSONArray(prefs.getString("viajes_pendientes", "[]")) }.getOrElse { JSONArray() }
+        cola.put(JSONObject().apply {
+            put("km", km); put("inicioMs", inicioMs); put("recogidaMs", recogidaMsViaje)
+            put("finMs", finMs); put("tiempoMs", duracionMs); put("puntosJson", puntosDelViaje.toString())
+        })
+        // Tope defensivo — mismo criterio que el cap de 5000 puntos en GpsTrackingService: un
+        // conductor no debería acumular más de esto sin abrir la app en algún momento, pero si
+        // pasa, no tiene sentido dejar crecer la cola sin límite.
+        while (cola.length() > 50) cola.remove(0)
+        prefs.edit().putString("viajes_pendientes", cola.toString()).apply()
     }
 
     /**
@@ -321,6 +372,7 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
                 !enViaje -> { iniciarViaje(true); BurbujaPlugin.instanciaActiva?.notificarAccion("iniciar") }
                 !pasajeroRecogido -> {
                     pasajeroRecogido = true
+                    recogidaMs = System.currentTimeMillis()
                     hablar("Pasajero recogido")
                     BurbujaPlugin.instanciaActiva?.notificarAccion("recogida")
                 }

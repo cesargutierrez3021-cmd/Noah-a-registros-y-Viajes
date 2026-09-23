@@ -6,8 +6,8 @@ import { calcularDistanciaReal } from './distancia'
 import { iniciarSeguimientoGPS, obtenerUbicacionActual, filtrarRecorridoValido, type SeguidorGPS } from './gps'
 import { obtenerLocalidad, obtenerZonaCustom } from './geofencing'
 import { Capacitor } from '@capacitor/core'
-import { obtenerTrazaPersistida, limpiarTrazaPersistida } from './gpsBackground'
-import { mostrarBurbuja, actualizarBurbuja, ocultarBurbuja } from './burbuja'
+import { obtenerTrazaPersistida, limpiarTrazaPersistida, type PuntoGpsCrudo } from './gpsBackground'
+import { mostrarBurbuja, actualizarBurbuja, ocultarBurbuja, obtenerViajesPendientesNativos, limpiarViajesPendientesNativos } from './burbuja'
 
 /**
  * Store del dominio de Viajes. A propósito, este store SOLO conoce viajes —
@@ -145,6 +145,51 @@ async function recorridoDefinitivo(recorridoEnVivo: PuntoGPS[]): Promise<PuntoGP
 }
 
 /**
+ * 2026-09-23, pedido explícito del usuario (bug real reportado): "hice 5 o 6 viajes con la
+ * burbuja sin abrir la app... cuando entré me acumuló todos en un solo viaje de 63 km". La
+ * causa completa está documentada en `BurbujaService.kt` (`encolarViajePendiente`) — en
+ * resumen, cada viaje que la burbuja cierra sola (sin que la app esté abierta para que
+ * `burbujaOrquestacion.ts` reaccione en vivo) ahora queda en una cola nativa en vez de
+ * perderse/mezclarse. Esta función procesa esa cola ENTERA cada vez que se abre la app: un
+ * `Viaje` real por cada entrada, con su propio recorrido (recortado nativamente al rango de
+ * tiempo de ESE viaje) y su propio `puntoDeRecogidaISO` — mismo camino (`crearViajeDesdeCiere`)
+ * que ya usa `pausarParaIngreso` para un viaje cerrado con la app abierta, D-18: no se inventa
+ * una segunda forma de construir un Viaje.
+ */
+async function recuperarViajesPendientesDeBurbuja(): Promise<Viaje[]> {
+  if (!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android')) return []
+  try {
+    const pendientes = await obtenerViajesPendientesNativos()
+    if (pendientes.length === 0) return []
+
+    const viajesCreados: Viaje[] = []
+    for (const p of pendientes) {
+      let crudos: PuntoGpsCrudo[] = []
+      try { crudos = JSON.parse(p.puntosJson) as PuntoGpsCrudo[] } catch { crudos = [] }
+      const recorrido = filtrarRecorridoValido(crudos)
+
+      const viaje = crearViajeDesdeCiere(generarId(), {
+        plataforma: useViajes.getState().plataformaPreferida ?? 'Particular',
+        inicioISO: new Date(p.inicioMs).toISOString(),
+        finISO: new Date(p.finMs).toISOString(),
+        recorrido,
+        puntoDeRecogidaISO: p.recogidaMs > 0 ? new Date(p.recogidaMs).toISOString() : null,
+        distanciaReportadaPlataforma: null,
+        ingreso: 0,
+        ingresoPendiente: true,
+      })
+      await repositorioViajes.guardar(viaje)
+      viajesCreados.push(viaje)
+    }
+
+    await limpiarViajesPendientesNativos()
+    return viajesCreados
+  } catch {
+    return []
+  }
+}
+
+/**
  * 2026-09-22, pedido explícito del usuario: corrección manual de km al
  * completar el ingreso — mismo criterio de `crearViajeManual` (repository.ts,
  * D-18: no se reparte a mano entre "hasta recoger"/"con pasajero", todo va a
@@ -176,16 +221,30 @@ export const useViajes = create<EstadoViajes>((set, get) => ({
   cargar: async () => {
     set({ cargando: true })
     const viajes = await repositorioViajes.listar()
+    const viajesRecuperados = await recuperarViajesPendientesDeBurbuja()
+
     let viajeEnCurso: ViajeEnCurso | null = null
     try {
       const guardado = localStorage.getItem(CLAVE_ACTIVO)
       if (guardado) viajeEnCurso = JSON.parse(guardado) as ViajeEnCurso
       if (viajeEnCurso && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-        const puntos = await obtenerTrazaPersistida()
-        if (puntos.length) viajeEnCurso = { ...viajeEnCurso, recorrido: puntos.map(p => ({ lat:p.lat, lng:p.lng, timestampISO:new Date(p.timestampMs).toISOString() })) }
+        // 2026-09-23, pedido explícito del usuario (bug real, ver el comentario largo en
+        // `recuperarViajesPendientesDeBurbuja`): si la cola de arriba trajo viajes que la
+        // burbuja ya cerró del todo mientras la app estaba cerrada, este `viajeEnCurso`
+        // guardado quedó obsoleto — representa el PRIMERO de esa cadena (el único que el
+        // lado JS alcanzó a registrar antes de que Android matara el WebView), no "el viaje
+        // de ahora". Pegarle encima la traza GPS completa (como se hacía antes) mezclaba
+        // todos los viajes recuperados arriba con este en uno solo — se descarta en su lugar.
+        if (viajesRecuperados.length > 0) {
+          viajeEnCurso = null
+          guardarActivo(null)
+        } else {
+          const puntos = await obtenerTrazaPersistida()
+          if (puntos.length) viajeEnCurso = { ...viajeEnCurso, recorrido: puntos.map(p => ({ lat:p.lat, lng:p.lng, timestampISO:new Date(p.timestampMs).toISOString() })) }
+        }
       }
     } catch { /* recuperación best-effort */ }
-    set({ viajes, viajeEnCurso, cargando: false })
+    set({ viajes: [...viajesRecuperados.slice().reverse(), ...viajes], viajeEnCurso, cargando: false })
   },
 
   iniciarViaje: async (plataforma) => {

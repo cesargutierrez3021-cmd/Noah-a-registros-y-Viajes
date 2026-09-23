@@ -38,9 +38,39 @@ interface BurbujaPlugin {
   actualizar(args:{km:string;tiempo:string;enViaje:boolean;totalViajes:number} & ColoresBurbuja): Promise<void>
   ocultar(): Promise<void>
   actualizarApariencia(args: ColoresBurbuja): Promise<void>
+  viajesPendientes(): Promise<{viajesJson: string}>
+  limpiarViajesPendientes(): Promise<void>
   addListener(eventName: 'accion', listenerFunc: (datos: AccionBurbuja) => void): Promise<{ remove: () => void }>
 }
 const Burbuja = registerPlugin<BurbujaPlugin>('Burbuja')
+
+/**
+ * 2026-09-23, pedido explícito del usuario (bug real: "hice 5 o 6 viajes con la burbuja sin
+ * abrir la app... me acumuló todos en un solo viaje de 63 km"). Un viaje que la burbuja cierra
+ * sola, sin la app abierta (`BurbujaService.kt`, `finalizarViaje` → `encolarViajePendiente`)
+ * — ver el comentario largo ahí para la causa completa del bug. `puntosJson` es un
+ * `PuntoGpsCrudo[]` serializado, ya recortado por el nativo al rango de tiempo de ESE viaje
+ * (no toda la traza de la jornada).
+ */
+export interface ViajePendienteNativo {
+  km: number
+  inicioMs: number
+  /** 0 = nunca se marcó "recogida" para este viaje (mismo criterio que `puntoDeRecogidaISO: null`). */
+  recogidaMs: number
+  finMs: number
+  tiempoMs: number
+  puntosJson: string
+}
+
+/** La cola completa de viajes que la burbuja cerró sola desde la última vez que se llamó a `limpiarViajesPendientesNativos()`. */
+export async function obtenerViajesPendientesNativos(): Promise<ViajePendienteNativo[]> {
+  const r = await Burbuja.viajesPendientes()
+  try { return JSON.parse(r.viajesJson) as ViajePendienteNativo[] } catch { return [] }
+}
+
+export async function limpiarViajesPendientesNativos(): Promise<void> {
+  await Burbuja.limpiarViajesPendientes().catch(() => undefined)
+}
 
 /**
  * 2026-09-15, pedido explícito del usuario: la burbuja se veía siempre con
