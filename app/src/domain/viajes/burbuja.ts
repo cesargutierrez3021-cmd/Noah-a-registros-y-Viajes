@@ -60,6 +60,16 @@ export interface ViajePendienteNativo {
   finMs: number
   tiempoMs: number
   puntosJson: string
+  /**
+   * 2026-09-24, pedido explícito del usuario ("que se abra una etiqueta para poner cuánto es el
+   * valor de ese viaje... con eso que se guarde de una vez"): la etiqueta flotante de precio de
+   * `BurbujaService.kt` (`mostrarEtiquetaDePrecio`) es opcional — si el conductor escribe el
+   * precio ahí mismo, esta entrada trae `ingreso` puesto y el viaje se guarda YA completo
+   * (`ingresoPendiente: false`); si la cierra con la X sin escribir nada, este campo no viene
+   * (`undefined`) y el viaje queda pendiente, exactamente como antes de que existiera la
+   * etiqueta.
+   */
+  ingreso?: number
 }
 
 /** La cola completa de viajes que la burbuja cerró sola desde la última vez que se llamó a `limpiarViajesPendientesNativos()`. */

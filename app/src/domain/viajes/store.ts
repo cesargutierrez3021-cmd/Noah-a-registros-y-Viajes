@@ -194,6 +194,12 @@ async function recuperarViajesPendientesDeBurbuja(): Promise<Viaje[]> {
       try { crudos = JSON.parse(p.puntosJson) as PuntoGpsCrudo[] } catch { crudos = [] }
       const recorrido = filtrarRecorridoValido(crudos)
 
+      // 2026-09-24, pedido explícito del usuario ("que se abra una etiqueta para poner cuánto es
+      // el valor de ese viaje... con eso que se guarde de una vez"): si el conductor escribió el
+      // precio en la etiqueta flotante de la burbuja (`mostrarEtiquetaDePrecio`, BurbujaService.kt),
+      // `p.ingreso` viene puesto — el viaje se guarda YA completo, sin quedar pendiente. Si cerró
+      // la etiqueta con la X sin escribir nada, `p.ingreso` no viene — mismo comportamiento de
+      // siempre (pendiente, se completa después desde TarjetaViajesPendientes.tsx).
       const viajeConGps = crearViajeDesdeCiere(generarId(), {
         plataforma: useViajes.getState().plataformaPreferida ?? 'Particular',
         inicioISO: new Date(p.inicioMs).toISOString(),
@@ -201,8 +207,8 @@ async function recuperarViajesPendientesDeBurbuja(): Promise<Viaje[]> {
         recorrido,
         puntoDeRecogidaISO: p.recogidaMs > 0 ? new Date(p.recogidaMs).toISOString() : null,
         distanciaReportadaPlataforma: null,
-        ingreso: 0,
-        ingresoPendiente: true,
+        ingreso: p.ingreso ?? 0,
+        ingresoPendiente: p.ingreso == null,
       })
       const viaje = conKmManual(viajeConGps, p.km)
       await repositorioViajes.guardar(viaje)

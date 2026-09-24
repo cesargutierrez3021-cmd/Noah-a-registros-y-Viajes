@@ -37,6 +37,14 @@ interface GpsTrackingPlugin {
    * (instalación de antes de este fix).
    */
   solicitarIgnorarOptimizacionBateria(): Promise<{exento: boolean}>;
+  /**
+   * 2026-09-24, pedido explícito del usuario ("mi celular... cierra todas las aplicaciones en
+   * segundo plano"): intenta abrir el ajuste de batería PROPIO del fabricante (Xiaomi/Huawei/
+   * Oppo/Vivo/Samsung, aparte del estándar de Android que ya pide `solicitarIgnorarOptimizacionBateria`)
+   * — si no encuentra la pantalla específica de la marca, cae a "Detalles de la app" de Android.
+   * `especifico` avisa cuál de las dos abrió, para poder explicarle al conductor qué buscar.
+   */
+  abrirAjustesDeFabricante(): Promise<{abierto: boolean; especifico: boolean}>;
   addListener(
     eventName: 'locationUpdate',
     listenerFunc: (punto: PuntoGpsCrudo) => void
@@ -68,10 +76,15 @@ export async function solicitarPermisosUbicacion(): Promise<boolean> {
   return r.concedido
 }
 
-/** Onboarding (2026-09-15, bug real corregido): pide excluir la app de la optimización de batería del fabricante. */
+/** Onboarding (2026-09-15, bug real corregido): pide excluir la app de la optimización de batería estándar de Android. */
 export async function solicitarIgnorarOptimizacionBateria(): Promise<boolean> {
   const r = await GpsTracking.solicitarIgnorarOptimizacionBateria()
   return r.exento
+}
+
+/** Ajustes (2026-09-24): abre el ajuste de batería propio del fabricante — ver el comentario largo en la interfaz de arriba. */
+export async function abrirAjustesDeFabricante(): Promise<{ abierto: boolean; especifico: boolean }> {
+  return GpsTracking.abrirAjustesDeFabricante()
 }
 
 export function suscribirsePuntosGps(
