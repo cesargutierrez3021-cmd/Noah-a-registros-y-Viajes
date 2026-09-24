@@ -13,6 +13,7 @@ import { PLATAFORMAS_DISPONIBLES } from '../../domain/viajes/types'
 import { useMetaDiaria } from '../../domain/metaDiaria/store'
 import { useAuth } from '../../domain/auth/store'
 import { borrarHistorialLocal } from '../../domain/restauracion/borrarHistorial'
+import { abrirAjustesDeFabricante } from '../../domain/viajes/gpsBackground'
 import { CampoMonto } from '../../components/CampoMonto'
 import { AnillosOrbitales } from '../../components/graficos/AnillosOrbitales'
 import { Cristal3D } from '../../components/graficos/Cristal3D'
@@ -44,7 +45,7 @@ const INGRESO_MUESTRA = 5_800_000
  * cuando sea. Reusa el mismo store/lista que OnboardingScreen (D-18): no
  * hay una segunda fuente de temas disponibles.
  */
-type SeccionAjustes = 'vehiculo' | 'plataforma' | 'tema' | 'estadisticas' | 'metaDiaria' | 'datos'
+type SeccionAjustes = 'vehiculo' | 'plataforma' | 'tema' | 'estadisticas' | 'metaDiaria' | 'datos' | 'bateria'
 
 export function AjustesScreen() {
   const { tema, elegirTema } = useTema()
@@ -59,6 +60,7 @@ export function AjustesScreen() {
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false)
   const [borrando, setBorrando] = useState(false)
   const [borradoListo, setBorradoListo] = useState(false)
+  const [resultadoAjusteBateria, setResultadoAjusteBateria] = useState<'especifico' | 'generico' | 'error' | null>(null)
 
   async function manejarBorrarHistorial() {
     setBorrando(true)
@@ -66,6 +68,16 @@ export function AjustesScreen() {
     setBorrando(false)
     setConfirmandoBorrado(false)
     setBorradoListo(true)
+  }
+
+  async function manejarAbrirAjustesDeFabricante() {
+    setResultadoAjusteBateria(null)
+    try {
+      const { abierto, especifico } = await abrirAjustesDeFabricante()
+      setResultadoAjusteBateria(!abierto ? 'error' : especifico ? 'especifico' : 'generico')
+    } catch {
+      setResultadoAjusteBateria('error')
+    }
   }
 
   useEffect(() => {
@@ -225,6 +237,34 @@ export function AjustesScreen() {
             </div>
           ))}
         </div>
+      </SeccionDesplegable>
+
+      <SeccionDesplegable titulo="Batería" abierta={seccionAbierta === 'bateria'} onToggle={() => alternar('bateria')}>
+        <p className="texto-mute" style={{ marginBottom: 16 }}>
+          Si tu celular es Xiaomi, Huawei, Oppo, Realme, Vivo o Samsung, puede tener su PROPIO administrador de batería, aparte del de
+          Android — a veces cierra la burbuja y el GPS en segundo plano aunque ya hayas dado el permiso normal de Android. Este botón
+          intenta abrir el ajuste específico de tu marca (a veces se llama "inicio automático", "app protegida" o "sin restricciones") —
+          si no lo encuentra, abre los detalles de la app en Ajustes de Android, donde puedes buscarlo a mano.
+        </p>
+        <button type="button" onClick={() => void manejarAbrirAjustesDeFabricante()}>
+          Abrir ajuste de batería de mi celular
+        </button>
+        {resultadoAjusteBateria === 'especifico' && (
+          <p className="texto-mute" style={{ marginTop: 12 }}>
+            Busca la opción de inicio automático / app protegida / sin restricciones y actívala para MIA.
+          </p>
+        )}
+        {resultadoAjusteBateria === 'generico' && (
+          <p className="texto-mute" style={{ marginTop: 12 }}>
+            No encontré el ajuste específico de tu marca — abrí los detalles de la app en Ajustes de Android. Busca ahí algo de batería,
+            inicio automático o restricciones en segundo plano.
+          </p>
+        )}
+        {resultadoAjusteBateria === 'error' && (
+          <p className="texto-mute" style={{ marginTop: 12, color: '#ff6b6b' }}>
+            No pude abrir ningún ajuste — busca manualmente en Ajustes de tu celular, en la información de la app MIA.
+          </p>
+        )}
       </SeccionDesplegable>
 
       <SeccionDesplegable titulo="Datos" abierta={seccionAbierta === 'datos'} onToggle={() => alternar('datos')}>

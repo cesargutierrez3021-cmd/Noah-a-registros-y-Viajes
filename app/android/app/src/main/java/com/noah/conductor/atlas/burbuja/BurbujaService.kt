@@ -17,14 +17,17 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.animation.ValueAnimator
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.noah.conductor.atlas.MainActivity
@@ -101,19 +104,19 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private var recogidaMs = 0L
     private var kmAcumulados = 0.0
     private var viajesContados = 0
-    // 2026-09-22, pedido explícito del usuario ("la aplicación no debería consumir tanto
-    // recurso"): bug real — el ValueAnimator de la órbita (ver crearBurbuja()) nunca se
-    // guardaba en ningún lado, así que nadie podía cancelarlo. Con repeatCount = INFINITE eso
-    // significa que sigue tickeando (Choreographer, cada frame) PARA SIEMPRE, incluso después
-    // de que el servicio se destruye y la vista se saca del WindowManager — un conductor que
-    // trabaja 8-10 horas tenía esa animación corriendo de fondo todo ese tiempo sin ningún
-    // motivo. Ahora se guarda la referencia para poder cancelarla en onDestroy().
-    private var animadorOrbita: ValueAnimator? = null
     // Ancla GPS vigente de `actualizarKmDesdeGps()` (nativo, ver comentario ahí) — solo avanza
     // cuando un punto se acepta de verdad, mismo criterio que domain/viajes/gps.ts.
     private var ultimoLatNativo: Double? = null
     private var ultimoLngNativo: Double? = null
     private var ultimaPrecisionNativa: Float = 0f
+    // 2026-09-24, pedido explícito del usuario ("apenas guarde, se guarde en automático... y se
+    // cierra otra vez la etiqueta"): la etiqueta chiquita para poner el precio al finalizar un
+    // viaje — ver `mostrarEtiquetaDePrecio()`. `ultimoViajeInicioMs`/`ultimoViajeFinMs` identifican
+    // en la cola nativa CUÁL entrada de `encolarViajePendiente()` hay que completarle el ingreso
+    // cuando el conductor lo escribe acá.
+    private var vistaPrecio: View? = null
+    private var ultimoViajeInicioMs = 0L
+    private var ultimoViajeFinMs = 0L
     private var ultimoTimestampNativoMs: Long = 0L
     private var tts: TextToSpeech? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -179,9 +182,9 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     override fun onDestroy() {
         activo = false
         if (instanciaActiva === this) instanciaActiva = null
-        animadorOrbita?.cancel(); animadorOrbita = null
         handler.removeCallbacksAndMessages(null); tts?.stop(); tts?.shutdown()
         getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", false).apply()
+        cerrarEtiquetaDePrecio()
         vistaManija?.let { runCatching { windowManager.removeView(it) } }
         vistaBurbuja?.let { runCatching { windowManager.removeView(it) } }
         vistaManija = null; vistaBurbuja = null
@@ -190,6 +193,9 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
 
     private fun iniciarViaje(anunciar: Boolean) {
         if (enViaje) return
+        // Si quedó una etiqueta de precio abierta de un viaje anterior sin responder, este viaje
+        // nuevo la cierra — nunca deben quedar dos flotando a la vez.
+        cerrarEtiquetaDePrecio()
         enViaje = true; pasajeroRecogido = false; recogidaMs = 0L; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
         // Viaje nuevo, punto de referencia nuevo — si se dejara el de un viaje anterior,
         // el primer punto de este viaje calcularía distancia contra un lugar viejo.
@@ -230,7 +236,115 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         if (anunciar) hablar("Viaje finalizado")
         actualizarTextos(formatearKm(kmFinal), formatearTiempo(duracionMs))
         encolarViajePendiente(kmFinal, inicioMs, recogidaFinal, finMs, duracionMs)
-        if (anunciar) BurbujaPlugin.instanciaActiva?.notificarAccion("terminar", kmFinal, inicioMs, finMs, duracionMs)
+        if (anunciar) {
+            BurbujaPlugin.instanciaActiva?.notificarAccion("terminar", kmFinal, inicioMs, finMs, duracionMs)
+            // 2026-09-24, pedido explícito del usuario: "que se abra una etiqueta para poner
+            // cuánto es el valor de ese viaje... apenas guarde, se guarde en automático". Viaje
+            // ya encolado arriba (ingresoPendiente de siempre) — esta etiqueta es un atajo
+            // opcional para no tener que esperar a abrir la app: si el conductor escribe el
+            // precio, se lo completa a esa MISMA entrada de la cola (`aplicarPrecioAlUltimoViajeEncolado`);
+            // si la cierra con la X sin escribir nada, el viaje queda exactamente como hoy
+            // (pendiente de ingreso, se completa después desde la app).
+            mostrarEtiquetaDePrecio(inicioMs, finMs)
+        }
+    }
+
+    /**
+     * 2026-09-24, pedido explícito del usuario: etiqueta chiquita y flotante, con foco (a
+     * diferencia de la burbuja/manija, que a propósito NO lo tienen — ver `crearBurbuja()`/
+     * `crearManijaVoz()`, para no interrumpir la app de abajo) porque necesita mostrar el
+     * teclado. Dos salidas, las dos cierran la etiqueta y devuelven el foco a la app de abajo:
+     * tocar ✓ (o Listo/Enter del teclado) guarda el precio de una vez; tocar ✕ la cierra sin
+     * guardar nada (el viaje sigue pendiente, igual que si esto no existiera).
+     */
+    private fun mostrarEtiquetaDePrecio(inicioMs: Long, finMs: Long) {
+        cerrarEtiquetaDePrecio()
+        ultimoViajeInicioMs = inicioMs
+        ultimoViajeFinMs = finMs
+
+        val campo = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            hint = "$"
+            setTextColor(colorVisible(colorFg, colorSurface))
+            setHintTextColor(Color.argb(140, 255, 255, 255))
+            gravity = Gravity.CENTER
+            textSize = 14f
+            setPadding(dp(10), dp(4), dp(6), dp(4))
+            setSingleLine(true)
+            background = null
+        }
+        val botonGuardar = TextView(this).apply {
+            text = "✓"; textSize = 16f; gravity = Gravity.CENTER
+            setTextColor(colorSeguro(colorAcento, "#D4AF37"))
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+        }
+        val botonCerrar = TextView(this).apply {
+            text = "✕"; textSize = 12f; gravity = Gravity.CENTER
+            setTextColor(colorVisible(colorFg, colorSurface))
+            setPadding(dp(8), dp(4), dp(10), dp(4))
+        }
+
+        fun guardar() {
+            val monto = campo.text?.toString()?.trim()?.toDoubleOrNull()
+            if (monto != null && monto > 0) {
+                aplicarPrecioAlUltimoViajeEncolado(monto)
+                hablar("Viaje guardado")
+            }
+            cerrarEtiquetaDePrecio()
+        }
+        campo.setOnEditorActionListener { _, accion, _ -> if (accion == EditorInfo.IME_ACTION_DONE) { guardar(); true } else false }
+        botonGuardar.setOnClickListener { guardar() }
+        botonCerrar.setOnClickListener { cerrarEtiquetaDePrecio() }
+
+        val fila = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; cornerRadius = dp(16).toFloat(); setColor(colorSeguro(colorSurface, "#14100A")); setStroke(dp(1), colorSeguro(colorAcento, "#D4AF37")) }
+            setPadding(dp(2), dp(2), dp(2), dp(2))
+            addView(campo, LinearLayout.LayoutParams(dp(70), LinearLayout.LayoutParams.WRAP_CONTENT))
+            addView(botonGuardar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            addView(botonCerrar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+
+        // FLAG_ALT_FOCUSABLE_IM (sin FLAG_NOT_FOCUSABLE): a propósito SÍ focusable — es la única
+        // ventana flotante de esta app que necesita teclado. SOFT_INPUT_STATE_ALWAYS_VISIBLE para
+        // que el teclado aparezca solo, sin que el conductor tenga que tocar el campo primero.
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+            tipoVentana(), WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM, PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = dp(12); y = dp(160)
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+        }
+
+        runCatching {
+            windowManager.addView(fila, params)
+            vistaPrecio = fila
+            campo.requestFocus()
+        }
+    }
+
+    private fun cerrarEtiquetaDePrecio() {
+        val vista = vistaPrecio ?: return
+        runCatching { getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(vista.windowToken, 0) }
+        runCatching { windowManager.removeView(vista) }
+        vistaPrecio = null
+    }
+
+    /** Completa el `ingreso` de la entrada que `finalizarViaje()` acaba de encolar — la identifica por inicioMs/finMs, únicos por viaje. */
+    private fun aplicarPrecioAlUltimoViajeEncolado(monto: Double) {
+        val prefs = getSharedPreferences("mia-burbuja", MODE_PRIVATE)
+        val cola = runCatching { JSONArray(prefs.getString("viajes_pendientes", "[]")) }.getOrElse { JSONArray() }
+        for (i in cola.length() - 1 downTo 0) {
+            val entrada = cola.optJSONObject(i) ?: continue
+            if (entrada.optLong("inicioMs") == ultimoViajeInicioMs && entrada.optLong("finMs") == ultimoViajeFinMs) {
+                entrada.put("ingreso", monto)
+                break
+            }
+        }
+        prefs.edit().putString("viajes_pendientes", cola.toString()).apply()
     }
 
     /**
@@ -462,7 +576,6 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
             }
         }
         windowManager.addView(contenedor, params); vistaBurbuja = contenedor
-        animadorOrbita = ValueAnimator.ofFloat(0f, 360f).apply { duration = 9000; repeatCount = ValueAnimator.INFINITE; addUpdateListener { (contenedor.getChildAt(0) as? OrbitaView)?.angulo = it.animatedValue as Float; contenedor.getChildAt(0).invalidate() }; start() }
     }
 
     /**
@@ -530,6 +643,11 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
     private fun dp(v: Float): Int = (v * resources.displayMetrics.density).toInt()
 
+    // 2026-09-24, pedido explícito del usuario ("como la burbuja tiene una animación, eso
+    // consume más batería... si la quitamos ahorramos batería"): antes `angulo` lo movía un
+    // ValueAnimator infinito (9s por vuelta) mientras la burbuja estuviera visible — prácticamente
+    // toda la jornada, redibujando este `onDraw` hasta 60 veces por segundo sin parar. Ahora
+    // `angulo` se queda fijo en 0 — un solo dibujo, sin ningún costo sostenido de batería/GPU.
     private inner class OrbitaView(context: android.content.Context) : View(context) {
         var angulo = 0f
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)

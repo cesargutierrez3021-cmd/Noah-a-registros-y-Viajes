@@ -186,6 +186,75 @@ class GpsTrackingPlugin : Plugin(), GpsTrackingService.GpsLocationListener {
         call.resolve(r)
     }
 
+    /**
+     * 2026-09-24, pedido explícito del usuario ("mi celular tiene un problema y cierra todas las
+     * aplicaciones en segundo plano... verifica en un celular normal si está bien que no se
+     * cierre"). Confirmado: en un Android de fábrica (o cercano), un foreground service con
+     * notificación fija + `stopWithTask="false"` + exento de la optimización de batería estándar
+     * de Android (`solicitarIgnorarOptimizacionBateria` arriba) NO se cierra solo — es el
+     * comportamiento correcto y esperado, el mismo que usan Uber/Waze. El problema real son los
+     * administradores de batería PROPIOS de ciertas marcas (Xiaomi/MIUI, Huawei/EMUI,
+     * Oppo-Realme-OnePlus/ColorOS, Vivo/FuntouchOS, y en menor medida Samsung) — matan procesos en
+     * segundo plano por su cuenta, aparte del sistema estándar de Android, y NO existe una sola
+     * API de Android para pedirles la excepción: cada marca esconde ese permiso ("inicio
+     * automático", "app protegida", "sin restricciones") en su propia pantalla de ajustes.
+     *
+     * Esto intenta abrir esa pantalla específica según `Build.MANUFACTURER` — nombres de
+     * paquete/actividad tomados de los mismos que documenta el proyecto abierto
+     * "Don't kill my app" (dontkillmyapp.com), que rastrea este problema por marca. Como esos
+     * nombres pueden cambiar entre versiones del sistema del fabricante (no hay garantía de que
+     * sigan existiendo en el celular exacto del conductor), cada intento se prueba con
+     * `runCatching` y si falla se sigue con el siguiente — el respaldo final, que SIEMPRE existe,
+     * es la pantalla estándar de "Detalles de la app" de Android.
+     */
+    @PluginMethod
+    fun abrirAjustesDeFabricante(call: PluginCall) {
+        val fabricante = Build.MANUFACTURER.lowercase()
+        val candidatos = mutableListOf<Intent>()
+
+        fun agregar(paquete: String, actividad: String) {
+            candidatos.add(Intent().setComponent(android.content.ComponentName(paquete, actividad)))
+        }
+
+        when {
+            fabricante.contains("xiaomi") -> {
+                agregar("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")
+            }
+            fabricante.contains("huawei") || fabricante.contains("honor") -> {
+                agregar("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity")
+                agregar("com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity")
+            }
+            fabricante.contains("oppo") || fabricante.contains("realme") || fabricante.contains("oneplus") -> {
+                agregar("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")
+                agregar("com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerConsumptionActivity")
+                agregar("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity")
+            }
+            fabricante.contains("vivo") -> {
+                agregar("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity")
+                agregar("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity")
+            }
+            fabricante.contains("samsung") -> {
+                agregar("com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity")
+            }
+        }
+
+        for (intent in candidatos) {
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            if (runCatching { context.startActivity(intent) }.isSuccess) {
+                call.resolve(JSObject().apply { put("abierto", true); put("especifico", true) })
+                return
+            }
+        }
+
+        // Respaldo — no es el ajuste específico de la marca, pero siempre existe.
+        val respaldo = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:" + context.packageName)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val abierto = runCatching { context.startActivity(respaldo) }.isSuccess
+        call.resolve(JSObject().apply { put("abierto", abierto); put("especifico", false) })
+    }
+
     @PluginMethod
     fun getPersistedTrack(call: PluginCall) {
         val r = JSObject()
