@@ -61,6 +61,17 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         private const val CANAL_ID = "mia_burbuja"
         private const val NOTIF_ID = 4201
         private const val UMBRAL_ARRASTRE_PX = 12
+        // 2026-09-24, pedido explícito del usuario (bug real: "me apareció en la burbuja 14
+        // viajes que fueron de ayer, hoy es otro día"). `viajesContados` es un contador nativo
+        // simple, sin ningún concepto de "día" — con la burbuja ahora mucho más persistente
+        // (stopWithTask="false", exenta de optimización de batería, ver rondas anteriores) el
+        // MISMO proceso puede seguir vivo de un día para el otro si el conductor nunca vuelve a
+        // abrir la app (que es la única forma en que hoy llegaba un `EXTRA_TOTAL_VIAJES` fresco
+        // desde el lado JS) — el contador simplemente seguía sumando sobre el número de ayer.
+        // Estas dos claves guardan CON qué día de negocio (Bogotá) corresponde el contador
+        // persistido — ver `diaDeNegocioBogotaHoy()`/`asegurarContadorDelDiaVigente()` abajo.
+        private const val CLAVE_VIAJES_DIA = "viajes_dia"
+        private const val CLAVE_VIAJES_CONTADOS = "viajes_contados"
         // 2026-09-15, pedido explícito del usuario: mantener presionada la burbuja 2s termina
         // la jornada (y la cierra); doble-tap la pausa/reanuda. El tap simple (iniciar/terminar
         // un VIAJE) se retrasa este mismo tiempo de doble-tap para poder distinguir si viene un
@@ -129,6 +140,36 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         }
     }
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /** YYYY-MM-DD del día de negocio en Bogotá — mismo criterio que `fechaNegocioISO()` (lib/fechas.ts), medianoche a medianoche, sin horario de verano (Bogotá no lo usa). */
+    private fun diaDeNegocioBogotaHoy(): String {
+        val formato = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        formato.timeZone = java.util.TimeZone.getTimeZone("America/Bogota")
+        return formato.format(java.util.Date())
+    }
+
+    /**
+     * 2026-09-24, pedido explícito del usuario (bug real: "me apareció en la burbuja 14 viajes
+     * que fueron de ayer, hoy es otro día"). Si el día persistido no coincide con hoy, el
+     * contador arranca en 0 — se llama desde `iniciarViaje()`, antes de sumar el viaje que
+     * está por empezar.
+     */
+    private fun asegurarContadorDelDiaVigente() {
+        val prefs = getSharedPreferences("mia-burbuja", MODE_PRIVATE)
+        val hoy = diaDeNegocioBogotaHoy()
+        if (prefs.getString(CLAVE_VIAJES_DIA, null) != hoy) {
+            viajesContados = 0
+            prefs.edit().putString(CLAVE_VIAJES_DIA, hoy).putInt(CLAVE_VIAJES_CONTADOS, 0).apply()
+        }
+    }
+
+    private fun guardarViajesContados() {
+        getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit()
+            .putString(CLAVE_VIAJES_DIA, diaDeNegocioBogotaHoy())
+            .putInt(CLAVE_VIAJES_CONTADOS, viajesContados)
+            .apply()
+    }
+
     override fun onCreate() {
         super.onCreate()
         activo = true
@@ -138,6 +179,12 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         colorFg = apariencia.getString(EXTRA_COLOR_FG, colorFg) ?: colorFg
         colorSurface = apariencia.getString(EXTRA_COLOR_SURFACE, colorSurface) ?: colorSurface
         estilo = apariencia.getString(EXTRA_ESTILO, estilo) ?: estilo
+        // Si Android mató y revivió el proceso a mitad del día (START_STICKY), recupera el
+        // contador guardado — pero solo si sigue siendo el mismo día de negocio; si cambió de
+        // día mientras el proceso estaba muerto, arranca en 0 igual que asegurarContadorDelDiaVigente().
+        if (apariencia.getString(CLAVE_VIAJES_DIA, null) == diaDeNegocioBogotaHoy()) {
+            viajesContados = apariencia.getInt(CLAVE_VIAJES_CONTADOS, 0)
+        }
         getSharedPreferences("mia-burbuja", MODE_PRIVATE).edit().putBoolean("servicio_activo", true).apply()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         tts = TextToSpeech(this, this)
@@ -167,7 +214,10 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         val tiempo = intent?.getStringExtra(EXTRA_TIEMPO) ?: formatearTiempo(if (enViaje) System.currentTimeMillis() - inicioViajeMs else 0)
         val estadoSolicitado = intent?.getBooleanExtra(EXTRA_EN_VIAJE, enViaje) ?: enViaje
         val viajesExternos = intent?.getIntExtra(EXTRA_TOTAL_VIAJES, -1) ?: -1
-        if (viajesExternos >= 0) viajesContados = viajesExternos
+        // El lado JS (domain/viajes/store.ts) es la fuente de verdad cuando la app está abierta
+        // — si manda un total, se guarda TAL CUAL junto con el día de hoy (D-18: mismo mecanismo
+        // de persistencia que usa asegurarContadorDelDiaVigente()/guardarViajesContados()).
+        if (viajesExternos >= 0) { viajesContados = viajesExternos; guardarViajesContados() }
         if (estadoSolicitado && !enViaje) iniciarViaje(false)
         if (!estadoSolicitado && enViaje) finalizarViaje(false)
         if (vistaBurbuja == null) crearBurbuja()
@@ -196,7 +246,9 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
         // Si quedó una etiqueta de precio abierta de un viaje anterior sin responder, este viaje
         // nuevo la cierra — nunca deben quedar dos flotando a la vez.
         cerrarEtiquetaDePrecio()
+        asegurarContadorDelDiaVigente()
         enViaje = true; pasajeroRecogido = false; recogidaMs = 0L; viajesContados += 1; inicioViajeMs = System.currentTimeMillis(); kmAcumulados = 0.0
+        guardarViajesContados()
         // Viaje nuevo, punto de referencia nuevo — si se dejara el de un viaje anterior,
         // el primer punto de este viaje calcularía distancia contra un lugar viejo.
         ultimoLatNativo = null; ultimoLngNativo = null; ultimoTimestampNativoMs = 0L
@@ -307,22 +359,36 @@ class BurbujaService : Service(), TextToSpeech.OnInitListener {
             addView(botonCerrar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
 
-        // FLAG_ALT_FOCUSABLE_IM (sin FLAG_NOT_FOCUSABLE): a propósito SÍ focusable — es la única
-        // ventana flotante de esta app que necesita teclado. SOFT_INPUT_STATE_ALWAYS_VISIBLE para
-        // que el teclado aparezca solo, sin que el conductor tenga que tocar el campo primero.
+        // 2026-09-24, corrección de un bug real reportado por el usuario ("no abre el teclado"):
+        // `FLAG_ALT_FOCUSABLE_IM` SOLO tiene efecto cuando `FLAG_NOT_FOCUSABLE` también está
+        // puesto (modifica su comportamiento con el teclado) — sin `FLAG_NOT_FOCUSABLE`, como acá
+        // a propósito (es la única ventana flotante de esta app que SÍ necesita foco), ese flag
+        // no hacía nada. Sin flags especiales la ventana ya es focusable de por sí; lo que
+        // faltaba era pedirle el teclado AL SISTEMA de forma explícita — `SOFT_INPUT_STATE_ALWAYS_VISIBLE`
+        // es un criterio pensado para ventanas de Activity normales, no siempre alcanza para una
+        // ventana agregada a mano con `WindowManager.addView()`. Ahora se llama a
+        // `InputMethodManager.showSoftInput()` directo, en un `post{}` para que corra después de
+        // que la vista ya esté anclada de verdad a la ventana (pedir foco/teclado en el mismo
+        // frame en que se agrega la vista puede fallar en silencio).
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
-            tipoVentana(), WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM, PixelFormat.TRANSLUCENT,
+            tipoVentana(), 0, PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = dp(12); y = dp(160)
-            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
 
         runCatching {
             windowManager.addView(fila, params)
             vistaPrecio = fila
+            campo.isFocusable = true
+            campo.isFocusableInTouchMode = true
             campo.requestFocus()
+            campo.post {
+                val imm = getSystemService(InputMethodManager::class.java)
+                imm?.showSoftInput(campo, InputMethodManager.SHOW_FORCED)
+            }
         }
     }
 
